@@ -29,7 +29,7 @@ export function gerarBlocoLimpeza(
   ordem: Ordem,
   produto: Produto
 ): BlocoGantt | null {
-  if (!ordem.fim_calculado) return null
+  if (!ordem.fim_calculado || !ordem.maquina_id) return null
   if (produto.tempo_limpeza_min === 0) return null
 
   const inicio = new Date(ordem.fim_calculado)
@@ -59,7 +59,7 @@ export function ordenarPorInicio(ordens: Ordem[]): Ordem[] {
 
 /** Converte lista de ordens em blocos para o Gantt (produção + limpeza) */
 export function ordemParaBlocos(ordem: Ordem): BlocoGantt[] {
-  if (!ordem.inicio_agendado || !ordem.fim_calculado || !ordem.produto) return []
+  if (!ordem.inicio_agendado || !ordem.fim_calculado || !ordem.produto || !ordem.maquina_id) return []
 
   const blocoProducao: BlocoGantt = {
     id: ordem.id,

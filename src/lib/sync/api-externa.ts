@@ -11,7 +11,7 @@ export type OrdemExterna = {
   status: string
 }
 
-export type OrdemParaUpsert = {
+type OrdemParaUpsert = {
   numero_externo: string
   produto_sku: string
   maquina_externa_codigo: string | null

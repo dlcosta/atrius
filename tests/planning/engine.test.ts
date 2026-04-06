@@ -4,6 +4,7 @@ import {
   detectarConflito,
   gerarBlocoLimpeza,
   ordenarPorInicio,
+  ordemParaBlocos,
 } from '@/lib/planning/engine'
 import type { Ordem, Produto, BlocoGantt } from '@/types'
 
@@ -120,5 +121,34 @@ describe('ordenarPorInicio', () => {
     expect(result[0].id).toBe('o1')
     expect(result[1].id).toBe('o2')
     expect(result[2].id).toBe('o3')
+  })
+})
+
+describe('ordemParaBlocos', () => {
+  it('retorna bloco de produção e limpeza quando produto tem tempo_limpeza_min > 0', () => {
+    const blocos = ordemParaBlocos(ordemBase)
+    expect(blocos).toHaveLength(2)
+    expect(blocos[0].tipo).toBe('producao')
+    expect(blocos[0].id).toBe('o1')
+    expect(blocos[1].tipo).toBe('limpeza')
+    expect(blocos[1].id).toBe('limpeza-o1')
+  })
+
+  it('retorna apenas bloco de produção quando tempo_limpeza_min é 0', () => {
+    const produtoSemLimpeza = { ...produto, tempo_limpeza_min: 0 }
+    const ordemSemLimpeza = { ...ordemBase, produto: produtoSemLimpeza }
+    const blocos = ordemParaBlocos(ordemSemLimpeza)
+    expect(blocos).toHaveLength(1)
+    expect(blocos[0].tipo).toBe('producao')
+  })
+
+  it('retorna array vazio quando maquina_id é null', () => {
+    const ordemSemMaquina = { ...ordemBase, maquina_id: null }
+    expect(ordemParaBlocos(ordemSemMaquina)).toHaveLength(0)
+  })
+
+  it('retorna array vazio quando inicio_agendado é null', () => {
+    const ordemSemHorario = { ...ordemBase, inicio_agendado: null, fim_calculado: null }
+    expect(ordemParaBlocos(ordemSemHorario)).toHaveLength(0)
   })
 })

@@ -13,7 +13,7 @@ export async function POST() {
     // Mapa: "mq1" → uuid, "mq2" → uuid, etc.
     const maquinaMap: Record<string, string> = {}
     maquinas.forEach((m) => {
-      const codigo = m.nome.toLowerCase().replace(' ', '')  // "MAQ 1" → "maq1"
+      const codigo = m.nome.toLowerCase().replace(/\s+/g, '')  // "MAQ 1" → "maq1"
       maquinaMap[codigo] = m.id
     })
 
