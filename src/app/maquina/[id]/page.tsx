@@ -12,17 +12,22 @@ export default function MaquinaPage() {
   const id = params?.id as string
   const [maquina, setMaquina] = useState<Maquina | null>(null)
   const [ordens, setOrdens] = useState<Ordem[]>([])
+  const [carregando, setCarregando] = useState(true)
 
   const carregarOrdens = useCallback(async () => {
     if (!id) return
-    const hoje = format(new Date(), 'yyyy-MM-dd')
-    const res = await fetch(`/api/ordens?data=${hoje}`)
-    if (!res.ok) return
-    const data: Ordem[] = await res.json()
-    const dasMaquina = data.filter(
-      (o) => o.maquina_id === id && o.inicio_agendado !== null
-    )
-    setOrdens(ordenarPorInicio(dasMaquina))
+    try {
+      const hoje = format(new Date(), 'yyyy-MM-dd')
+      const res = await fetch(`/api/ordens?data=${hoje}`)
+      if (!res.ok) return
+      const data: Ordem[] = await res.json()
+      const dasMaquina = data.filter(
+        (o) => o.maquina_id === id && o.inicio_agendado !== null
+      )
+      setOrdens(ordenarPorInicio(dasMaquina))
+    } catch (err) {
+      console.error('Erro ao carregar ordens da máquina:', err)
+    }
   }, [id])
 
   useEffect(() => {
@@ -31,8 +36,12 @@ export default function MaquinaPage() {
       .then((r) => r.json())
       .then((maquinas: Maquina[]) => {
         setMaquina(maquinas.find((m) => m.id === id) ?? null)
+        setCarregando(false)
       })
-      .catch(console.error)
+      .catch((err) => {
+        console.error(err)
+        setCarregando(false)
+      })
 
     carregarOrdens()
   }, [id, carregarOrdens])
@@ -53,10 +62,18 @@ export default function MaquinaPage() {
     return () => { supabase.removeChannel(channel) }
   }, [id, carregarOrdens])
 
-  if (!maquina) {
+  if (carregando) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-900 text-gray-400">
         Carregando...
+      </div>
+    )
+  }
+
+  if (!maquina) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gray-900 text-red-400">
+        Máquina não encontrada.
       </div>
     )
   }

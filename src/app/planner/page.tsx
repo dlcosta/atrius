@@ -39,20 +39,23 @@ export default function PlannerPage() {
 
   async function agendar(ordemId: string, maquinaId: string, inicio: Date) {
     setMensagem('')
-    const res = await fetch('/api/ordens', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        id: ordemId,
-        maquina_id: maquinaId,
-        inicio_agendado: inicio.toISOString(),
-      }),
-    })
-
-    if (res.status === 409) {
-      setMensagem('Conflito de horário — escolha outro horário ou máquina.')
-    } else if (!res.ok) {
-      setMensagem('Erro ao agendar ordem.')
+    try {
+      const res = await fetch('/api/ordens', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: ordemId,
+          maquina_id: maquinaId,
+          inicio_agendado: inicio.toISOString(),
+        }),
+      })
+      if (res.status === 409) {
+        setMensagem('Conflito de horário — escolha outro horário ou máquina.')
+      } else if (!res.ok) {
+        setMensagem('Erro ao agendar ordem.')
+      }
+    } catch {
+      setMensagem('Erro de rede ao agendar ordem.')
     }
     await carregarDados()
   }
@@ -78,13 +81,17 @@ export default function PlannerPage() {
   async function sincronizar() {
     setSincronizando(true)
     setMensagem('')
-    const res = await fetch('/api/sincronizar', { method: 'POST' })
-    const data = await res.json()
-    if (res.ok) {
-      setMensagem(`Sincronizado: ${data.importadas} ordens importadas, ${data.erros} erros.`)
-      await carregarDados()
-    } else {
-      setMensagem('Erro na sincronização com a API externa.')
+    try {
+      const res = await fetch('/api/sincronizar', { method: 'POST' })
+      const data = await res.json()
+      if (res.ok) {
+        setMensagem(`Sincronizado: ${data.importadas} ordens importadas, ${data.erros} erros.`)
+        await carregarDados()
+      } else {
+        setMensagem('Erro na sincronização com a API externa.')
+      }
+    } catch {
+      setMensagem('Erro de rede ao sincronizar.')
     }
     setSincronizando(false)
   }
