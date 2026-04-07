@@ -5,15 +5,23 @@ export type Maquina = {
   criado_em: string
 }
 
+export type TempoMaquina = {
+  setup: number
+  producao: number
+}
+
 export type Produto = {
   id: string
   sku: string
   nome: string
-  tempo_producao_min: number
+  volume_base: number
   tempo_limpeza_min: number
+  tempos_maquinas: Record<string, TempoMaquina>
   cor: string
   criado_em: string
 }
+
+export type EtapaOrdem = 'tanque' | 'envase'
 
 export type StatusOrdem =
   | 'aguardando'
@@ -30,9 +38,15 @@ export type Ordem = {
   maquina_id: string | null
   quantidade: number
   unidade: string
+  tanque: string | null
+  lote: string | null
+  etapa: EtapaOrdem
   data_prevista: string | null
   inicio_agendado: string | null  // ISO string
   fim_calculado: string | null    // ISO string
+  inicio_operacao_em?: string | null
+  fim_operacao_em?: string | null
+  quantidade_referencia_litros?: number | null
   status: StatusOrdem
   sincronizado_em: string
   // join opcionais
@@ -48,15 +62,16 @@ export type EventoTimer = {
   timestamp: string
 }
 
-// Bloco no Gantt (pode ser produção ou limpeza)
+// Bloco no Gantt (setup ou producao)
 export type BlocoGantt = {
-  id: string           // ordem.id ou `limpeza-${ordem.id}`
+  id: string
   ordemId: string
-  tipo: 'producao' | 'limpeza'
+  tipo: 'setup' | 'producao' | 'limpeza'
   maquinaId: string
   produto: string      // nome do produto
   cor: string
   inicio: Date
   fim: Date
   duracao_min: number
+  tanque?: string | null
 }

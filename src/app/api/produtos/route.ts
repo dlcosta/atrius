@@ -1,14 +1,21 @@
-import { NextRequest, NextResponse } from 'next/server'
+﻿import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+
+function mensagemErroProduto(errorMessage: string): string {
+  const lower = errorMessage.toLowerCase()
+
+  if (lower.includes('tempos_maquinas') || lower.includes('volume_base') || lower.includes('schema cache')) {
+    return 'Schema do banco desatualizado para produtos. Rode a migration 002_dashboard_producao.sql no Supabase.'
+  }
+
+  return errorMessage
+}
 
 export async function GET() {
   const supabase = await createClient()
-  const { data, error } = await supabase
-    .from('produtos')
-    .select('*')
-    .order('nome')
+  const { data, error } = await supabase.from('produtos').select('*').order('nome')
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return NextResponse.json({ error: mensagemErroProduto(error.message) }, { status: 500 })
   return NextResponse.json(data)
 }
 
@@ -21,35 +28,36 @@ export async function POST(req: NextRequest) {
     .insert({
       sku: body.sku,
       nome: body.nome,
-      tempo_producao_min: Number(body.tempo_producao_min),
-      tempo_limpeza_min: Number(body.tempo_limpeza_min ?? 0),
+      volume_base: Number(body.volume_base ?? 3800),
+      tempos_maquinas: body.tempos_maquinas ?? {},
+      tempo_limpeza_min: 0,
       cor: body.cor ?? '#5B9BD5',
     })
-    .select()
+    .select('*')
     .single()
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+  if (error) return NextResponse.json({ error: mensagemErroProduto(error.message) }, { status: 400 })
   return NextResponse.json(data, { status: 201 })
 }
 
 export async function PATCH(req: NextRequest) {
   const supabase = await createClient()
-  const { id, nome, tempo_producao_min, tempo_limpeza_min, cor } = await req.json()
+  const { id, nome, volume_base, tempos_maquinas, cor } = await req.json()
 
-  const updates: Record<string, unknown> = {}
+  const updates: Record<string, unknown> = { tempo_limpeza_min: 0 }
   if (nome !== undefined) updates.nome = nome
-  if (tempo_producao_min !== undefined) updates.tempo_producao_min = Number(tempo_producao_min)
-  if (tempo_limpeza_min !== undefined) updates.tempo_limpeza_min = Number(tempo_limpeza_min)
+  if (volume_base !== undefined) updates.volume_base = Number(volume_base)
+  if (tempos_maquinas !== undefined) updates.tempos_maquinas = tempos_maquinas
   if (cor !== undefined) updates.cor = cor
 
   const { data, error } = await supabase
     .from('produtos')
     .update(updates)
     .eq('id', id)
-    .select()
+    .select('*')
     .single()
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+  if (error) return NextResponse.json({ error: mensagemErroProduto(error.message) }, { status: 400 })
   return NextResponse.json(data)
 }
 
@@ -58,6 +66,6 @@ export async function DELETE(req: NextRequest) {
   const { id } = await req.json()
 
   const { error } = await supabase.from('produtos').delete().eq('id', id)
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+  if (error) return NextResponse.json({ error: mensagemErroProduto(error.message) }, { status: 400 })
   return NextResponse.json({ ok: true })
 }

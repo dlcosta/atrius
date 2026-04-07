@@ -1,52 +1,80 @@
-import type { Ordem } from '@/types'
+﻿import type { Ordem } from '@/types'
 
 type Props = {
   ordens: Ordem[]
+  onNovaOrdem: () => void
 }
 
-export function OrdemSidebar({ ordens }: Props) {
+function badgeEtapa(etapa: Ordem['etapa']) {
+  if (etapa === 'tanque') {
+    return 'bg-cyan-100 text-cyan-700'
+  }
+  return 'bg-violet-100 text-violet-700'
+}
+
+export function OrdemSidebar({ ordens, onNovaOrdem }: Props) {
   function handleDragStart(e: React.DragEvent, ordemId: string) {
     e.dataTransfer.setData('ordemId', ordemId)
     e.dataTransfer.effectAllowed = 'move'
   }
 
   return (
-    <div className="w-64 flex-shrink-0 border border-gray-200 rounded overflow-hidden">
-      <div className="bg-gray-50 border-b border-gray-200 px-3 py-2">
-        <h3 className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
-          Não agendadas ({ordens.length})
-        </h3>
+    <aside className="w-80 flex-shrink-0 rounded-2xl border border-slate-200 bg-white overflow-hidden">
+      <div className="bg-slate-50 border-b border-slate-200 px-4 py-3 flex items-center justify-between">
+        <div>
+          <h3 className="text-xs font-semibold text-slate-700 uppercase tracking-wide">Nao agendadas</h3>
+          <p className="text-[11px] text-slate-500 mt-0.5">{ordens.length} ordens no backlog</p>
+        </div>
+        <button
+          onClick={onNovaOrdem}
+          title="Nova ordem manual"
+          className="w-7 h-7 rounded-full bg-blue-600 text-white hover:bg-blue-700 text-base leading-none"
+        >
+          +
+        </button>
       </div>
-      <div className="overflow-y-auto max-h-[calc(100vh-200px)]">
+
+      <div className="overflow-y-auto max-h-[calc(100vh-220px)]">
         {ordens.length === 0 ? (
-          <p className="text-xs text-gray-400 text-center py-8">Todas as ordens agendadas</p>
+          <p className="text-xs text-slate-400 text-center py-10">Todas as ordens estao agendadas</p>
         ) : (
           ordens.map((ordem) => (
             <div
               key={ordem.id}
               draggable
               onDragStart={(e) => handleDragStart(e, ordem.id)}
-              className="border-b border-gray-100 px-3 py-2.5 cursor-grab active:cursor-grabbing hover:bg-blue-50 select-none"
+              className="border-b border-slate-100 px-4 py-3 cursor-grab active:cursor-grabbing hover:bg-slate-50 select-none"
             >
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 mb-1.5">
                 <div
-                  className="w-3 h-3 rounded-full flex-shrink-0"
+                  className="w-2.5 h-2.5 rounded-full flex-shrink-0"
                   style={{ backgroundColor: ordem.produto?.cor ?? '#5B9BD5' }}
                 />
-                <span className="text-xs font-medium text-gray-800 truncate">
+                <span className="text-sm font-medium text-slate-800 truncate">
                   {ordem.produto?.nome ?? ordem.produto_sku}
                 </span>
+                <span className={`ml-auto px-2 py-0.5 rounded-full text-[10px] font-semibold ${badgeEtapa(ordem.etapa)}`}>
+                  {ordem.etapa}
+                </span>
               </div>
-              <div className="text-[10px] text-gray-500 mt-0.5 pl-5">
-                #{ordem.numero_externo} · {ordem.quantidade} {ordem.unidade}
-                {ordem.produto && (
-                  <> · {ordem.produto.tempo_producao_min}min</>
-                )}
+
+              <div className="text-xs text-slate-500">
+                #{ordem.numero_externo} - {ordem.quantidade} {ordem.unidade}
+              </div>
+
+              <div className="mt-1 flex items-center gap-2 text-[11px] text-slate-500">
+                {ordem.tanque && <span className="px-1.5 py-0.5 rounded bg-slate-100">{ordem.tanque}</span>}
+                {ordem.lote && <span className="px-1.5 py-0.5 rounded bg-slate-100">{ordem.lote}</span>}
+                {ordem.quantidade_referencia_litros ? (
+                  <span className="ml-auto font-medium text-slate-600">
+                    {ordem.quantidade_referencia_litros.toFixed(0)} L ref
+                  </span>
+                ) : null}
               </div>
             </div>
           ))
         )}
       </div>
-    </div>
+    </aside>
   )
 }
