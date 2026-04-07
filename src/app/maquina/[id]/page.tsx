@@ -17,6 +17,7 @@ export default function MaquinaPage() {
     if (!id) return
     const hoje = format(new Date(), 'yyyy-MM-dd')
     const res = await fetch(`/api/ordens?data=${hoje}`)
+    if (!res.ok) return
     const data: Ordem[] = await res.json()
     const dasMaquina = data.filter(
       (o) => o.maquina_id === id && o.inicio_agendado !== null
@@ -26,12 +27,12 @@ export default function MaquinaPage() {
 
   useEffect(() => {
     if (!id) return
-    // Load machine name
     fetch('/api/maquinas')
       .then((r) => r.json())
       .then((maquinas: Maquina[]) => {
         setMaquina(maquinas.find((m) => m.id === id) ?? null)
       })
+      .catch(console.error)
 
     carregarOrdens()
   }, [id, carregarOrdens])
