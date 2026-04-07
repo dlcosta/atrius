@@ -15,13 +15,18 @@ export default function PlannerPage() {
   const [mensagem, setMensagem] = useState('')
 
   const carregarDados = useCallback(async () => {
-    const dataStr = format(dia, 'yyyy-MM-dd')
-    const [m, o] = await Promise.all([
-      fetch('/api/maquinas').then((r) => r.json()),
-      fetch(`/api/ordens?data=${dataStr}`).then((r) => r.json()),
-    ])
-    setMaquinas(Array.isArray(m) ? m : [])
-    setOrdens(Array.isArray(o) ? o : [])
+    try {
+      const dataStr = format(dia, 'yyyy-MM-dd')
+      const [m, o] = await Promise.all([
+        fetch('/api/maquinas').then((r) => r.json()),
+        fetch(`/api/ordens?data=${dataStr}`).then((r) => r.json()),
+      ])
+      setMaquinas(Array.isArray(m) ? m : [])
+      setOrdens(Array.isArray(o) ? o : [])
+    } catch (err) {
+      console.error('Erro ao carregar dados:', err)
+      setMensagem('Erro ao carregar dados. Verifique a conexão.')
+    }
   }, [dia])
 
   useEffect(() => { carregarDados() }, [carregarDados])
@@ -53,15 +58,20 @@ export default function PlannerPage() {
   }
 
   async function desagendar(ordemId: string) {
-    await fetch('/api/ordens', {
+    const res = await fetch('/api/ordens', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         id: ordemId,
         maquina_id: null,
         inicio_agendado: null,
+        fim_calculado: null,
       }),
     })
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      setMensagem(data.error ?? 'Erro ao remover agendamento.')
+    }
     await carregarDados()
   }
 

@@ -1,4 +1,4 @@
-import { GANTT_START_HOUR, GANTT_END_HOUR, PIXELS_PER_MINUTE } from '@/lib/planning/gantt-layout'
+import { GANTT_START_HOUR, GANTT_END_HOUR, PIXELS_PER_MINUTE, GANTT_WIDTH } from '@/lib/planning/gantt-layout'
 
 export function GanttTimeline() {
   const horas = Array.from(
@@ -10,7 +10,7 @@ export function GanttTimeline() {
     <div className="flex border-b border-gray-200 bg-gray-50 sticky top-0 z-10">
       {/* Label column for machine names */}
       <div className="w-24 flex-shrink-0 border-r border-gray-200" />
-      <div className="relative overflow-hidden" style={{ width: 1320 }}>
+      <div className="relative overflow-hidden" style={{ width: GANTT_WIDTH }}>
         {horas.map((h) => (
           <div
             key={h}

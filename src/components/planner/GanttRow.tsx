@@ -2,7 +2,7 @@
 import { useRef } from 'react'
 import type { BlocoGantt, Maquina } from '@/types'
 import { GanttBlock } from './GanttBlock'
-import { pixelParaHora, GANTT_WIDTH, ROW_HEIGHT } from '@/lib/planning/gantt-layout'
+import { pixelParaHora, GANTT_WIDTH, ROW_HEIGHT, PIXELS_PER_MINUTE } from '@/lib/planning/gantt-layout'
 
 type Props = {
   maquina: Maquina
@@ -56,7 +56,7 @@ export function GanttRow({ maquina, blocos, dia, conflitos, onSoltar, onRemover 
           <div
             key={i}
             className="absolute top-0 bottom-0 border-l border-gray-100"
-            style={{ left: i * 120 * 2 }}
+            style={{ left: i * 60 * PIXELS_PER_MINUTE }}
           />
         ))}
 
