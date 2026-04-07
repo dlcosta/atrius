@@ -30,7 +30,7 @@ function statusClass(status: Ordem['status']): string {
 
 function formatarDataHora(dataIso: string | null | undefined): string {
   if (!dataIso) return '--'
-  return format(new Date(dataIso), "dd/MM HH:mm", { locale: ptBR })
+  return format(new Date(dataIso), 'dd/MM HH:mm', { locale: ptBR })
 }
 
 function ordenarPorInicio(ordens: Ordem[]): Ordem[] {
@@ -66,12 +66,12 @@ export function OperacaoDashboard({ maquinas, ordens, executandoOrdemId, onAcao 
         <div className="mb-4 flex items-center justify-between">
           <div>
             <h2 className="text-xl font-black text-slate-900 uppercase tracking-tighter">Acompanhamento Operacional</h2>
-            <p className="text-sm font-bold text-slate-500">Controle manual em tempo real por máquina.</p>
+            <p className="text-sm font-bold text-slate-500">Controle manual em tempo real por maquina.</p>
           </div>
           <div className="flex gap-2">
             <div className="flex items-center gap-2 px-4 py-2 bg-emerald-50 rounded-lg border border-emerald-200">
               <div className="w-3 h-3 bg-emerald-500 rounded-full animate-pulse" />
-              <span className="text-xs font-black text-emerald-700 uppercase">Em Produção</span>
+              <span className="text-xs font-black text-emerald-700 uppercase">Em Producao</span>
             </div>
           </div>
         </div>
@@ -88,7 +88,7 @@ export function OperacaoDashboard({ maquinas, ordens, executandoOrdemId, onAcao 
                 <div className={`px-5 py-4 border-b-2 flex items-center justify-between ${getMaquinaColorClass(maquina.nome)}`}>
                   <span className="text-2xl font-black text-slate-900 uppercase tracking-tighter">{maquina.nome}</span>
                   <span className={`text-xs font-black px-3 py-1 rounded-full border shadow-sm ${getMaquinaBadgeClass(maquina.nome)}`}>
-                    {ordensDaMaquina.length} OP'S AGENDADAS
+                    {ordensDaMaquina.length} OPS AGENDADAS
                   </span>
                 </div>
 
@@ -119,7 +119,7 @@ export function OperacaoDashboard({ maquinas, ordens, executandoOrdemId, onAcao 
                             <span>Inicio real: {formatarDataHora(ordem.inicio_operacao_em)}</span>
                             <span>Fim real: {formatarDataHora(ordem.fim_operacao_em)}</span>
                             <span>
-                              #{ordem.numero_externo} · {ordem.quantidade} {ordem.unidade}
+                              #{ordem.numero_externo} - {ordem.quantidade} {ordem.unidade}
                             </span>
                           </div>
 

@@ -1,16 +1,20 @@
-'use client'
+﻿'use client'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { addDays, format, subDays } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import type { Maquina, Ordem } from '@/types'
 import {
   calcularIndicadores,
+  calcularMediaTempoPorProduto,
+  calcularTempoRestanteMs,
+  formatarDuracaoRelogio,
   formatarMinutos,
   obterQuantidadeProduzidaEstimada,
   obterTempoProducaoMin,
 } from '@/lib/monitoring/indicadores'
 
 const REFRESH_MS = 15000
+const DIAS_MEDIA_OPTIONS = [3, 7, 15, 30]
 
 function formatarNumero(valor: number): string {
   return new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 1 }).format(valor)
@@ -37,26 +41,33 @@ function pertenceAoDia(ordem: Ordem, dia: Date): boolean {
 
 export default function MonitoramentoPage() {
   const [dia, setDia] = useState<Date>(() => new Date())
+  const [agoraMs, setAgoraMs] = useState<number>(Date.now())
+  const [diasMedia, setDiasMedia] = useState<number>(7)
   const [maquinas, setMaquinas] = useState<Maquina[]>([])
-  const [ordens, setOrdens] = useState<Ordem[]>([])
+  const [ordensDiaRaw, setOrdensDiaRaw] = useState<Ordem[]>([])
+  const [ordensHistorico, setOrdensHistorico] = useState<Ordem[]>([])
   const [erro, setErro] = useState('')
 
   const carregarDados = useCallback(async () => {
     try {
       setErro('')
       const dataStr = format(dia, 'yyyy-MM-dd')
-      const [m, o] = await Promise.all([
+      const [m, oDia, oHist] = await Promise.all([
         fetch('/api/maquinas').then((r) => r.json()),
         fetch(`/api/ordens?data=${dataStr}`).then((r) => r.json()),
+        fetch(`/api/ordens?data=${dataStr}&dias=${diasMedia}`).then((r) => r.json()),
       ])
 
       setMaquinas(Array.isArray(m) ? m : [])
-      setOrdens(Array.isArray(o) ? o : [])
-      if (o?.error) setErro(o.error)
+      setOrdensDiaRaw(Array.isArray(oDia) ? oDia : [])
+      setOrdensHistorico(Array.isArray(oHist) ? oHist : [])
+
+      if (oDia?.error) setErro(oDia.error)
+      if (oHist?.error) setErro(oHist.error)
     } catch {
       setErro('Erro ao carregar monitoramento.')
     }
-  }, [dia])
+  }, [dia, diasMedia])
 
   useEffect(() => {
     carregarDados()
@@ -67,16 +78,26 @@ export default function MonitoramentoPage() {
     return () => clearInterval(timer)
   }, [carregarDados])
 
+  useEffect(() => {
+    const clock = setInterval(() => setAgoraMs(Date.now()), 1000)
+    return () => clearInterval(clock)
+  }, [])
+
   const ordensDia = useMemo(
-    () => ordens.filter((o) => o.status !== 'cancelada').filter((o) => pertenceAoDia(o, dia)),
-    [ordens, dia]
+    () => ordensDiaRaw.filter((o) => o.status !== 'cancelada').filter((o) => pertenceAoDia(o, dia)),
+    [ordensDiaRaw, dia]
   )
 
   const maquinasAtivas = useMemo(() => maquinas.filter((m) => m.ativa), [maquinas])
+
   const indicadores = useMemo(
-    () => calcularIndicadores(ordensDia, maquinasAtivas.length),
-    [ordensDia, maquinasAtivas.length]
+    () => calcularIndicadores(ordensDia, maquinasAtivas.length, agoraMs),
+    [ordensDia, maquinasAtivas.length, agoraMs]
   )
+
+  const mediasProduto = useMemo(() => {
+    return calcularMediaTempoPorProduto(ordensHistorico)
+  }, [ordensHistorico])
 
   const ordensOrdenadas = useMemo(() => {
     return [...ordensDia].sort((a, b) => {
@@ -113,6 +134,21 @@ export default function MonitoramentoPage() {
           <button onClick={() => setDia(new Date())} className="px-3 py-2 rounded-lg border border-slate-300 text-sm text-slate-700 hover:bg-slate-50">
             Hoje
           </button>
+
+          <div className="ml-auto flex items-center gap-2">
+            <label className="text-xs font-medium text-slate-600">Media produto:</label>
+            <select
+              value={diasMedia}
+              onChange={(e) => setDiasMedia(Number(e.target.value))}
+              className="h-9 px-3 rounded-lg border border-slate-300 bg-white text-sm text-slate-700"
+            >
+              {DIAS_MEDIA_OPTIONS.map((dias) => (
+                <option key={dias} value={dias}>
+                  ultimos {dias} dias
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
 
@@ -121,30 +157,34 @@ export default function MonitoramentoPage() {
       )}
 
       <main className="max-w-7xl mx-auto px-6 py-6 space-y-6">
-        <section className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
-          <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm hover:shadow-md transition-all">
+        <section className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-7 gap-4">
+          <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
             <div className="text-xs font-medium text-slate-500 uppercase tracking-wider">Ordens do dia</div>
             <div className="text-2xl font-bold text-slate-900 mt-1">{indicadores.totalOrdens}</div>
           </div>
-          <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm hover:shadow-md transition-all">
-            <div className="text-xs font-medium text-slate-500 uppercase tracking-wider">Em produção</div>
+          <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="text-xs font-medium text-slate-500 uppercase tracking-wider">Em producao</div>
             <div className="text-2xl font-bold text-emerald-600 mt-1">{indicadores.ordensEmProducao}</div>
           </div>
-          <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm hover:shadow-md transition-all">
-            <div className="text-xs font-medium text-slate-500 uppercase tracking-wider">Concluídas</div>
+          <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="text-xs font-medium text-slate-500 uppercase tracking-wider">Concluidas</div>
             <div className="text-2xl font-bold text-slate-900 mt-1">{indicadores.ordensConcluidas}</div>
           </div>
-          <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm hover:shadow-md transition-all">
+          <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
             <div className="text-xs font-medium text-slate-500 uppercase tracking-wider">Qtd (est.)</div>
             <div className="text-2xl font-bold text-slate-900 mt-1">{formatarNumero(indicadores.quantidadeProduzidaEstimada)}</div>
           </div>
-          <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm hover:shadow-md transition-all">
+          <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
             <div className="text-xs font-medium text-slate-500 uppercase tracking-wider">% produzido</div>
             <div className="text-2xl font-bold text-slate-900 mt-1">{formatarNumero(indicadores.percentualProduzido)}%</div>
           </div>
-          <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm hover:shadow-md transition-all">
-            <div className="text-xs font-medium text-slate-500 uppercase tracking-wider">Tempo acul.</div>
+          <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="text-xs font-medium text-slate-500 uppercase tracking-wider">Tempo acumulado</div>
             <div className="text-2xl font-bold text-slate-900 mt-1">{formatarMinutos(indicadores.tempoProducaoAcumuladoMin)}</div>
+          </div>
+          <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="text-xs font-medium text-slate-500 uppercase tracking-wider">Ciclo medio</div>
+            <div className="text-2xl font-bold text-slate-900 mt-1">{formatarMinutos(indicadores.tempoMedioCicloMin)}</div>
           </div>
         </section>
 
@@ -153,12 +193,15 @@ export default function MonitoramentoPage() {
             const ordensMaquina = ordensDia.filter((o) => o.maquina_id === maquina.id)
             const emProducao = ordensMaquina.find((o) => o.status === 'produzindo')
             const qtdPlanejada = ordensMaquina.reduce((acc, o) => acc + Number(o.quantidade || 0), 0)
-            const qtdProduzida = ordensMaquina.reduce((acc, o) => acc + obterQuantidadeProduzidaEstimada(o), 0)
-            const tempoTotalMin = ordensMaquina.reduce((acc, o) => acc + obterTempoProducaoMin(o), 0)
+            const qtdProduzida = ordensMaquina.reduce((acc, o) => acc + obterQuantidadeProduzidaEstimada(o, agoraMs), 0)
+            const tempoTotalMin = ordensMaquina.reduce((acc, o) => acc + obterTempoProducaoMin(o, agoraMs), 0)
             const progresso = qtdPlanejada > 0 ? (qtdProduzida / qtdPlanejada) * 100 : 0
 
+            const restanteMs = emProducao ? calcularTempoRestanteMs(emProducao, agoraMs) : null
+            const decorridoMin = emProducao ? obterTempoProducaoMin(emProducao, agoraMs) : 0
+
             return (
-              <div key={maquina.id} className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm hover:shadow-md transition-shadow">
+              <div key={maquina.id} className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
                 <div className="flex items-center justify-between">
                   <h2 className="text-sm font-semibold text-slate-900">{maquina.nome}</h2>
                   <span
@@ -182,13 +225,68 @@ export default function MonitoramentoPage() {
                 </div>
 
                 {emProducao && (
-                  <div className="mt-2 text-[11px] text-slate-600">
-                    Ordem #{emProducao.numero_externo} em producao · previsao termino {formatarDataHora(emProducao.fim_calculado)}
+                  <div className="mt-3 rounded-md border border-emerald-200 bg-emerald-50 p-3">
+                    <div className="text-[11px] font-semibold text-emerald-700">
+                      Ordem #{emProducao.numero_externo} em producao
+                    </div>
+                    <div className="mt-1 grid grid-cols-2 gap-2 text-[11px] text-slate-700">
+                      <div>
+                        <div className="text-slate-500">Tempo decorrido</div>
+                        <div className="font-semibold">{formatarMinutos(decorridoMin)}</div>
+                      </div>
+                      <div>
+                        <div className="text-slate-500">Tempo restante</div>
+                        <div className="font-semibold">{restanteMs === null ? '--' : formatarDuracaoRelogio(restanteMs)}</div>
+                      </div>
+                    </div>
+                    <div className="mt-1 text-[11px] text-slate-600">
+                      Previsao de termino: <span className="font-semibold">{formatarDataHora(emProducao.fim_calculado)}</span>
+                    </div>
                   </div>
                 )}
               </div>
             )
           })}
+        </section>
+
+        <section className="rounded-lg border border-slate-200 bg-white overflow-hidden shadow-sm">
+          <div className="px-5 py-4 border-b border-slate-200 bg-slate-50/50 flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-slate-900">Media de tempo de producao por produto</h2>
+            <span className="text-xs text-slate-500">ultimos {diasMedia} dias</span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-slate-50 text-slate-600 text-xs uppercase tracking-wide">
+                <tr>
+                  <th className="px-3 py-2 text-left">Produto</th>
+                  <th className="px-3 py-2 text-left">SKU</th>
+                  <th className="px-3 py-2 text-right">Ordens concluidas</th>
+                  <th className="px-3 py-2 text-right">Tempo medio</th>
+                  <th className="px-3 py-2 text-right">Melhor tempo</th>
+                  <th className="px-3 py-2 text-right">Pior tempo</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {mediasProduto.map((media) => (
+                  <tr key={media.produtoSku}>
+                    <td className="px-3 py-2 text-slate-800 font-medium">{media.produtoNome}</td>
+                    <td className="px-3 py-2 text-slate-600">{media.produtoSku}</td>
+                    <td className="px-3 py-2 text-right text-slate-700">{media.ordensConcluidas}</td>
+                    <td className="px-3 py-2 text-right text-slate-900 font-semibold">{formatarMinutos(media.tempoMedioMin)}</td>
+                    <td className="px-3 py-2 text-right text-emerald-700">{formatarMinutos(media.tempoMinMin)}</td>
+                    <td className="px-3 py-2 text-right text-red-700">{formatarMinutos(media.tempoMaxMin)}</td>
+                  </tr>
+                ))}
+                {mediasProduto.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="px-3 py-8 text-center text-slate-400">
+                      Sem dados de producao concluida para os ultimos {diasMedia} dias.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </section>
 
         <section className="rounded-lg border border-slate-200 bg-white overflow-hidden shadow-sm">
@@ -220,8 +318,8 @@ export default function MonitoramentoPage() {
                     <td className="px-3 py-2 text-slate-600">{formatarDataHora(ordem.inicio_operacao_em)}</td>
                     <td className="px-3 py-2 text-slate-600">{formatarDataHora(ordem.fim_calculado)}</td>
                     <td className="px-3 py-2 text-slate-600">{formatarDataHora(ordem.fim_operacao_em)}</td>
-                    <td className="px-3 py-2 text-right text-slate-800">{formatarNumero(obterQuantidadeProduzidaEstimada(ordem))}</td>
-                    <td className="px-3 py-2 text-right text-slate-800">{formatarMinutos(obterTempoProducaoMin(ordem))}</td>
+                    <td className="px-3 py-2 text-right text-slate-800">{formatarNumero(obterQuantidadeProduzidaEstimada(ordem, agoraMs))}</td>
+                    <td className="px-3 py-2 text-right text-slate-800">{formatarMinutos(obterTempoProducaoMin(ordem, agoraMs))}</td>
                   </tr>
                 ))}
                 {ordensOrdenadas.length === 0 && (
