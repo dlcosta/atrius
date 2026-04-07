@@ -34,12 +34,17 @@ export async function POST(req: NextRequest) {
 
 export async function PATCH(req: NextRequest) {
   const supabase = await createClient()
-  const body = await req.json()
-  const { id, ...fields } = body
+  const { id, nome, tempo_producao_min, tempo_limpeza_min, cor } = await req.json()
+
+  const updates: Record<string, unknown> = {}
+  if (nome !== undefined) updates.nome = nome
+  if (tempo_producao_min !== undefined) updates.tempo_producao_min = Number(tempo_producao_min)
+  if (tempo_limpeza_min !== undefined) updates.tempo_limpeza_min = Number(tempo_limpeza_min)
+  if (cor !== undefined) updates.cor = cor
 
   const { data, error } = await supabase
     .from('produtos')
-    .update(fields)
+    .update(updates)
     .eq('id', id)
     .select()
     .single()

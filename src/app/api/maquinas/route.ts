@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
+// Returns ALL machines (active and inactive) so the admin can see and re-activate them.
+// Note: the GanttChart component should filter to only machines where ativa === true.
 export async function GET() {
   const supabase = await createClient()
   const { data, error } = await supabase
     .from('maquinas')
     .select('*')
-    .eq('ativa', true)
     .order('nome')
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
@@ -29,11 +30,15 @@ export async function POST(req: NextRequest) {
 
 export async function PATCH(req: NextRequest) {
   const supabase = await createClient()
-  const { id, ...fields } = await req.json()
+  const { id, nome, ativa } = await req.json()
+
+  const updates: Record<string, unknown> = {}
+  if (nome !== undefined) updates.nome = nome
+  if (ativa !== undefined) updates.ativa = ativa
 
   const { data, error } = await supabase
     .from('maquinas')
-    .update(fields)
+    .update(updates)
     .eq('id', id)
     .select()
     .single()

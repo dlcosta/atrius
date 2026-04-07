@@ -24,11 +24,16 @@ export function MaquinaList({ maquinas, onAtualizado }: Props) {
   }
 
   async function toggleAtiva(m: Maquina) {
-    await fetch('/api/maquinas', {
+    const res = await fetch('/api/maquinas', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id: m.id, ativa: !m.ativa }),
     })
+    if (!res.ok) {
+      const data = await res.json()
+      alert(data.error ?? 'Erro ao atualizar máquina')
+      return
+    }
     onAtualizado()
   }
 

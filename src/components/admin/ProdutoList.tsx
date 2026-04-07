@@ -14,11 +14,16 @@ export function ProdutoList({ produtos, onAtualizado }: Props) {
 
   async function deletar(id: string, nome: string) {
     if (!confirm(`Excluir "${nome}"?`)) return
-    await fetch('/api/produtos', {
+    const res = await fetch('/api/produtos', {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id }),
     })
+    if (!res.ok) {
+      const data = await res.json()
+      alert(data.error ?? 'Erro ao excluir produto')
+      return
+    }
     onAtualizado()
   }
 

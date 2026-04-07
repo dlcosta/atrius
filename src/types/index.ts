@@ -21,6 +21,7 @@ export type StatusOrdem =
   | 'limpeza'
   | 'concluida'
   | 'atrasada'
+  | 'cancelada'
 
 export type Ordem = {
   id: string

@@ -14,6 +14,10 @@ export async function GET(req: NextRequest) {
     .not('status', 'in', '(concluida,cancelada)')
     .order('inicio_agendado', { ascending: true, nullsFirst: false })
 
+  if (data && !/^\d{4}-\d{2}-\d{2}$/.test(data)) {
+    return NextResponse.json({ error: 'data inválida' }, { status: 400 })
+  }
+
   if (data) {
     query = query.or(`data_prevista.eq.${data},inicio_agendado.is.null`)
   }
@@ -27,6 +31,8 @@ export async function PATCH(req: NextRequest) {
   const supabase = await createClient()
   const body = await req.json()
   const { id, inicio_agendado, maquina_id } = body
+
+  if (!id) return NextResponse.json({ error: 'id obrigatório' }, { status: 400 })
 
   // If unsetting the schedule (desagendar)
   if (!inicio_agendado) {
@@ -50,6 +56,8 @@ export async function PATCH(req: NextRequest) {
   if (!ordemData) return NextResponse.json({ error: 'Ordem não encontrada' }, { status: 404 })
 
   const produto = Array.isArray(ordemData.produto) ? ordemData.produto[0] : ordemData.produto
+  if (!produto) return NextResponse.json({ error: 'Ordem sem produto vinculado' }, { status: 422 })
+
   const inicio = new Date(inicio_agendado)
   const fim = calcularFim(inicio, produto.tempo_producao_min)
 
