@@ -44,17 +44,39 @@ function ordenarPorInicio(ordens: Ordem[]): Ordem[] {
 export function OperacaoDashboard({ maquinas, ordens, executandoOrdemId, onAcao }: Props) {
   const maquinasAtivas = maquinas.filter((m) => m.ativa)
 
+  const getMaquinaColorClass = (nome: string) => {
+    const n = nome.toUpperCase()
+    if (n.includes('MAQ 1')) return 'border-blue-500 bg-blue-50'
+    if (n.includes('MAQ 2')) return 'border-yellow-400 bg-yellow-50'
+    if (n.includes('MAQ 3')) return 'border-emerald-500 bg-emerald-50'
+    return 'border-slate-200 bg-slate-50'
+  }
+
+  const getMaquinaBadgeClass = (nome: string) => {
+    const n = nome.toUpperCase()
+    if (n.includes('MAQ 1')) return 'bg-blue-600 text-white'
+    if (n.includes('MAQ 2')) return 'bg-yellow-400 text-yellow-900'
+    if (n.includes('MAQ 3')) return 'bg-emerald-600 text-white'
+    return 'bg-white text-slate-500 border-slate-200'
+  }
+
   return (
-    <section className="px-4 pb-2">
-      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-        <div className="mb-3">
-          <h2 className="text-sm font-semibold text-slate-900">Acompanhamento operacional</h2>
-          <p className="text-xs text-slate-500">
-            Controle manual de inicio e fim por programacao de cada maquina.
-          </p>
+    <section className="px-4 pb-4">
+      <div className="rounded-xl border-2 border-slate-300 bg-white p-6 shadow-md transition-all">
+        <div className="mb-4 flex items-center justify-between">
+          <div>
+            <h2 className="text-xl font-black text-slate-900 uppercase tracking-tighter">Acompanhamento Operacional</h2>
+            <p className="text-sm font-bold text-slate-500">Controle manual em tempo real por máquina.</p>
+          </div>
+          <div className="flex gap-2">
+            <div className="flex items-center gap-2 px-4 py-2 bg-emerald-50 rounded-lg border border-emerald-200">
+              <div className="w-3 h-3 bg-emerald-500 rounded-full animate-pulse" />
+              <span className="text-xs font-black text-emerald-700 uppercase">Em Produção</span>
+            </div>
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
           {maquinasAtivas.map((maquina) => {
             const ordensDaMaquina = ordenarPorInicio(
               ordens.filter((ordem) => ordem.maquina_id === maquina.id && ordem.inicio_agendado)
@@ -62,10 +84,12 @@ export function OperacaoDashboard({ maquinas, ordens, executandoOrdemId, onAcao 
             const ordemProduzindo = ordensDaMaquina.find((ordem) => ordem.status === 'produzindo')
 
             return (
-              <div key={maquina.id} className="rounded-xl border border-slate-200 overflow-hidden">
-                <div className="px-3 py-2 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
-                  <span className="text-xs font-semibold text-slate-700">{maquina.nome}</span>
-                  <span className="text-[11px] text-slate-500">{ordensDaMaquina.length} programacoes</span>
+              <div key={maquina.id} className={`rounded-xl border-2 overflow-hidden bg-white shadow-sm transition-all hover:shadow-lg ${getMaquinaColorClass(maquina.nome).split(' ')[0]}`}>
+                <div className={`px-5 py-4 border-b-2 flex items-center justify-between ${getMaquinaColorClass(maquina.nome)}`}>
+                  <span className="text-2xl font-black text-slate-900 uppercase tracking-tighter">{maquina.nome}</span>
+                  <span className={`text-xs font-black px-3 py-1 rounded-full border shadow-sm ${getMaquinaBadgeClass(maquina.nome)}`}>
+                    {ordensDaMaquina.length} OP'S AGENDADAS
+                  </span>
                 </div>
 
                 {ordensDaMaquina.length === 0 ? (
@@ -80,12 +104,12 @@ export function OperacaoDashboard({ maquinas, ordens, executandoOrdemId, onAcao 
                       const emExecucao = executandoOrdemId === ordem.id
 
                       return (
-                        <div key={ordem.id} className="px-3 py-2.5">
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-medium text-slate-800 truncate">
+                        <div key={ordem.id} className="px-5 py-4 bg-white/50">
+                          <div className="flex items-center gap-3">
+                            <span className="text-lg font-black text-slate-900 truncate tracking-tight">
                               {ordem.produto?.nome ?? ordem.produto_sku}
                             </span>
-                            <span className={`ml-auto px-2 py-0.5 rounded-full text-[10px] font-semibold ${statusClass(ordem.status)}`}>
+                            <span className={`ml-auto px-3 py-1 rounded-lg text-xs font-black uppercase tracking-wider shadow-sm ${statusClass(ordem.status)}`}>
                               {ordem.status}
                             </span>
                           </div>
@@ -99,18 +123,18 @@ export function OperacaoDashboard({ maquinas, ordens, executandoOrdemId, onAcao 
                             </span>
                           </div>
 
-                          <div className="mt-2 flex gap-2">
+                          <div className="mt-3 flex gap-3">
                             <button
                               onClick={() => onAcao(ordem.id, 'iniciar')}
                               disabled={!podeIniciar || emExecucao}
-                              className="px-2.5 py-1.5 rounded-md text-xs font-medium bg-emerald-600 text-white disabled:opacity-40 disabled:cursor-not-allowed hover:bg-emerald-700"
+                              className="flex-1 py-3 rounded-lg text-sm font-black uppercase tracking-widest bg-emerald-600 text-white disabled:opacity-40 disabled:cursor-not-allowed hover:bg-emerald-700 transition-all shadow-md active:scale-95"
                             >
                               {emExecucao && podeIniciar ? 'Iniciando...' : 'Iniciar'}
                             </button>
                             <button
                               onClick={() => onAcao(ordem.id, 'finalizar')}
                               disabled={!podeFinalizar || emExecucao}
-                              className="px-2.5 py-1.5 rounded-md text-xs font-medium bg-slate-700 text-white disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-800"
+                              className="flex-1 py-3 rounded-lg text-sm font-black uppercase tracking-widest bg-slate-800 text-white disabled:opacity-40 disabled:cursor-not-allowed hover:bg-black transition-all shadow-md active:scale-95"
                             >
                               {emExecucao && podeFinalizar ? 'Finalizando...' : 'Finalizar'}
                             </button>

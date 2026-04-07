@@ -55,10 +55,10 @@ export function NovaOrdemForm({ produtos, dataInicial, onSalvo, onFechar }: Prop
   }
 
   return (
-    <div className="fixed inset-0 bg-black/45 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg p-6">
-        <h2 className="text-base font-semibold text-slate-900 mb-1">Nova ordem manual</h2>
-        <p className="text-sm text-slate-500 mb-4">Preencha etapa, tanque e lote para manter o fluxo tanque para envase.</p>
+    <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-lg p-6 border border-slate-200">
+        <h2 className="text-xl font-semibold text-slate-900 mb-1">Nova ordem manual</h2>
+        <p className="text-sm text-slate-500 mb-6">Preencha etapa, tanque e lote para manter o fluxo tanque para envase.</p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
@@ -67,7 +67,7 @@ export function NovaOrdemForm({ produtos, dataInicial, onSalvo, onFechar }: Prop
               value={produtoSku}
               onChange={(e) => setProdutoSku(e.target.value)}
               required
-              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
+              className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
             >
               <option value="">Selecione...</option>
               {produtos.map((p) => (
@@ -87,7 +87,7 @@ export function NovaOrdemForm({ produtos, dataInicial, onSalvo, onFechar }: Prop
                 value={quantidade}
                 onChange={(e) => setQuantidade(e.target.value)}
                 required
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
+                className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
               />
             </div>
             <div>
@@ -97,7 +97,7 @@ export function NovaOrdemForm({ produtos, dataInicial, onSalvo, onFechar }: Prop
                 value={unidade}
                 onChange={(e) => setUnidade(e.target.value.toUpperCase())}
                 maxLength={8}
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
+                className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
               />
             </div>
           </div>
@@ -108,7 +108,7 @@ export function NovaOrdemForm({ produtos, dataInicial, onSalvo, onFechar }: Prop
               <select
                 value={etapa}
                 onChange={(e) => setEtapa(e.target.value as 'tanque' | 'envase')}
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
+                className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
               >
                 <option value="tanque">Tanque</option>
                 <option value="envase">Envase</option>
@@ -121,7 +121,7 @@ export function NovaOrdemForm({ produtos, dataInicial, onSalvo, onFechar }: Prop
                 placeholder="tq3"
                 value={tanque}
                 onChange={(e) => setTanque(e.target.value.toLowerCase())}
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
+                className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
               />
             </div>
             <div>
@@ -131,7 +131,7 @@ export function NovaOrdemForm({ produtos, dataInicial, onSalvo, onFechar }: Prop
                 placeholder="lt906"
                 value={lote}
                 onChange={(e) => setLote(e.target.value.toLowerCase())}
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
+                className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
               />
             </div>
           </div>
@@ -143,24 +143,24 @@ export function NovaOrdemForm({ produtos, dataInicial, onSalvo, onFechar }: Prop
               value={dataPrevista}
               onChange={(e) => setDataPrevista(e.target.value)}
               required
-              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
+              className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
             />
           </div>
 
-          {erro && <p className="text-sm text-red-600">{erro}</p>}
+          {erro && <p className="text-sm font-medium text-red-600">{erro}</p>}
 
-          <div className="flex justify-end gap-2 pt-2">
+          <div className="flex justify-end gap-3 pt-4">
             <button
               type="button"
               onClick={onFechar}
-              className="px-4 py-2 border border-slate-300 rounded-lg text-sm hover:bg-slate-50"
+              className="px-4 py-2 border border-slate-300 rounded-md text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
             >
               Cancelar
             </button>
             <button
               type="submit"
               disabled={salvando}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 disabled:opacity-50"
+              className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 shadow-sm transition-colors"
             >
               {salvando ? 'Salvando...' : 'Criar ordem'}
             </button>

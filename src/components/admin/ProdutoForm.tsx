@@ -89,7 +89,7 @@ export function ProdutoForm({ maquinas, produto, onSalvo, onCancelar }: Props) {
             onChange={(e) => setSku(e.target.value)}
             required
             disabled={!!produto}
-            className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm disabled:bg-slate-100"
+            className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm disabled:bg-slate-100 focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
           />
         </div>
 
@@ -99,7 +99,7 @@ export function ProdutoForm({ maquinas, produto, onSalvo, onCancelar }: Props) {
             value={nome}
             onChange={(e) => setNome(e.target.value)}
             required
-            className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
+            className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
           />
         </div>
 
@@ -111,7 +111,7 @@ export function ProdutoForm({ maquinas, produto, onSalvo, onCancelar }: Props) {
             onChange={(e) => setVolumeBase(e.target.value)}
             required
             min="1"
-            className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
+            className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
           />
         </div>
 
@@ -121,7 +121,7 @@ export function ProdutoForm({ maquinas, produto, onSalvo, onCancelar }: Props) {
             type="color"
             value={cor}
             onChange={(e) => setCor(e.target.value)}
-            className="w-16 h-10 border border-slate-300 rounded-lg cursor-pointer"
+            className="w-full h-9 border border-slate-300 rounded-md cursor-pointer bg-white"
           />
         </div>
       </div>
@@ -132,29 +132,29 @@ export function ProdutoForm({ maquinas, produto, onSalvo, onCancelar }: Props) {
           {maquinasAtivas.map((m) => {
             const t = tempos[m.id] || { setup: 0, producao: 0 }
             return (
-              <div key={m.id} className="bg-white border border-slate-200 rounded-lg p-3">
-                <div className="font-medium text-sm text-slate-800 mb-2">{m.nome}</div>
+              <div key={m.id} className="bg-slate-50 border border-slate-200 rounded-md p-3">
+                <div className="font-semibold text-xs text-slate-900 mb-2 uppercase tracking-wider">{m.nome}</div>
                 <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <label className="block text-xs text-slate-500 mb-1">Setup (min)</label>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Setup (min)</label>
                     <input
                       type="number"
                       value={t.setup || ''}
                       onChange={(e) => handleTempoChange(m.id, 'setup', e.target.value)}
                       placeholder="0"
                       min="0"
-                      className="w-full border border-slate-300 rounded px-2 py-1 text-sm"
+                      className="w-full border border-slate-300 rounded-md px-2 py-1.5 text-sm bg-white focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs text-slate-500 mb-1">Producao (min)</label>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Produção (min)</label>
                     <input
                       type="number"
                       value={t.producao || ''}
                       onChange={(e) => handleTempoChange(m.id, 'producao', e.target.value)}
                       placeholder="0"
                       min="0"
-                      className="w-full border border-slate-300 rounded px-2 py-1 text-sm"
+                      className="w-full border border-slate-300 rounded-md px-2 py-1.5 text-sm bg-white focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                     />
                   </div>
                 </div>
@@ -166,18 +166,18 @@ export function ProdutoForm({ maquinas, produto, onSalvo, onCancelar }: Props) {
 
       {erro && <p className="text-red-600 text-sm">{erro}</p>}
 
-      <div className="flex gap-2">
+      <div className="flex gap-3 pt-2">
         <button
           type="submit"
           disabled={salvando}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 disabled:opacity-50"
+          className="px-6 py-2 bg-blue-600 text-white rounded-md text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors shadow-sm"
         >
-          {salvando ? 'Salvando...' : produto ? 'Atualizar' : 'Criar'}
+          {salvando ? 'Salvando...' : produto ? 'Atualizar produto' : 'Criar produto'}
         </button>
         <button
           type="button"
           onClick={onCancelar}
-          className="px-4 py-2 border border-slate-300 rounded-lg text-sm hover:bg-slate-50"
+          className="px-6 py-2 border border-slate-300 rounded-md text-sm font-semibold text-slate-700 bg-white hover:bg-slate-50 transition-colors"
         >
           Cancelar
         </button>

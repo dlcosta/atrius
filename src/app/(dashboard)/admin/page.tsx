@@ -23,28 +23,13 @@ export default function AdminPage() {
   }, [carregar])
 
   return (
-    <div className="min-h-screen bg-slate-100">
-      <header className="border-b border-slate-200 bg-white/80 backdrop-blur">
-        <div className="max-w-6xl mx-auto px-6 py-5 flex items-center justify-between gap-3">
-          <div>
-            <h1 className="text-xl font-semibold text-slate-900">Atrius Planner - Admin</h1>
-            <p className="text-sm text-slate-500">Cadastro de produtos, tempos por maquina e estrutura da linha.</p>
-          </div>
-          <a
-            href="/planner"
-            className="px-3 py-2 rounded-lg border border-slate-300 text-sm text-slate-700 hover:bg-slate-50"
-          >
-            Voltar ao planner
-          </a>
-        </div>
-      </header>
-
-      <main className="max-w-6xl mx-auto px-6 py-8 space-y-10">
-        <section className="rounded-2xl border border-slate-200 bg-white p-6">
+    <div className="flex flex-col h-full overflow-hidden">
+      <main className="max-w-6xl mx-auto w-full px-6 py-8 space-y-8">
+        <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm hover:shadow-md transition-all">
           <ProdutoList produtos={produtos} maquinas={maquinas} onAtualizado={carregar} />
         </section>
 
-        <section className="rounded-2xl border border-slate-200 bg-white p-6">
+        <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm hover:shadow-md transition-all">
           <MaquinaList maquinas={maquinas} onAtualizado={carregar} />
         </section>
       </main>

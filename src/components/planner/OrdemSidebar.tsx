@@ -19,22 +19,22 @@ export function OrdemSidebar({ ordens, onNovaOrdem }: Props) {
   }
 
   return (
-    <aside className="w-80 flex-shrink-0 rounded-2xl border border-slate-200 bg-white overflow-hidden">
-      <div className="bg-slate-50 border-b border-slate-200 px-4 py-3 flex items-center justify-between">
+    <aside className="w-80 flex-shrink-0 rounded-lg border-2 border-slate-200 bg-white overflow-hidden shadow-md">
+      <div className="bg-slate-100 border-b-2 border-slate-200 px-5 py-4 flex items-center justify-between">
         <div>
-          <h3 className="text-xs font-semibold text-slate-700 uppercase tracking-wide">Nao agendadas</h3>
-          <p className="text-[11px] text-slate-500 mt-0.5">{ordens.length} ordens no backlog</p>
+          <h3 className="text-sm font-black text-slate-700 uppercase tracking-tighter">Não agendadas</h3>
+          <p className="text-xs text-slate-500 mt-0.5 font-bold">{ordens.length} ordens no backlog</p>
         </div>
         <button
           onClick={onNovaOrdem}
           title="Nova ordem manual"
-          className="w-7 h-7 rounded-full bg-blue-600 text-white hover:bg-blue-700 text-base leading-none"
+          className="w-7 h-7 rounded-md bg-blue-600 text-white hover:bg-blue-700 text-base leading-none font-bold shadow-sm transition-colors"
         >
           +
         </button>
       </div>
 
-      <div className="overflow-y-auto max-h-[calc(100vh-220px)]">
+      <div className="overflow-y-auto max-h-[calc(100vh-220px)] divide-y divide-slate-100">
         {ordens.length === 0 ? (
           <p className="text-xs text-slate-400 text-center py-10">Todas as ordens estao agendadas</p>
         ) : (
@@ -43,14 +43,15 @@ export function OrdemSidebar({ ordens, onNovaOrdem }: Props) {
               key={ordem.id}
               draggable
               onDragStart={(e) => handleDragStart(e, ordem.id)}
-              className="border-b border-slate-100 px-4 py-3 cursor-grab active:cursor-grabbing hover:bg-slate-50 select-none"
+              className="px-4 py-3 cursor-grab active:cursor-grabbing hover:bg-blue-50/30 select-none transition-colors border-l-4"
+              style={{ borderLeftColor: ordem.produto?.cor ?? '#5B9BD5' }}
             >
               <div className="flex items-center gap-2 mb-1.5">
                 <div
                   className="w-2.5 h-2.5 rounded-full flex-shrink-0"
                   style={{ backgroundColor: ordem.produto?.cor ?? '#5B9BD5' }}
                 />
-                <span className="text-sm font-medium text-slate-800 truncate">
+                <span className="text-base font-bold text-slate-900 truncate tracking-tight">
                   {ordem.produto?.nome ?? ordem.produto_sku}
                 </span>
                 <span className={`ml-auto px-2 py-0.5 rounded-full text-[10px] font-semibold ${badgeEtapa(ordem.etapa)}`}>

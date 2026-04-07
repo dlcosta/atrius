@@ -23,25 +23,30 @@ export function GanttBlock({ bloco, dia, janela, conflito, onRemover }: Props) {
 
   return (
     <div
-      className={`absolute top-1 bottom-1 rounded-lg flex flex-col justify-center px-2 select-none overflow-hidden
-        ${conflito ? 'ring-2 ring-red-500 z-10' : ''}
-        ${isLimpeza ? 'opacity-80 border border-dashed border-amber-500' : 'border border-black/10'}
-        ${isSetup ? 'bg-[length:8px_8px] bg-[linear-gradient(-45deg,rgba(255,255,255,0.2)_25%,transparent_25%,transparent_50%,rgba(255,255,255,0.2)_50%,rgba(255,255,255,0.2)_75%,transparent_75%,transparent)]' : ''}
+      className={`absolute top-2 bottom-2 rounded-xl flex flex-col justify-center px-4 select-none overflow-hidden shadow-sm transition-all hover:scale-[1.02] hover:z-20 hover:shadow-xl
+        ${conflito ? 'ring-4 ring-red-600 z-10 animate-pulse' : ''}
+        ${isLimpeza ? 'opacity-90 border-2 border-dashed border-amber-600' : 'border-2 border-black/20'}
+        ${isSetup ? 'bg-[length:12px_12px] bg-[linear-gradient(-45deg,rgba(255,255,255,0.3)_25%,transparent_25%,transparent_50%,rgba(255,255,255,0.3)_50%,rgba(255,255,255,0.3)_75%,transparent_75%,transparent)]' : ''}
       `}
       style={{
         left,
-        width: Math.max(width, 44),
+        width: Math.max(width, 80),
         backgroundColor: bloco.cor,
       }}
       title={`${bloco.produto}\n${bloco.tanque ? `Tanque: ${bloco.tanque}\n` : ''}${formatarHora(bloco.inicio)} - ${formatarHora(bloco.fim)}\n${formatarDuracao(bloco.duracao_min)}`}
     >
-      <span className="text-xs font-semibold text-slate-800 truncate leading-tight drop-shadow-sm">
-        {bloco.tanque && <span className="font-bold mr-1">[{bloco.tanque.toUpperCase()}]</span>}
+      <span className="text-lg font-black text-slate-900 truncate leading-none drop-shadow-md tracking-tighter">
+        {bloco.tanque && <span className="text-blue-900 opacity-60 mr-1">[{bloco.tanque.toUpperCase()}]</span>}
         {bloco.produto}
       </span>
-      <span className="text-[10px] text-slate-700 font-medium leading-tight">
-        {formatarHora(bloco.inicio)} - {formatarDuracao(bloco.duracao_min)}
-      </span>
+      <div className="flex items-center gap-2 mt-1">
+        <span className="text-xs bg-black/10 px-1.5 py-0.5 rounded font-bold text-slate-800">
+          {formatarHora(bloco.inicio)}
+        </span>
+        <span className="text-xs font-black text-slate-900 drop-shadow-sm">
+          {formatarDuracao(bloco.duracao_min)}
+        </span>
+      </div>
 
       {!isLimpeza && !isSetup && onRemover && (
         <button

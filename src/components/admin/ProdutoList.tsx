@@ -41,7 +41,7 @@ export function ProdutoList({ produtos, maquinas, onAtualizado }: Props) {
         {!criando && (
           <button
             onClick={() => setCriando(true)}
-            className="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700"
+            className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-semibold hover:bg-blue-700 transition-colors shadow-sm"
           >
             + Novo produto
           </button>
@@ -49,7 +49,7 @@ export function ProdutoList({ produtos, maquinas, onAtualizado }: Props) {
       </div>
 
       {criando && (
-        <div className="border border-blue-200 bg-blue-50 rounded-xl p-4">
+        <div className="border border-blue-200 bg-blue-50 rounded-lg p-4">
           <ProdutoForm
             maquinas={maquinas}
             onSalvo={() => {
@@ -61,9 +61,9 @@ export function ProdutoList({ produtos, maquinas, onAtualizado }: Props) {
         </div>
       )}
 
-      <div className="border border-slate-200 rounded-xl overflow-hidden bg-white">
+      <div className="border border-slate-200 rounded-lg overflow-hidden bg-white shadow-sm">
         <table className="w-full text-sm">
-          <thead className="bg-slate-50 text-slate-600 text-xs uppercase tracking-wide">
+          <thead className="bg-slate-50 text-slate-600 text-[11px] uppercase tracking-wider font-semibold">
             <tr>
               <th className="px-4 py-3 text-left">SKU</th>
               <th className="px-4 py-3 text-left">Nome</th>

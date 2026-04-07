@@ -1,5 +1,5 @@
-﻿export const PIXELS_PER_MINUTE = 2
-export const ROW_HEIGHT = 72
+﻿export const PIXELS_PER_MINUTE = 3
+export const ROW_HEIGHT = 120
 
 export type JanelaProducao = {
   startHour: number

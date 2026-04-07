@@ -95,15 +95,10 @@ export default function MonitoramentoPage() {
   }, [ordensDia])
 
   return (
-    <div className="min-h-screen bg-slate-100">
-      <header className="border-b border-slate-200 bg-white sticky top-0 z-20">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex flex-wrap items-center gap-3">
-          <div className="mr-auto">
-            <h1 className="text-lg font-semibold text-slate-900">Painel de monitoramento da producao</h1>
-            <p className="text-sm text-slate-500">Acompanhamento em tempo real de quantidade produzida e tempo operacional.</p>
-          </div>
-
-          <div className="flex items-center gap-1 rounded-xl border border-slate-200 bg-slate-50 px-1 py-1">
+    <div className="flex flex-col h-full overflow-hidden">
+      <div className="border-b border-slate-200 bg-white p-4">
+        <div className="max-w-7xl mx-auto flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-1 py-1">
             <button onClick={() => setDia((d) => subDays(d, 1))} className="px-2 py-1 rounded-md text-sm text-slate-600 hover:bg-white">
               {'<'}
             </button>
@@ -118,45 +113,42 @@ export default function MonitoramentoPage() {
           <button onClick={() => setDia(new Date())} className="px-3 py-2 rounded-lg border border-slate-300 text-sm text-slate-700 hover:bg-slate-50">
             Hoje
           </button>
-          <a href="/planner" className="px-3 py-2 rounded-lg border border-slate-300 text-sm text-slate-700 hover:bg-slate-50">
-            Planner
-          </a>
         </div>
-      </header>
+      </div>
 
       {erro && (
         <div className="bg-amber-50 border-b border-amber-200 px-6 py-2 text-sm text-amber-800">{erro}</div>
       )}
 
-      <main className="max-w-7xl mx-auto px-6 py-6 space-y-5">
-        <section className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
-          <div className="rounded-xl border border-slate-200 bg-white p-3">
-            <div className="text-xs text-slate-500">Ordens do dia</div>
-            <div className="text-2xl font-semibold text-slate-900">{indicadores.totalOrdens}</div>
+      <main className="max-w-7xl mx-auto px-6 py-6 space-y-6">
+        <section className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
+          <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm hover:shadow-md transition-all">
+            <div className="text-xs font-medium text-slate-500 uppercase tracking-wider">Ordens do dia</div>
+            <div className="text-2xl font-bold text-slate-900 mt-1">{indicadores.totalOrdens}</div>
           </div>
-          <div className="rounded-xl border border-slate-200 bg-white p-3">
-            <div className="text-xs text-slate-500">Em producao</div>
-            <div className="text-2xl font-semibold text-emerald-600">{indicadores.ordensEmProducao}</div>
+          <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm hover:shadow-md transition-all">
+            <div className="text-xs font-medium text-slate-500 uppercase tracking-wider">Em produção</div>
+            <div className="text-2xl font-bold text-emerald-600 mt-1">{indicadores.ordensEmProducao}</div>
           </div>
-          <div className="rounded-xl border border-slate-200 bg-white p-3">
-            <div className="text-xs text-slate-500">Concluidas</div>
-            <div className="text-2xl font-semibold text-slate-900">{indicadores.ordensConcluidas}</div>
+          <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm hover:shadow-md transition-all">
+            <div className="text-xs font-medium text-slate-500 uppercase tracking-wider">Concluídas</div>
+            <div className="text-2xl font-bold text-slate-900 mt-1">{indicadores.ordensConcluidas}</div>
           </div>
-          <div className="rounded-xl border border-slate-200 bg-white p-3">
-            <div className="text-xs text-slate-500">Qtd produzida (est.)</div>
-            <div className="text-2xl font-semibold text-slate-900">{formatarNumero(indicadores.quantidadeProduzidaEstimada)}</div>
+          <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm hover:shadow-md transition-all">
+            <div className="text-xs font-medium text-slate-500 uppercase tracking-wider">Qtd (est.)</div>
+            <div className="text-2xl font-bold text-slate-900 mt-1">{formatarNumero(indicadores.quantidadeProduzidaEstimada)}</div>
           </div>
-          <div className="rounded-xl border border-slate-200 bg-white p-3">
-            <div className="text-xs text-slate-500">% produzido</div>
-            <div className="text-2xl font-semibold text-slate-900">{formatarNumero(indicadores.percentualProduzido)}%</div>
+          <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm hover:shadow-md transition-all">
+            <div className="text-xs font-medium text-slate-500 uppercase tracking-wider">% produzido</div>
+            <div className="text-2xl font-bold text-slate-900 mt-1">{formatarNumero(indicadores.percentualProduzido)}%</div>
           </div>
-          <div className="rounded-xl border border-slate-200 bg-white p-3">
-            <div className="text-xs text-slate-500">Tempo acumulado</div>
-            <div className="text-2xl font-semibold text-slate-900">{formatarMinutos(indicadores.tempoProducaoAcumuladoMin)}</div>
+          <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm hover:shadow-md transition-all">
+            <div className="text-xs font-medium text-slate-500 uppercase tracking-wider">Tempo acul.</div>
+            <div className="text-2xl font-bold text-slate-900 mt-1">{formatarMinutos(indicadores.tempoProducaoAcumuladoMin)}</div>
           </div>
         </section>
 
-        <section className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+        <section className="grid grid-cols-1 xl:grid-cols-2 gap-6">
           {maquinasAtivas.map((maquina) => {
             const ordensMaquina = ordensDia.filter((o) => o.maquina_id === maquina.id)
             const emProducao = ordensMaquina.find((o) => o.status === 'produzindo')
@@ -166,7 +158,7 @@ export default function MonitoramentoPage() {
             const progresso = qtdPlanejada > 0 ? (qtdProduzida / qtdPlanejada) * 100 : 0
 
             return (
-              <div key={maquina.id} className="rounded-2xl border border-slate-200 bg-white p-4">
+              <div key={maquina.id} className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm hover:shadow-md transition-shadow">
                 <div className="flex items-center justify-between">
                   <h2 className="text-sm font-semibold text-slate-900">{maquina.nome}</h2>
                   <span
@@ -199,8 +191,8 @@ export default function MonitoramentoPage() {
           })}
         </section>
 
-        <section className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
-          <div className="px-4 py-3 border-b border-slate-200">
+        <section className="rounded-lg border border-slate-200 bg-white overflow-hidden shadow-sm">
+          <div className="px-5 py-4 border-b border-slate-200 bg-slate-50/50">
             <h2 className="text-sm font-semibold text-slate-900">Ordens e indicadores por programacao</h2>
           </div>
           <div className="overflow-x-auto">

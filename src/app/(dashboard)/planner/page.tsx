@@ -1,13 +1,10 @@
-﻿'use client'
+﻿ 'use client'
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { format, addDays, subDays } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import type { Maquina, Ordem, Produto, BlocoGantt } from '@/types'
-import { GanttChart } from '@/components/planner/GanttChart'
-import { OrdemSidebar } from '@/components/planner/OrdemSidebar'
+import type { Maquina, Ordem, Produto } from '@/types'
 import { NovaOrdemForm } from '@/components/planner/NovaOrdemForm'
 import { OperacaoDashboard } from '@/components/planner/OperacaoDashboard'
-import { ordemParaBlocos } from '@/lib/planning/engine'
 import {
   DEFAULT_JANELA_PRODUCAO,
   JanelaProducao,
@@ -56,6 +53,7 @@ export default function PlannerPage() {
   const [mensagem, setMensagem] = useState('')
   const [novaOrdemAberta, setNovaOrdemAberta] = useState(false)
   const [executandoOrdemId, setExecutandoOrdemId] = useState<string | null>(null)
+  const [isExpanded, setIsExpanded] = useState(false)
   const [janela, setJanela] = useState<JanelaProducao>(DEFAULT_JANELA_PRODUCAO)
   const [turnoSelecionado, setTurnoSelecionado] = useState<string>(() => detectarPreset(DEFAULT_JANELA_PRODUCAO))
 
@@ -107,16 +105,6 @@ export default function PlannerPage() {
     [ordens]
   )
 
-  const blocos: BlocoGantt[] = useMemo(
-    () => ordensAtivas.filter((o) => o.inicio_agendado !== null).flatMap(ordemParaBlocos),
-    [ordensAtivas]
-  )
-
-  const ordensSemHorario = useMemo(
-    () => ordensAtivas.filter((o) => o.inicio_agendado === null),
-    [ordensAtivas]
-  )
-
   const resumo = useMemo(() => {
     const total = ordens.length
     const tanque = ordens.filter((o) => o.etapa === 'tanque').length
@@ -140,52 +128,6 @@ export default function PlannerPage() {
     if (!preset) return
 
     atualizarJanela({ startHour: preset.startHour, endHour: preset.endHour })
-  }
-
-  async function agendar(ordemId: string, maquinaId: string, inicio: Date) {
-    setMensagem('')
-    try {
-      const res = await fetch('/api/ordens', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: ordemId,
-          maquina_id: maquinaId,
-          inicio_agendado: inicio.toISOString(),
-        }),
-      })
-
-      if (res.status === 409) {
-        setMensagem('Conflito de horario: escolha outro horario ou maquina.')
-      } else if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
-        setMensagem(data.error ?? 'Erro ao agendar ordem.')
-      }
-    } catch {
-      setMensagem('Erro de rede ao agendar ordem.')
-    }
-
-    await carregarDados()
-  }
-
-  async function desagendar(ordemId: string) {
-    const res = await fetch('/api/ordens', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        id: ordemId,
-        maquina_id: null,
-        inicio_agendado: null,
-        fim_calculado: null,
-      }),
-    })
-
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}))
-      setMensagem(data.error ?? 'Erro ao remover agendamento.')
-    }
-
-    await carregarDados()
   }
 
   async function sincronizar() {
@@ -235,15 +177,17 @@ export default function PlannerPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-100 flex flex-col">
-      <header className="border-b border-slate-200 bg-white/90 backdrop-blur sticky top-0 z-20">
-        <div className="px-6 py-4 flex flex-wrap items-center gap-3">
-          <div className="mr-auto">
-            <h1 className="text-lg font-semibold text-slate-900">Dashboard de Producao</h1>
-            <p className="text-sm text-slate-500">Planejamento visual por maquina no estilo calendario operacional.</p>
+    <div className="flex flex-col h-full overflow-hidden">
+      <div className="border-b border-slate-200 bg-white p-4 space-y-4 shadow-sm relative z-10">
+        <div className="flex items-center gap-3 mb-2">
+          <img src="/logoAtrius.webp" alt="Atrius Logo" className="h-12 w-auto" />
+          <div>
+            <h1 className="text-2xl font-black text-slate-900 tracking-tighter uppercase">Painel de Controle Atrius</h1>
+            <p className="text-xs font-bold text-slate-500">Monitoramento e Gestão de Produção em Tempo Real</p>
           </div>
-
-          <div className="flex items-center gap-1 rounded-xl border border-slate-200 bg-slate-50 px-1 py-1">
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-1 py-1">
             <button
               onClick={() => setDia((d) => subDays(d, 1))}
               className="px-2 py-1 rounded-md text-sm text-slate-600 hover:bg-white"
@@ -268,23 +212,24 @@ export default function PlannerPage() {
             Hoje
           </button>
 
-          <button
-            onClick={sincronizar}
-            disabled={sincronizando}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 disabled:opacity-50"
-          >
-            {sincronizando ? 'Sincronizando...' : 'Sincronizar API'}
-          </button>
-
-          <a href="/monitoramento" className="px-3 py-2 rounded-lg border border-slate-300 text-sm text-slate-700 hover:bg-slate-50">
-            Monitoramento
-          </a>
-          <a href="/admin" className="px-3 py-2 rounded-lg border border-slate-300 text-sm text-slate-700 hover:bg-slate-50">
-            Admin
-          </a>
+          <div className="ml-auto flex items-center gap-2">
+            <button
+              onClick={() => setIsExpanded(true)}
+              className="px-4 py-2 bg-slate-900 text-white rounded-md text-sm font-black uppercase tracking-widest hover:bg-black transition-all shadow-md active:scale-95"
+            >
+              Expandir Painel Operacional
+            </button>
+            <button
+              onClick={sincronizar}
+              disabled={sincronizando}
+              className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors shadow-sm"
+            >
+              {sincronizando ? 'Sincronizando...' : 'Sincronizar API'}
+            </button>
+          </div>
         </div>
 
-        <div className="px-6 pb-3 flex flex-wrap items-end gap-2">
+        <div className="flex flex-wrap items-end gap-2">
           <div className="flex flex-col gap-1">
             <label className="text-[11px] font-semibold text-slate-600 uppercase tracking-wide">Turno</label>
             <select
@@ -338,14 +283,29 @@ export default function PlannerPage() {
           </span>
         </div>
 
-        <div className="px-6 pb-4 flex flex-wrap gap-2">
-          <span className="px-2.5 py-1 rounded-full bg-slate-200 text-slate-700 text-xs font-medium">Total: {resumo.total}</span>
-          <span className="px-2.5 py-1 rounded-full bg-cyan-100 text-cyan-700 text-xs font-medium">Tanque: {resumo.tanque}</span>
-          <span className="px-2.5 py-1 rounded-full bg-violet-100 text-violet-700 text-xs font-medium">Envase: {resumo.envase}</span>
-          <span className="px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700 text-xs font-medium">Agendadas: {resumo.agendadas}</span>
-          <span className="px-2.5 py-1 rounded-full bg-slate-300 text-slate-700 text-xs font-medium">Concluidas: {resumo.concluidas}</span>
+        <div className="flex flex-wrap gap-4 pt-4 border-t border-slate-100">
+          <div className="px-5 py-2 rounded-xl bg-slate-100 border border-slate-200 shadow-sm">
+            <span className="text-[10px] font-black text-slate-500 uppercase block leading-none mb-1">Total</span>
+            <span className="text-2xl font-black text-slate-900 leading-none">{resumo.total}</span>
+          </div>
+          <div className="px-5 py-2 rounded-xl bg-blue-50 border border-blue-200 shadow-sm">
+            <span className="text-[10px] font-black text-blue-500 uppercase block leading-none mb-1">Tanque</span>
+            <span className="text-2xl font-black text-blue-700 leading-none">{resumo.tanque}</span>
+          </div>
+          <div className="px-5 py-2 rounded-xl bg-purple-50 border border-purple-200 shadow-sm">
+            <span className="text-[10px] font-black text-purple-500 uppercase block leading-none mb-1">Envase</span>
+            <span className="text-2xl font-black text-purple-700 leading-none">{resumo.envase}</span>
+          </div>
+          <div className="px-5 py-2 rounded-xl bg-green-50 border border-green-200 shadow-sm">
+            <span className="text-[10px] font-black text-green-500 uppercase block leading-none mb-1">Agendadas</span>
+            <span className="text-2xl font-black text-green-700 leading-none">{resumo.agendadas}</span>
+          </div>
+          <div className="px-5 py-2 rounded-xl bg-slate-100 border border-slate-300 shadow-sm">
+            <span className="text-[10px] font-black text-slate-500 uppercase block leading-none mb-1">Concluídas</span>
+            <span className="text-2xl font-black text-slate-700 leading-none">{resumo.concluidas}</span>
+          </div>
         </div>
-      </header>
+      </div>
 
       {mensagem && (
         <div className="bg-amber-50 border-b border-amber-200 px-6 py-2 text-sm text-amber-800">{mensagem}</div>
@@ -363,27 +323,75 @@ export default function PlannerPage() {
         />
       )}
 
-      <OperacaoDashboard
-        maquinas={maquinas}
-        ordens={ordens.filter((o) => o.inicio_agendado !== null)}
-        executandoOrdemId={executandoOrdemId}
-        onAcao={executarAcaoOperacao}
-      />
+      <main className="flex-1 overflow-y-auto p-4 space-y-4">
+        {isExpanded ? (
+          <div className="fixed inset-0 z-[100] bg-slate-50 overflow-y-auto p-6 animate-in fade-in zoom-in-95 duration-300">
+            <div className="max-w-[1600px] mx-auto space-y-6">
+              <div className="flex items-center justify-between bg-white p-6 rounded-xl border-2 border-slate-200 shadow-xl mb-6">
+                <div className="flex items-center gap-4">
+                  <img src="/logoAtrius.webp" alt="Atrius Logo" className="h-16 w-auto" />
+                  <div>
+                    <h1 className="text-4xl font-black text-slate-900 tracking-tighter uppercase leading-none">Painel de Produção</h1>
+                    <p className="text-lg font-bold text-slate-500 uppercase tracking-widest mt-1">Controle de Chão de Fábrica</p>
+                  </div>
+                </div>
 
-      <main className="flex flex-1 gap-4 p-4 overflow-hidden">
-        <OrdemSidebar ordens={ordensSemHorario} onNovaOrdem={() => setNovaOrdemAberta(true)} />
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-2 rounded-2xl border-2 border-slate-200 bg-slate-50 p-2 shadow-inner">
+                    <button
+                      onClick={() => setDia((d) => subDays(d, 1))}
+                      className="px-6 py-3 rounded-xl text-xl font-black text-slate-600 hover:bg-white hover:text-blue-600 transition-all shadow-sm active:scale-95"
+                    >
+                      Ontem
+                    </button>
+                    <div className="h-10 w-[2px] bg-slate-200 mx-2" />
+                    <button
+                      onClick={() => setDia(new Date())}
+                      className="px-8 py-3 rounded-xl text-xl font-black text-blue-700 bg-white shadow-md border-2 border-blue-100 hover:bg-blue-50 transition-all active:scale-95"
+                    >
+                      HOJE
+                    </button>
+                    <div className="h-10 w-[2px] bg-slate-200 mx-2" />
+                    <button
+                      onClick={() => setDia((d) => addDays(d, 1))}
+                      className="px-6 py-3 rounded-xl text-xl font-black text-slate-600 hover:bg-white hover:text-blue-600 transition-all shadow-sm active:scale-95"
+                    >
+                      Amanhã
+                    </button>
+                  </div>
 
-        <div className="flex-1 overflow-x-auto">
-          <GanttChart
+                  <div className="bg-slate-900 text-white px-6 py-3 rounded-xl border-b-4 border-slate-950 flex flex-col items-center">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Data Visualizada</span>
+                    <span className="text-2xl font-black uppercase tracking-tighter">
+                      {format(dia, "dd 'de' MMMM", { locale: ptBR })}
+                    </span>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => setIsExpanded(false)}
+                  className="px-8 py-4 bg-red-600 text-white rounded-xl text-xl font-black uppercase tracking-tighter hover:bg-red-700 shadow-2xl transition-all active:scale-95 border-b-4 border-red-800 ml-4"
+                >
+                  Sair
+                </button>
+              </div>
+              
+              <OperacaoDashboard
+                maquinas={maquinas}
+                ordens={ordens.filter((o) => o.inicio_agendado !== null)}
+                executandoOrdemId={executandoOrdemId}
+                onAcao={executarAcaoOperacao}
+              />
+            </div>
+          </div>
+        ) : (
+          <OperacaoDashboard
             maquinas={maquinas}
-            blocos={blocos}
-            ordens={ordensAtivas.filter((o) => o.inicio_agendado !== null)}
-            dia={dia}
-            janela={janela}
-            onAgendar={agendar}
-            onDesagendar={desagendar}
+            ordens={ordens.filter((o) => o.inicio_agendado !== null)}
+            executandoOrdemId={executandoOrdemId}
+            onAcao={executarAcaoOperacao}
           />
-        </div>
+        )}
       </main>
     </div>
   )
