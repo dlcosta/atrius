@@ -1,5 +1,25 @@
 import { olistFetch } from './client'
 
+export type ProducaoEstrutura = {
+  produtoIdOlist: number
+  mpIdOlist: number | null
+  mpSku: string | null
+  mpDescricao: string
+  mpTipo: string | null
+  quantidade: number
+}
+
+export type ProducaoEtapa = {
+  produtoIdOlist: number
+  ordem: number
+  descricao: string
+}
+
+export type ProducaoFabricado = {
+  estrutura: ProducaoEstrutura[]
+  etapas: ProducaoEtapa[]
+}
+
 export type ProdutoResumo = {
   id: number
   sku: string
@@ -92,6 +112,33 @@ export async function buscarProdutoDetalhe(id: number): Promise<ProdutoDetalhe> 
     dataCriacao: parseDataOlist(j.dataCriacao),
     dataAlteracao: parseDataOlist(j.dataAlteracao),
   }
+}
+
+export async function buscarProducaoFabricado(idProduto: number): Promise<ProducaoFabricado | null> {
+  const res = await olistFetch(`/produtos/${idProduto}/fabricado`)
+  if (res.status === 404) return null
+
+  const json = await res.json()
+
+  const estrutura: ProducaoEstrutura[] = (json.produtos ?? []).map((item: Record<string, unknown>) => {
+    const p = item.produto as Record<string, unknown> | null
+    return {
+      produtoIdOlist: idProduto,
+      mpIdOlist: p?.id ? Number(p.id) : null,
+      mpSku: p?.sku ? String(p.sku) : null,
+      mpDescricao: String(p?.descricao ?? '').trim(),
+      mpTipo: p?.tipo ? String(p.tipo) : null,
+      quantidade: Number(item.quantidade ?? 0),
+    }
+  })
+
+  const etapas: ProducaoEtapa[] = (json.etapas ?? []).map((desc: unknown, i: number) => ({
+    produtoIdOlist: idProduto,
+    ordem: i + 1,
+    descricao: String(desc).trim(),
+  }))
+
+  return { estrutura, etapas }
 }
 
 export function produtoParaUpsert(p: ProdutoDetalhe): ProdutoParaUpsert {
