@@ -2,25 +2,43 @@
 
 import { useState } from 'react'
 
+type SyncState = { loading: boolean; result: string | null }
+
+const idle: SyncState = { loading: false, result: null }
+
 export default function OlistActions({ connected }: { connected: boolean }) {
-  const [syncing, setSyncing] = useState(false)
-  const [syncResult, setSyncResult] = useState<string | null>(null)
+  const [categorias, setCategorias] = useState<SyncState>(idle)
+  const [produtos, setProdutos] = useState<SyncState>(idle)
 
   async function sincronizarCategorias() {
-    setSyncing(true)
-    setSyncResult(null)
+    setCategorias({ loading: true, result: null })
     try {
       const res = await fetch('/api/sincronizar/categorias', { method: 'POST' })
       const json = await res.json()
-      if (!res.ok) {
-        setSyncResult(`Erro: ${json.error}`)
-      } else {
-        setSyncResult(`${json.importadas} categorias importadas (${json.categorias_raiz} raízes).`)
-      }
+      setCategorias({
+        loading: false,
+        result: res.ok
+          ? `${json.importadas} categorias importadas (${json.categorias_raiz} raízes).`
+          : `Erro: ${json.error}`,
+      })
     } catch {
-      setSyncResult('Erro de rede.')
-    } finally {
-      setSyncing(false)
+      setCategorias({ loading: false, result: 'Erro de rede.' })
+    }
+  }
+
+  async function sincronizarProdutos() {
+    setProdutos({ loading: true, result: null })
+    try {
+      const res = await fetch('/api/sincronizar/produtos', { method: 'POST' })
+      const json = await res.json()
+      setProdutos({
+        loading: false,
+        result: res.ok
+          ? `${json.importados} de ${json.total} produtos importados${json.erros > 0 ? ` (${json.erros} erros)` : ''}.`
+          : `Erro: ${json.error}`,
+      })
+    } catch {
+      setProdutos({ loading: false, result: 'Erro de rede.' })
     }
   }
 
@@ -30,13 +48,24 @@ export default function OlistActions({ connected }: { connected: boolean }) {
         <>
           <button
             onClick={sincronizarCategorias}
-            disabled={syncing}
+            disabled={categorias.loading || produtos.loading}
             className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
           >
-            {syncing ? 'Sincronizando...' : 'Sincronizar Categorias'}
+            {categorias.loading ? 'Sincronizando...' : 'Sincronizar Categorias'}
           </button>
-          {syncResult && (
-            <p className="text-sm text-gray-700">{syncResult}</p>
+          {categorias.result && (
+            <p className="text-sm text-gray-700">{categorias.result}</p>
+          )}
+
+          <button
+            onClick={sincronizarProdutos}
+            disabled={categorias.loading || produtos.loading}
+            className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
+          >
+            {produtos.loading ? 'Sincronizando produtos...' : 'Sincronizar Produtos'}
+          </button>
+          {produtos.result && (
+            <p className="text-sm text-gray-700">{produtos.result}</p>
           )}
         </>
       )}
