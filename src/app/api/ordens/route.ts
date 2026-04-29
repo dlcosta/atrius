@@ -17,6 +17,8 @@ type LinhaVolume = {
   etapa: EtapaOrdem | null
 }
 
+const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/
+
 function normalizarTexto(valor: unknown): string | null {
   const texto = typeof valor === 'string' ? valor.trim() : ''
   return texto ? texto : null
@@ -25,6 +27,17 @@ function normalizarTexto(valor: unknown): string | null {
 function normalizarEtapa(valor: unknown, sku?: string | null, unidade?: string | null): EtapaOrdem {
   if (valor === 'tanque' || valor === 'envase') return valor
   return inferirEtapa(sku, unidade)
+}
+
+function isDateInRange(dataIso: string | null | undefined, inicioMs: number, fimMs: number): boolean {
+  if (!dataIso) return false
+  const t = new Date(dataIso).getTime()
+  return Number.isFinite(t) && t >= inicioMs && t <= fimMs
+}
+
+function isDateOnlyInRange(dataYmd: string | null | undefined, inicioYmd: string, fimYmd: string): boolean {
+  if (!dataYmd) return false
+  return dataYmd >= inicioYmd && dataYmd <= fimYmd
 }
 
 async function carregarVolumeReferencia(
@@ -50,6 +63,7 @@ export async function GET(req: NextRequest) {
   const supabase = await createClient()
   const { searchParams } = new URL(req.url)
   const data = searchParams.get('data')
+  const diasParam = searchParams.get('dias')
 
   let query = supabase
     .from('ordens')
@@ -57,18 +71,51 @@ export async function GET(req: NextRequest) {
     .neq('status', 'cancelada')
     .order('inicio_agendado', { ascending: true, nullsFirst: false })
 
-  if (data && !/^\d{4}-\d{2}-\d{2}$/.test(data)) {
+  if (data && !DATE_REGEX.test(data)) {
     return NextResponse.json({ error: 'data invalida' }, { status: 400 })
   }
 
-  if (data) {
+  let dias: number | null = null
+  if (diasParam) {
+    const parsed = Number(diasParam)
+    if (!Number.isInteger(parsed) || parsed < 1 || parsed > 60) {
+      return NextResponse.json({ error: 'dias invalido (use 1..60)' }, { status: 400 })
+    }
+    dias = parsed
+  }
+
+  if (data && !dias) {
     query = query.or(`data_prevista.eq.${data},inicio_agendado.is.null`)
   }
 
   const { data: ordens, error } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  const lista = Array.isArray(ordens) ? ordens : []
+  let lista = Array.isArray(ordens) ? ordens : []
+
+  if (dias) {
+    const baseDateYmd = data ?? new Date().toISOString().slice(0, 10)
+    const base = new Date(`${baseDateYmd}T00:00:00`)
+    const inicio = new Date(base)
+    inicio.setDate(inicio.getDate() - (dias - 1))
+    const fim = new Date(base)
+    fim.setHours(23, 59, 59, 999)
+
+    const inicioMs = inicio.getTime()
+    const fimMs = fim.getTime()
+    const inicioYmd = inicio.toISOString().slice(0, 10)
+    const fimYmd = baseDateYmd
+
+    lista = lista.filter((ordem) => {
+      return (
+        isDateOnlyInRange(ordem.data_prevista, inicioYmd, fimYmd) ||
+        isDateInRange(ordem.inicio_agendado, inicioMs, fimMs) ||
+        isDateInRange(ordem.inicio_operacao_em, inicioMs, fimMs) ||
+        isDateInRange(ordem.fim_operacao_em, inicioMs, fimMs)
+      )
+    })
+  }
+
   const volumePorOrdem = mapearVolumeReferenciaPorOrdem(
     lista.map((ordem) => ({
       id: ordem.id,

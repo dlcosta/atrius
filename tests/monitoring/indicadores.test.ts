@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import type { Ordem } from '@/types'
 import {
+  calcularMediaTempoPorProduto,
+  calcularTempoRestanteMs,
   calcularIndicadores,
+  formatarDuracaoRelogio,
   formatarMinutos,
   obterQuantidadeProduzidaEstimada,
   obterTempoProducaoMin,
@@ -104,5 +107,67 @@ describe('formatarMinutos', () => {
     expect(formatarMinutos(75)).toBe('1 h 15 min')
     expect(formatarMinutos(60)).toBe('1 h')
     expect(formatarMinutos(15)).toBe('15 min')
+  })
+})
+
+describe('timer operacional', () => {
+  it('calcula tempo restante em ms', () => {
+    const ordem = criarOrdem({
+      status: 'produzindo',
+      inicio_operacao_em: '2026-04-07T10:00:00Z',
+      fim_calculado: '2026-04-07T13:00:00Z',
+    })
+    expect(calcularTempoRestanteMs(ordem, baseMs)).toBe(3600000)
+  })
+
+  it('formata duracao em HH:MM:SS', () => {
+    expect(formatarDuracaoRelogio(3661000)).toBe('01:01:01')
+  })
+})
+
+describe('calcularMediaTempoPorProduto', () => {
+  it('calcula media por produto com ordens concluidas', () => {
+    const ordens = [
+      criarOrdem({
+        id: 'a1',
+        produto_sku: 'P1',
+        produto: {
+          id: 'p1',
+          sku: 'P1',
+          nome: 'Produto A',
+          volume_base: 3800,
+          tempo_limpeza_min: 0,
+          tempos_maquinas: {},
+          cor: '#000000',
+          criado_em: '2026-04-01T00:00:00Z',
+        },
+        status: 'concluida',
+        inicio_operacao_em: '2026-04-07T08:00:00Z',
+        fim_operacao_em: '2026-04-07T09:00:00Z',
+      }),
+      criarOrdem({
+        id: 'a2',
+        produto_sku: 'P1',
+        produto: {
+          id: 'p1',
+          sku: 'P1',
+          nome: 'Produto A',
+          volume_base: 3800,
+          tempo_limpeza_min: 0,
+          tempos_maquinas: {},
+          cor: '#000000',
+          criado_em: '2026-04-01T00:00:00Z',
+        },
+        status: 'concluida',
+        inicio_operacao_em: '2026-04-07T10:00:00Z',
+        fim_operacao_em: '2026-04-07T11:30:00Z',
+      }),
+    ]
+
+    const medias = calcularMediaTempoPorProduto(ordens)
+    expect(medias).toHaveLength(1)
+    expect(medias[0].produtoSku).toBe('P1')
+    expect(medias[0].ordensConcluidas).toBe(2)
+    expect(medias[0].tempoMedioMin).toBe(75)
   })
 })

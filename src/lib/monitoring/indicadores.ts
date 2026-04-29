@@ -13,6 +13,15 @@ export type IndicadoresProducao = {
   maquinasProduzindo: number
 }
 
+export type MediaTempoProduto = {
+  produtoSku: string
+  produtoNome: string
+  ordensConcluidas: number
+  tempoMedioMin: number
+  tempoMinMin: number
+  tempoMaxMin: number
+}
+
 function toMs(dataIso: string | null | undefined): number | null {
   if (!dataIso) return null
   const t = new Date(dataIso).getTime()
@@ -102,4 +111,58 @@ export function formatarMinutos(min: number): string {
   if (h === 0) return `${m} min`
   if (m === 0) return `${h} h`
   return `${h} h ${m} min`
+}
+
+export function formatarDuracaoRelogio(ms: number): string {
+  const totalSeg = Math.max(0, Math.floor(ms / 1000))
+  const h = Math.floor(totalSeg / 3600)
+  const m = Math.floor((totalSeg % 3600) / 60)
+  const s = totalSeg % 60
+  return [h, m, s].map((v) => String(v).padStart(2, '0')).join(':')
+}
+
+export function calcularTempoRestanteMs(ordem: Ordem, agoraMs = Date.now()): number | null {
+  if (!ordem.fim_calculado) return null
+  const fimMs = toMs(ordem.fim_calculado)
+  if (!fimMs) return null
+  return Math.max(0, fimMs - agoraMs)
+}
+
+export function calcularMediaTempoPorProduto(ordens: Ordem[]): MediaTempoProduto[] {
+  const concluidas = ordens.filter((ordem) => {
+    return (
+      Boolean(ordem.inicio_operacao_em && ordem.fim_operacao_em) &&
+      (ordem.status === 'concluida' || Boolean(ordem.fim_operacao_em))
+    )
+  })
+
+  const porProduto = new Map<string, { nome: string; tempos: number[] }>()
+
+  for (const ordem of concluidas) {
+    const tempoMin = obterTempoProducaoMin(ordem)
+    if (tempoMin <= 0) continue
+
+    const sku = ordem.produto_sku ?? 'SEM-SKU'
+    const nome = ordem.produto?.nome ?? sku
+    const item = porProduto.get(sku) ?? { nome, tempos: [] }
+    item.tempos.push(tempoMin)
+    if (!item.nome && nome) item.nome = nome
+    porProduto.set(sku, item)
+  }
+
+  const resultado: MediaTempoProduto[] = []
+  porProduto.forEach((valor, sku) => {
+    if (valor.tempos.length === 0) return
+    const soma = valor.tempos.reduce((acc, t) => acc + t, 0)
+    resultado.push({
+      produtoSku: sku,
+      produtoNome: valor.nome || sku,
+      ordensConcluidas: valor.tempos.length,
+      tempoMedioMin: soma / valor.tempos.length,
+      tempoMinMin: Math.min(...valor.tempos),
+      tempoMaxMin: Math.max(...valor.tempos),
+    })
+  })
+
+  return resultado.sort((a, b) => b.ordensConcluidas - a.ordensConcluidas || a.tempoMedioMin - b.tempoMedioMin)
 }
