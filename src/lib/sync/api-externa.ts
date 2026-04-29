@@ -79,6 +79,7 @@ export function transformOrdem(ordemExterna: OrdemExterna): OrdemParaUpsert {
 
 /** Busca ordens da API externa */
 export async function fetchOrdensExternas(): Promise<OrdemExterna[]> {
+  console.log('Iniciando busca de ordens na API externa...')
   const rawUrl = process.env.API_EXTERNA_URL
   if (!rawUrl) {
     console.warn('API_EXTERNA_URL não definida, retornando lista vazia.')
@@ -108,9 +109,11 @@ export async function fetchOrdensExternas(): Promise<OrdemExterna[]> {
     }
 
     const data = await res.json()
-    return Array.isArray(data) ? data : data.ordens ?? data.data ?? []
+    const ordens = Array.isArray(data) ? data : data.ordens ?? data.data ?? []
+    console.log(`Busca finalizada com sucesso. Registros recebidos: ${ordens.length}`)
+    return ordens
   } catch (error) {
-    console.error(`Erro ao buscar ordens externas de ${url}:`, error)
+    console.error(`Erro na sincronização (API externa) em ${url}:`, error)
     if (error instanceof TypeError && error.message.includes('fetch failed')) {
       throw new Error(`Erro de conexão com a API externa (${baseUrl}). Verifique se o serviço está online.`)
     }
