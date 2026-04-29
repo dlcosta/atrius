@@ -79,26 +79,41 @@ export function transformOrdem(ordemExterna: OrdemExterna): OrdemParaUpsert {
 
 /** Busca ordens da API externa */
 export async function fetchOrdensExternas(): Promise<OrdemExterna[]> {
-  const baseUrl = process.env.API_EXTERNA_URL?.replace(/\/$/, '')
-  const isSupabase = baseUrl?.includes('supabase.co')
+  const rawUrl = process.env.API_EXTERNA_URL
+  if (!rawUrl) {
+    console.warn('API_EXTERNA_URL não definida, retornando lista vazia.')
+    return []
+  }
+
+  const baseUrl = rawUrl.replace(/\/$/, '')
+  const isSupabase = baseUrl.includes('supabase.co')
   const path = isSupabase ? '/rest/v1/ordens' : '/ordens'
   const filter = isSupabase ? 'status=in.(em_aberto,em_andamento)' : 'status=em_aberto,em_andamento'
 
-  const res = await fetch(
-    `${baseUrl}${path}?${filter}`,
-    {
+  const url = `${baseUrl}${path}?${filter}`
+
+  try {
+    const res = await fetch(url, {
       headers: {
         ...(isSupabase ? { 'apikey': process.env.API_EXTERNA_KEY! } : {}),
         Authorization: `Bearer ${process.env.API_EXTERNA_KEY}`,
         'Content-Type': 'application/json',
       },
+      next: { revalidate: 0 },
+    })
+
+    if (!res.ok) {
+      const errorText = await res.text()
+      throw new Error(`API externa retornou ${res.status}: ${errorText}`)
     }
-  )
 
-  if (!res.ok) {
-    throw new Error(`API externa retornou ${res.status}: ${await res.text()}`)
+    const data = await res.json()
+    return Array.isArray(data) ? data : data.ordens ?? data.data ?? []
+  } catch (error) {
+    console.error(`Erro ao buscar ordens externas de ${url}:`, error)
+    if (error instanceof TypeError && error.message.includes('fetch failed')) {
+      throw new Error(`Erro de conexão com a API externa (${baseUrl}). Verifique se o serviço está online.`)
+    }
+    throw error
   }
-
-  const data = await res.json()
-  return Array.isArray(data) ? data : data.ordens ?? data.data ?? []
 }
