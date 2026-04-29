@@ -332,7 +332,6 @@ export default function PlannerPage() {
                   <img src="/logoAtrius.webp" alt="Atrius Logo" className="h-16 w-auto" />
                   <div>
                     <h1 className="text-4xl font-black text-slate-900 tracking-tighter uppercase leading-none">Painel de Produção</h1>
-                    <p className="text-lg font-bold text-slate-500 uppercase tracking-widest mt-1">Controle de Chão de Fábrica</p>
                   </div>
                 </div>
 
