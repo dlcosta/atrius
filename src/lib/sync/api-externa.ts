@@ -79,10 +79,15 @@ export function transformOrdem(ordemExterna: OrdemExterna): OrdemParaUpsert {
 
 /** Busca ordens da API externa */
 export async function fetchOrdensExternas(): Promise<OrdemExterna[]> {
+  const baseUrl = process.env.API_EXTERNA_URL?.replace(/\/$/, '')
+  const isSupabase = baseUrl?.includes('supabase.co')
+  const path = isSupabase ? '/rest/v1/ordens' : '/ordens'
+
   const res = await fetch(
-    `${process.env.API_EXTERNA_URL}/ordens?status=em_aberto,em_andamento`,
+    `${baseUrl}${path}?status=em_aberto,em_andamento`,
     {
       headers: {
+        ...(isSupabase ? { 'apikey': process.env.API_EXTERNA_KEY! } : {}),
         Authorization: `Bearer ${process.env.API_EXTERNA_KEY}`,
         'Content-Type': 'application/json',
       },
