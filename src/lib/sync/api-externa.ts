@@ -82,9 +82,10 @@ export async function fetchOrdensExternas(): Promise<OrdemExterna[]> {
   const baseUrl = process.env.API_EXTERNA_URL?.replace(/\/$/, '')
   const isSupabase = baseUrl?.includes('supabase.co')
   const path = isSupabase ? '/rest/v1/ordens' : '/ordens'
+  const filter = isSupabase ? 'status=in.(em_aberto,em_andamento)' : 'status=em_aberto,em_andamento'
 
   const res = await fetch(
-    `${baseUrl}${path}?status=em_aberto,em_andamento`,
+    `${baseUrl}${path}?${filter}`,
     {
       headers: {
         ...(isSupabase ? { 'apikey': process.env.API_EXTERNA_KEY! } : {}),
