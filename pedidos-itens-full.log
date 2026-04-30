@@ -1,0 +1,24 @@
+﻿
+[2026-04-30T14:44:17.1992713-03:00] modo=full offset_inicial=100 offset_proximo=200 processados=99 itens=408 erros=1 finalizado=False
+[2026-04-30T14:46:39.4543838-03:00] modo=full offset_inicial=200 offset_proximo=300 processados=77 itens=366 erros=23 finalizado=False
+[2026-04-30T14:49:19.1411575-03:00] modo=full offset_inicial=300 offset_proximo=400 processados=100 itens=587 erros=0 finalizado=False
+[2026-04-30T14:51:47.3312289-03:00] modo=full offset_inicial=400 offset_proximo=500 processados=100 itens=516 erros=0 finalizado=False
+[2026-04-30T14:54:20.6964392-03:00] modo=full offset_inicial=500 offset_proximo=600 processados=100 itens=412 erros=0 finalizado=False
+[2026-04-30T14:56:50.2384717-03:00] modo=full offset_inicial=600 offset_proximo=700 processados=100 itens=495 erros=0 finalizado=False
+[2026-04-30T14:59:22.1894478-03:00] modo=full offset_inicial=700 offset_proximo=800 processados=100 itens=415 erros=0 finalizado=False
+[2026-04-30T15:02:38.1718338-03:00] modo=full offset_inicial=800 offset_proximo=900 processados=100 itens=397 erros=0 finalizado=False
+[2026-04-30T15:05:20.5223919-03:00] modo=full offset_inicial=900 offset_proximo=1000 processados=100 itens=476 erros=0 finalizado=False
+[2026-04-30T15:07:45.2265027-03:00] modo=full offset_inicial=1000 offset_proximo=1100 processados=100 itens=667 erros=0 finalizado=False
+[2026-04-30T15:10:12.1233037-03:00] modo=full offset_inicial=1100 offset_proximo=1200 processados=100 itens=553 erros=0 finalizado=False
+[2026-04-30T15:12:42.9589020-03:00] modo=full offset_inicial=1200 offset_proximo=1300 processados=100 itens=427 erros=0 finalizado=False
+[2026-04-30T15:15:14.9933296-03:00] modo=full offset_inicial=1300 offset_proximo=1400 processados=100 itens=607 erros=0 finalizado=False
+[2026-04-30T15:17:42.5629824-03:00] modo=full offset_inicial=1400 offset_proximo=1500 processados=100 itens=462 erros=0 finalizado=False
+[2026-04-30T15:20:15.5599634-03:00] modo=full offset_inicial=1500 offset_proximo=1600 processados=100 itens=482 erros=0 finalizado=False
+[2026-04-30T15:22:45.3576777-03:00] modo=full offset_inicial=1600 offset_proximo=1700 processados=100 itens=461 erros=0 finalizado=False
+[2026-04-30T15:25:17.2648672-03:00] modo=full offset_inicial=1700 offset_proximo=1800 processados=100 itens=543 erros=0 finalizado=False
+[2026-04-30T15:27:44.9448957-03:00] modo=full offset_inicial=1800 offset_proximo=1900 processados=100 itens=465 erros=0 finalizado=False
+[2026-04-30T15:30:17.9149820-03:00] modo=full offset_inicial=2000 offset_proximo=2100 processados=100 itens=507 erros=0 finalizado=False
+[2026-04-30T15:32:48.6532774-03:00] modo=full offset_inicial=2100 offset_proximo=2200 processados=100 itens=532 erros=0 finalizado=False
+[2026-04-30T15:35:23.6259560-03:00] modo=full offset_inicial=2200 offset_proximo=2300 processados=100 itens=652 erros=0 finalizado=False
+[2026-04-30T15:37:51.9004845-03:00] modo=full offset_inicial=2300 offset_proximo=2400 processados=100 itens=660 erros=0 finalizado=False
+[2026-04-30T15:40:21.3950538-03:00] modo=full offset_inicial=2400 offset_proximo=2500 processados=100 itens=491 erros=0 finalizado=False
