@@ -164,12 +164,6 @@ export async function GET(req: NextRequest) {
 
   const comVolume = lista.map((ordem) => ({
     ...ordem,
-    produto: ordem.produto
-      ? {
-          ...ordem.produto,
-          tempo_limpeza_min: 0,
-        }
-      : ordem.produto,
     etapa: normalizarEtapa(ordem.etapa, ordem.produto_sku, ordem.unidade),
     quantidade_referencia_litros: volumePorOrdem[ordem.id] ?? Number(ordem.quantidade),
   }))
@@ -185,6 +179,7 @@ export async function PATCH(req: NextRequest) {
   const inicio_agendado = body.inicio_agendado as string | null | undefined
   const fim_calculado = body.fim_calculado as string | null | undefined
   const maquina_id = body.maquina_id as string | null | undefined
+  const duracaoPlanejadaBody = body.duracao_planejada_min
 
   if (!id) return NextResponse.json({ error: 'id obrigatorio' }, { status: 400 })
 
@@ -192,6 +187,13 @@ export async function PATCH(req: NextRequest) {
   if (body.tanque !== undefined) metaUpdates.tanque = normalizarTexto(body.tanque)
   if (body.lote !== undefined) metaUpdates.lote = normalizarTexto(body.lote)
   if (body.etapa !== undefined) metaUpdates.etapa = normalizarEtapa(body.etapa)
+  if (duracaoPlanejadaBody !== undefined) {
+    const parsed = Number(duracaoPlanejadaBody)
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      return NextResponse.json({ error: 'duracao_planejada_min deve ser maior que zero' }, { status: 422 })
+    }
+    metaUpdates.duracao_planejada_min = Math.round(parsed)
+  }
 
   // Atualizacao de metadados sem agendamento
   if (inicio_agendado === undefined && maquina_id === undefined) {
@@ -229,7 +231,7 @@ export async function PATCH(req: NextRequest) {
 
   const { data: ordemData } = await supabase
     .from('ordens')
-    .select('id, quantidade, unidade, tanque, lote, etapa, produto_sku, produto:produtos(volume_base, tempos_maquinas)')
+    .select('id, quantidade, unidade, tanque, lote, etapa, produto_sku, duracao_planejada_min, produto:produtos(volume_base, tempos_maquinas)')
     .eq('id', id)
     .single()
 
@@ -250,7 +252,11 @@ export async function PATCH(req: NextRequest) {
 
   const inicio = new Date(inicio_agendado)
   const tempos = produto.tempos_maquinas?.[maquina_id] || { setup: 0, producao: 0 }
-  const duracaoMin = calcularDuracao(volumeReferencia, Number(produto.volume_base), tempos.setup, tempos.producao)
+  const duracaoManual = metaUpdates.duracao_planejada_min ?? ordemData.duracao_planejada_min
+  const duracaoMin =
+    typeof duracaoManual === 'number' && Number.isFinite(duracaoManual) && duracaoManual > 0
+      ? duracaoManual
+      : calcularDuracao(volumeReferencia, Number(produto.volume_base), tempos.setup, tempos.producao)
   const fimManual = typeof fim_calculado === 'string' ? new Date(fim_calculado) : null
   const fim = fimManual && Number.isFinite(fimManual.getTime()) ? fimManual : calcularFim(inicio, duracaoMin)
 

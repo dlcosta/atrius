@@ -57,6 +57,7 @@ type PendingDrop = {
 }
 
 const VIEW_STORAGE_KEY = 'atrius:calendario:view'
+const MACHINE_STORAGE_KEY = 'atrius:calendario:maquina'
 const JANELA_STORAGE_KEY = 'atrius:planner:janela-producao'
 const SNAP_OPTIONS = [5, 15, 30, 60]
 const ZOOM_OPTIONS = [
@@ -193,6 +194,40 @@ function calcularOcupacaoMaquina(ordens: Ordem[], janela: JanelaProducao, dias: 
   return Math.min(100, Math.max(0, (ocupadoMin / disponivelMin) * 100))
 }
 
+function minutesFromWindowStart(date: Date, janela: JanelaProducao): number {
+  return (date.getHours() - janela.startHour) * 60 + date.getMinutes()
+}
+
+function positionToCalendarDate(
+  x: number,
+  y: number,
+  rangeStart: Date,
+  janela: JanelaProducao,
+  columnWidth: number,
+  pxPerMinute: number,
+  totalDays: number
+): Date {
+  const dayOffset = Math.min(totalDays - 1, Math.max(0, Math.floor(x / columnWidth)))
+  const minutes = Math.max(0, Math.round(y / pxPerMinute))
+  const result = addDays(rangeStart, dayOffset)
+  result.setHours(janela.startHour, 0, 0, 0)
+  result.setMinutes(result.getMinutes() + minutes)
+  return result
+}
+
+function getCalendarMetrics(viewMode: ViewMode, zoomIndex: number): { columnWidth: number; pxPerMinute: number } {
+  const verticalScales = [
+    { day: 1.35, week: 1.05 },
+    { day: 1.75, week: 1.35 },
+    { day: 2.15, week: 1.7 },
+  ]
+  const scale = verticalScales[Math.min(verticalScales.length - 1, Math.max(0, zoomIndex))]
+  return {
+    columnWidth: viewMode === 'dia' ? 760 : 220,
+    pxPerMinute: viewMode === 'dia' ? scale.day : scale.week,
+  }
+}
+
 function DraggableBacklogCard({ ordem }: { ordem: Ordem }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: `backlog:${ordem.id}`,
@@ -240,6 +275,8 @@ function DroppableBacklog({ children }: { children: React.ReactNode }) {
   )
 }
 
+// Mantido como fallback da grade horizontal antiga enquanto a nova agenda vertical amadurece.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function MachineRow({
   maquina,
   ordens,
@@ -251,6 +288,7 @@ function MachineRow({
   rowWidth,
   viewMode,
   selected,
+  focusMode = false,
   rowRef,
   onRemove,
   onSelect,
@@ -266,6 +304,7 @@ function MachineRow({
   rowWidth: number
   viewMode: ViewMode
   selected: boolean
+  focusMode?: boolean
   rowRef: (node: HTMLDivElement | null) => void
   onRemove: (ordemId: string) => void
   onSelect: (maquinaId: string) => void
@@ -284,7 +323,7 @@ function MachineRow({
       <button
         type="button"
         onClick={() => onSelect(maquina.id)}
-        className={`sticky left-0 z-20 flex w-52 shrink-0 flex-col justify-center border-r px-4 text-left transition-colors ${
+        className={`sticky left-0 z-20 flex ${focusMode ? 'w-64' : 'w-52'} shrink-0 flex-col justify-center border-r px-4 text-left transition-colors ${
           selected ? 'border-blue-200 bg-blue-50' : 'border-slate-200 bg-slate-50 hover:bg-slate-100'
         }`}
         title="Expandir configuracao da maquina"
@@ -310,7 +349,9 @@ function MachineRow({
           setNodeRef(node)
           rowRef(node)
         }}
-        className={`relative transition-colors ${selected ? 'min-h-44 bg-blue-50/20' : 'min-h-32'} ${isOver ? 'bg-blue-50/50' : 'bg-white'}`}
+        className={`relative transition-colors ${
+          focusMode ? 'min-h-[620px] bg-white' : selected ? 'min-h-44 bg-blue-50/20' : 'min-h-32'
+        } ${isOver ? 'bg-blue-50/50' : 'bg-white'}`}
         style={{ width: rowWidth }}
       >
         {dias.map((dia, dayIndex) => (
@@ -518,6 +559,474 @@ function ScheduledEvent({
         >
           x
         </button>
+      </div>
+    </div>
+  )
+}
+
+function MachineCalendarBoard({
+  maquina,
+  ordens,
+  rangeStart,
+  dias,
+  janela,
+  viewMode,
+  zoomIndex,
+  zoomLabel,
+  boardRef,
+  onRemove,
+  onEdit,
+  onOpenOrder,
+}: {
+  maquina: Maquina
+  ordens: Ordem[]
+  rangeStart: Date
+  dias: Date[]
+  janela: JanelaProducao
+  viewMode: ViewMode
+  zoomIndex: number
+  zoomLabel: string
+  boardRef: (node: HTMLDivElement | null) => void
+  onRemove: (ordemId: string) => void
+  onEdit: (ordemId: string, maquinaId: string, inicio: Date, fim: Date) => Promise<void>
+  onOpenOrder: (ordem: Ordem) => void
+}) {
+  const { setNodeRef, isOver } = useDroppable({ id: `board:${maquina.id}` })
+  const { columnWidth, pxPerMinute } = getCalendarMetrics(viewMode, zoomIndex)
+  const hourHeight = 60 * pxPerMinute
+  const totalMinutes = Math.max(60, (janela.endHour - janela.startHour) * 60)
+  const boardHeight = totalMinutes * pxPerMinute
+  const boardWidth = columnWidth * dias.length
+  const hourMarks = useMemo(() => {
+    const marks: number[] = []
+    for (let h = janela.startHour; h <= janela.endHour; h++) marks.push(h)
+    return marks
+  }, [janela])
+
+  return (
+    <div className="min-w-max">
+      <div className="sticky top-0 z-30 flex border-b border-slate-200 bg-white">
+        <div className="sticky left-0 z-40 w-20 shrink-0 border-r border-slate-200 bg-slate-50 px-3 py-3 text-xs font-bold uppercase text-slate-500">
+          Hora
+        </div>
+        <div className="grid" style={{ gridTemplateColumns: `repeat(${dias.length}, ${columnWidth}px)` }}>
+          {dias.map((dia) => (
+            <div key={formatYmd(dia)} className="border-r border-slate-200 px-4 py-3">
+              <div className="text-xs font-black uppercase text-slate-900">{format(dia, "EEEE", { locale: ptBR })}</div>
+              <div className="text-[11px] font-semibold text-slate-500">{format(dia, "dd 'de' MMMM", { locale: ptBR })}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex">
+        <div
+          className="relative sticky left-0 z-20 w-20 shrink-0 border-r border-slate-200 bg-slate-50"
+          style={{ height: boardHeight }}
+        >
+          {hourMarks.map((hour) => (
+            <div
+              key={hour}
+              className="absolute right-3 -translate-y-2 text-[11px] font-bold text-slate-500"
+              style={{ top: (hour - janela.startHour) * hourHeight }}
+            >
+              {String(hour).padStart(2, '0')}h
+            </div>
+          ))}
+        </div>
+
+        <div
+          ref={(node) => {
+            setNodeRef(node)
+            boardRef(node)
+          }}
+          className={`relative bg-white transition-colors ${isOver ? 'bg-blue-50' : ''}`}
+          style={{ width: boardWidth, height: boardHeight }}
+        >
+          {dias.map((dia, dayIndex) => (
+            <div
+              key={formatYmd(dia)}
+              className="absolute inset-y-0 border-r border-slate-200"
+              style={{ left: dayIndex * columnWidth, width: columnWidth }}
+            >
+              {hourMarks.map((hour) => (
+                <div
+                  key={`${formatYmd(dia)}-${hour}`}
+                  className={`absolute inset-x-0 border-t ${hour === janela.startHour ? 'border-slate-300' : 'border-slate-100'}`}
+                  style={{ top: (hour - janela.startHour) * hourHeight }}
+                />
+              ))}
+            </div>
+          ))}
+
+          {ordens.map((ordem) => (
+            <VerticalScheduledEvent
+              key={ordem.id}
+              ordem={ordem}
+              rangeStart={rangeStart}
+              dias={dias}
+              janela={janela}
+              columnWidth={columnWidth}
+              pxPerMinute={pxPerMinute}
+              onRemove={onRemove}
+              onOpen={onOpenOrder}
+              onEdit={(ordemId, inicio, fim) => onEdit(ordemId, maquina.id, inicio, fim)}
+            />
+          ))}
+
+          {ordens.length === 0 && (
+            <div className="absolute inset-0 grid place-items-center">
+              <div className="rounded-md border border-dashed border-slate-300 bg-white px-8 py-6 text-sm font-semibold text-slate-400">
+                Arraste uma ordem do backlog para montar a agenda desta maquina.
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="sticky bottom-0 z-30 border-t border-slate-200 bg-white px-4 py-2 text-[11px] font-semibold uppercase text-slate-500">
+        Escala {zoomLabel} · linhas de 1 hora · encaixe de {janela.snapMinutes} min
+      </div>
+    </div>
+  )
+}
+
+function VerticalScheduledEvent({
+  ordem,
+  rangeStart,
+  dias,
+  janela,
+  columnWidth,
+  pxPerMinute,
+  onRemove,
+  onOpen,
+  onEdit,
+}: {
+  ordem: Ordem
+  rangeStart: Date
+  dias: Date[]
+  janela: JanelaProducao
+  columnWidth: number
+  pxPerMinute: number
+  onRemove: (ordemId: string) => void
+  onOpen: (ordem: Ordem) => void
+  onEdit: (ordemId: string, inicio: Date, fim: Date) => Promise<void>
+}) {
+  const [draft, setDraft] = useState<{ inicio: Date; fim: Date } | null>(null)
+  const [editing, setEditing] = useState<CalendarEditMode | null>(null)
+  const draftRef = useRef<{ inicio: Date; fim: Date } | null>(null)
+  const suppressClickRef = useRef(false)
+  const stateRef = useRef<{
+    mode: CalendarEditMode
+    startClientY: number
+    initialInicio: Date
+    initialFim: Date
+  } | null>(null)
+
+  if (!ordem.inicio_agendado || !ordem.fim_calculado) return null
+
+  const inicio = draft?.inicio ?? new Date(ordem.inicio_agendado)
+  const fim = draft?.fim ?? new Date(ordem.fim_calculado)
+  const duration = Math.max(15, (fim.getTime() - inicio.getTime()) / 60000)
+  const dayOffset = Math.round((dateAtStartOfDay(inicio).getTime() - rangeStart.getTime()) / 86400000)
+  if (dayOffset < 0 || dayOffset >= dias.length) return null
+
+  const top = Math.max(0, minutesFromWindowStart(inicio, janela) * pxPerMinute)
+  const height = Math.max(92, duration * pxPerMinute)
+  const left = dayOffset * columnWidth + 12
+  const width = columnWidth - 24
+  const color = ordem.produto?.cor ?? '#2563eb'
+  const minDurationMs = Math.max(15, janela.snapMinutes) * 60000
+
+  function handlePointerDown(e: React.PointerEvent<HTMLDivElement>, mode: CalendarEditMode) {
+    if (!ordem.inicio_agendado || !ordem.fim_calculado) return
+    e.preventDefault()
+    e.stopPropagation()
+    const initialInicio = draft?.inicio ?? new Date(ordem.inicio_agendado)
+    const initialFim = draft?.fim ?? new Date(ordem.fim_calculado)
+    stateRef.current = { mode, startClientY: e.clientY, initialInicio, initialFim }
+    suppressClickRef.current = false
+    setEditing(mode)
+    e.currentTarget.setPointerCapture(e.pointerId)
+  }
+
+  function handlePointerMove(e: React.PointerEvent<HTMLDivElement>) {
+    const state = stateRef.current
+    if (!state) return
+
+    const deltaMinutes = Math.round((e.clientY - state.startClientY) / pxPerMinute)
+    if (Math.abs(e.clientY - state.startClientY) > 4) suppressClickRef.current = true
+    const deltaMs = deltaMinutes * 60000
+    let nextInicio = new Date(state.initialInicio)
+    let nextFim = new Date(state.initialFim)
+
+    if (state.mode === 'move') {
+      nextInicio = new Date(state.initialInicio.getTime() + deltaMs)
+      nextFim = new Date(state.initialFim.getTime() + deltaMs)
+    }
+
+    if (state.mode === 'resize-start') {
+      nextInicio = new Date(Math.min(state.initialInicio.getTime() + deltaMs, state.initialFim.getTime() - minDurationMs))
+    }
+
+    if (state.mode === 'resize-end') {
+      nextFim = new Date(Math.max(state.initialFim.getTime() + deltaMs, state.initialInicio.getTime() + minDurationMs))
+    }
+
+    nextInicio = snapDate(nextInicio, janela.snapMinutes)
+    nextFim = snapDate(nextFim, janela.snapMinutes)
+    if (nextFim <= nextInicio) nextFim = new Date(nextInicio.getTime() + minDurationMs)
+
+    const nextDraft = { inicio: nextInicio, fim: nextFim }
+    draftRef.current = nextDraft
+    setDraft(nextDraft)
+  }
+
+  async function handlePointerUp(e: React.PointerEvent<HTMLDivElement>) {
+    const state = stateRef.current
+    if (!state) return
+    stateRef.current = null
+    setEditing(null)
+    try {
+      e.currentTarget.releasePointerCapture(e.pointerId)
+    } catch {
+      // Pointer capture may already be released by the browser.
+    }
+
+    const nextInicio = draftRef.current?.inicio ?? state.initialInicio
+    const nextFim = draftRef.current?.fim ?? state.initialFim
+    const changed = nextInicio.getTime() !== state.initialInicio.getTime() || nextFim.getTime() !== state.initialFim.getTime()
+    if (changed) await onEdit(ordem.id, nextInicio, nextFim)
+    draftRef.current = null
+    setDraft(null)
+  }
+
+  return (
+    <div
+      onPointerDown={(e) => handlePointerDown(e, 'move')}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={() => {
+        stateRef.current = null
+        draftRef.current = null
+        setEditing(null)
+        setDraft(null)
+      }}
+      onClick={() => {
+        if (suppressClickRef.current) {
+          suppressClickRef.current = false
+          return
+        }
+        if (!editing) onOpen(ordem)
+      }}
+      className={`group absolute overflow-hidden rounded-lg border bg-white shadow-sm transition hover:z-30 hover:border-blue-300 hover:shadow-lg ${
+        editing ? 'z-40 cursor-grabbing border-blue-400 ring-2 ring-blue-200' : 'cursor-pointer border-slate-200'
+      }`}
+      style={{ top, left, width, height }}
+      title={`${ordemLabel(ordem)}\n${formatarHora(inicio)} - ${formatarHora(fim)}`}
+    >
+      <div className="absolute inset-y-0 left-0 w-2.5" style={{ backgroundColor: color }} />
+      <div
+        className="absolute inset-x-0 top-0 z-10 h-2 cursor-ns-resize bg-blue-500/0 transition group-hover:bg-blue-500/20"
+        onPointerDown={(e) => handlePointerDown(e, 'resize-start')}
+        title="Ajustar inicio"
+      />
+      <div
+        className="absolute inset-x-0 bottom-0 z-10 h-2 cursor-ns-resize bg-blue-500/0 transition group-hover:bg-blue-500/20"
+        onPointerDown={(e) => handlePointerDown(e, 'resize-end')}
+        title="Ajustar fim"
+      />
+
+      <div className="flex h-full flex-col justify-between gap-2 bg-linear-to-br from-white to-slate-50 py-3 pl-5 pr-3">
+        <div className="flex items-start gap-3">
+          <div className="min-w-0 flex-1 pr-1">
+            <div className="line-clamp-2 text-[15px] font-black leading-5 text-slate-950">{ordemLabel(ordem)}</div>
+            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+              <span className="rounded-md bg-blue-50 px-2 py-1 text-[11px] font-black text-blue-800">
+                {formatarHora(inicio)} - {formatarHora(fim)}
+              </span>
+              <span className="rounded-md bg-slate-100 px-2 py-1 text-[11px] font-black text-slate-700">
+                {formatarDuracao(duration)}
+              </span>
+            </div>
+          </div>
+          <button
+            type="button"
+            className="grid h-8 w-8 shrink-0 place-items-center rounded-md border border-slate-200 bg-white text-slate-400 shadow-sm transition hover:border-red-200 hover:bg-red-50 hover:text-red-600"
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation()
+              onRemove(ordem.id)
+            }}
+            title="Desagendar"
+          >
+            <X size={14} />
+          </button>
+        </div>
+
+        <div className="flex min-h-6 flex-wrap items-center gap-1 overflow-hidden text-[10px] font-bold uppercase tracking-wide">
+          <span className="rounded-md bg-slate-900 px-2 py-1 text-white">#{ordem.numero_externo}</span>
+          <span className="rounded-md bg-slate-100 px-2 py-1 text-slate-600">{ordem.etapa}</span>
+          {ordem.lote && <span className="truncate rounded-md bg-amber-50 px-2 py-1 text-amber-700">{ordem.lote}</span>}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function OrderConfigModal({
+  ordem,
+  maquinas,
+  onClose,
+  onSave,
+}: {
+  ordem: Ordem
+  maquinas: Maquina[]
+  onClose: () => void
+  onSave: (ordem: Ordem, setupMin: number, producaoMin: number, limpezaMin: number) => Promise<void>
+}) {
+  const produto = ordem.produto
+  const maquinaId = ordem.maquina_id ?? maquinas.find((maquina) => maquina.ativa)?.id ?? ''
+  const maquina = maquinas.find((m) => m.id === maquinaId)
+  const tempos = produto?.tempos_maquinas?.[maquinaId] ?? { setup: 0, producao: 60 }
+  const inicio = ordem.inicio_agendado ? new Date(ordem.inicio_agendado) : null
+  const fim = ordem.fim_calculado ? new Date(ordem.fim_calculado) : null
+  const duracaoAtual = inicio && fim ? Math.max(0, (fim.getTime() - inicio.getTime()) / 60000) : 0
+  const producaoInicial = ordem.duracao_planejada_min ?? (duracaoAtual > 0 ? Math.max(1, duracaoAtual - Number(tempos.setup ?? 0)) : Number(tempos.producao ?? 60))
+  const [setupMin, setSetupMin] = useState(String(Number(tempos.setup ?? 0)))
+  const [producaoMin, setProducaoMin] = useState(String(Number(producaoInicial)))
+  const [limpezaMin, setLimpezaMin] = useState(String(Number(produto?.tempo_limpeza_min ?? 0)))
+  const [saving, setSaving] = useState(false)
+  const [erro, setErro] = useState('')
+
+  async function salvar() {
+    setErro('')
+    if (!produto?.id) {
+      setErro('Pedido sem produto vinculado para configurar tempos.')
+      return
+    }
+
+    const setup = Math.max(0, Number(setupMin) || 0)
+    const producao = Math.max(1, Number(producaoMin) || 1)
+    const limpeza = Math.max(0, Number(limpezaMin) || 0)
+
+    setSaving(true)
+    try {
+      await onSave(ordem, setup, producao, limpeza)
+      onClose()
+    } catch (err) {
+      setErro(err instanceof Error ? err.message : 'Nao foi possivel salvar os tempos do pedido.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-[130] flex items-center justify-center bg-slate-950/45 p-4">
+      <div className="flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-lg bg-white shadow-2xl">
+        <div className="border-b border-slate-200 px-6 py-5">
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <div className="text-xs font-black uppercase text-blue-700">Configurar pedido agendado</div>
+              <h2 className="mt-1 truncate text-2xl font-black text-slate-900">{ordemLabel(ordem)}</h2>
+              <p className="mt-1 text-sm text-slate-500">
+                #{ordem.numero_externo} · {maquina?.nome ?? 'Sem maquina'} · {ordem.quantidade} {ordem.unidade}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="grid h-9 w-9 place-items-center rounded-md border border-slate-200 text-slate-500 hover:bg-slate-50"
+              title="Fechar"
+            >
+              <X size={18} />
+            </button>
+          </div>
+        </div>
+
+        <div className="min-h-0 overflow-y-auto p-6">
+          <div className="grid gap-4 md:grid-cols-3">
+            <div className="rounded-md border border-slate-200 bg-slate-50 p-4">
+              <div className="text-xs font-bold uppercase text-slate-500">Horario atual</div>
+              <div className="mt-2 text-lg font-black text-slate-900">
+                {inicio && fim ? `${formatarHora(inicio)} - ${formatarHora(fim)}` : 'Sem horario'}
+              </div>
+              <div className="mt-1 text-sm font-semibold text-slate-500">{duracaoAtual ? formatarDuracao(duracaoAtual) : 'Nao calculado'}</div>
+            </div>
+            <div className="rounded-md border border-slate-200 bg-slate-50 p-4">
+              <div className="text-xs font-bold uppercase text-slate-500">Produto</div>
+              <div className="mt-2 truncate text-lg font-black text-slate-900">{produto?.sku ?? ordem.produto_sku ?? '--'}</div>
+              <div className="mt-1 text-sm font-semibold text-slate-500">Volume base {produto?.volume_base ?? 3800} L</div>
+            </div>
+            <div className="rounded-md border border-slate-200 bg-slate-50 p-4">
+              <div className="text-xs font-bold uppercase text-slate-500">Pedido</div>
+              <div className="mt-2 text-lg font-black text-slate-900">{ordem.etapa}</div>
+              <div className="mt-1 truncate text-sm font-semibold text-slate-500">{ordem.lote ? `Lote ${ordem.lote}` : 'Sem lote informado'}</div>
+            </div>
+          </div>
+
+          <div className="mt-5 grid gap-4 md:grid-cols-3">
+            <label className="block rounded-md border border-slate-200 p-4">
+              <span className="text-xs font-black uppercase text-slate-500">Setup</span>
+              <input
+                type="number"
+                min="0"
+                value={setupMin}
+                onChange={(e) => setSetupMin(e.target.value)}
+                className="mt-2 h-11 w-full rounded-md border border-slate-300 px-3 text-lg font-bold outline-none focus:border-blue-500"
+              />
+              <span className="mt-1 block text-xs font-semibold text-slate-400">minutos antes da producao</span>
+            </label>
+            <label className="block rounded-md border border-slate-200 p-4">
+              <span className="text-xs font-black uppercase text-slate-500">Tempo de producao</span>
+              <input
+                type="number"
+                min="1"
+                value={producaoMin}
+                onChange={(e) => setProducaoMin(e.target.value)}
+                className="mt-2 h-11 w-full rounded-md border border-slate-300 px-3 text-lg font-bold outline-none focus:border-blue-500"
+              />
+              <span className="mt-1 block text-xs font-semibold text-slate-400">minutos totais desta ordem</span>
+            </label>
+            <label className="block rounded-md border border-slate-200 p-4">
+              <span className="text-xs font-black uppercase text-slate-500">Tempo de limpeza</span>
+              <input
+                type="number"
+                min="0"
+                value={limpezaMin}
+                onChange={(e) => setLimpezaMin(e.target.value)}
+                className="mt-2 h-11 w-full rounded-md border border-slate-300 px-3 text-lg font-bold outline-none focus:border-blue-500"
+              />
+              <span className="mt-1 block text-xs font-semibold text-slate-400">minutos apos producao</span>
+            </label>
+          </div>
+
+          <div className="mt-5 rounded-md border border-slate-200 bg-white p-4">
+            <div className="text-xs font-black uppercase text-slate-500">Informacoes do pedido</div>
+            <div className="mt-3 grid gap-2 text-sm md:grid-cols-2">
+              <div><span className="font-bold text-slate-500">SKU:</span> {ordem.produto_sku ?? '--'}</div>
+              <div><span className="font-bold text-slate-500">Status:</span> {ordem.status}</div>
+              <div><span className="font-bold text-slate-500">Data prevista:</span> {ordem.data_prevista ?? '--'}</div>
+              <div><span className="font-bold text-slate-500">Tanque:</span> {ordem.tanque ?? '--'}</div>
+            </div>
+          </div>
+
+          {erro && <div className="mt-4 rounded-md bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{erro}</div>}
+        </div>
+
+        <div className="flex justify-end gap-2 border-t border-slate-200 px-6 py-4">
+          <button type="button" onClick={onClose} className="h-10 rounded-md border border-slate-300 px-4 text-sm font-bold text-slate-700">
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={salvar}
+            disabled={saving}
+            className="h-10 rounded-md bg-blue-600 px-5 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-50"
+          >
+            {saving ? 'Salvando...' : 'Salvar e recalcular agenda'}
+          </button>
+        </div>
       </div>
     </div>
   )
@@ -738,7 +1247,7 @@ function MachineInspector({
   }
 
   return (
-    <aside className="flex w-[380px] shrink-0 flex-col overflow-hidden rounded-lg border border-blue-200 bg-white shadow-sm">
+    <aside className="flex max-h-[360px] w-full flex-col overflow-hidden rounded-lg border border-blue-200 bg-white shadow-sm">
       <div className="border-b border-slate-200 bg-gradient-to-r from-blue-50 to-white p-4">
         <div className="flex items-start justify-between gap-3">
           <div>
@@ -918,6 +1427,7 @@ export default function CalendarioPage() {
   const [filtroEtapa, setFiltroEtapa] = useState<'todas' | 'tanque' | 'envase'>('todas')
   const [activePayload, setActivePayload] = useState<DragPayload | null>(null)
   const [pendingDrop, setPendingDrop] = useState<PendingDrop | null>(null)
+  const [configOrder, setConfigOrder] = useState<Ordem | null>(null)
   const [selectedMachineId, setSelectedMachineId] = useState<string | null>(null)
   const rowRefs = useRef<Record<string, HTMLDivElement | null>>({})
 
@@ -928,7 +1438,6 @@ export default function CalendarioPage() {
   const zoom = ZOOM_OPTIONS[zoomIndex]
   const pxPerMinute = viewMode === 'dia' ? zoom.pxPerMinuteDay : zoom.pxPerMinuteWeek
   const dayWidth = (janela.endHour - janela.startHour) * 60 * pxPerMinute
-  const rowWidth = dayWidth * range.dias.length
 
   const carregarDados = useCallback(async () => {
     try {
@@ -958,6 +1467,9 @@ export default function CalendarioPage() {
       const savedView = localStorage.getItem(VIEW_STORAGE_KEY)
       if (savedView === 'dia' || savedView === 'semana') setViewMode(savedView)
 
+      const savedMachine = localStorage.getItem(MACHINE_STORAGE_KEY)
+      if (savedMachine) setSelectedMachineId(savedMachine)
+
       const salvo = localStorage.getItem(JANELA_STORAGE_KEY)
       if (salvo) setJanela(sanitizarJanelaProducao(JSON.parse(salvo)))
     } catch {
@@ -968,6 +1480,10 @@ export default function CalendarioPage() {
   useEffect(() => {
     localStorage.setItem(VIEW_STORAGE_KEY, viewMode)
   }, [viewMode])
+
+  useEffect(() => {
+    if (selectedMachineId) localStorage.setItem(MACHINE_STORAGE_KEY, selectedMachineId)
+  }, [selectedMachineId])
 
   useEffect(() => {
     localStorage.setItem(JANELA_STORAGE_KEY, JSON.stringify(janela))
@@ -989,8 +1505,13 @@ export default function CalendarioPage() {
   )
 
   useEffect(() => {
-    if (selectedMachineId && !maquinasAtivas.some((maquina) => maquina.id === selectedMachineId)) {
+    if (maquinasAtivas.length === 0) {
       setSelectedMachineId(null)
+      return
+    }
+
+    if (!selectedMachineId || !maquinasAtivas.some((maquina) => maquina.id === selectedMachineId)) {
+      setSelectedMachineId(maquinasAtivas[0].id)
     }
   }, [maquinasAtivas, selectedMachineId])
   const ordensBacklog = useMemo(() => {
@@ -1010,7 +1531,8 @@ export default function CalendarioPage() {
     ordemId: string,
     maquinaId: string | null,
     inicio: Date | null,
-    fim?: Date | null
+    fim?: Date | null,
+    duracaoPlanejadaMin?: number | null
   ): Promise<{ ok: boolean; error?: string }> {
     const res = await fetch('/api/ordens', {
       method: 'PATCH',
@@ -1020,6 +1542,7 @@ export default function CalendarioPage() {
         maquina_id: maquinaId,
         inicio_agendado: inicio?.toISOString() ?? null,
         ...(fim ? { fim_calculado: fim.toISOString() } : {}),
+        ...(duracaoPlanejadaMin ? { duracao_planejada_min: Math.round(duracaoPlanejadaMin) } : {}),
       }),
     })
     const data = await res.json().catch(() => ({}))
@@ -1073,17 +1596,26 @@ export default function CalendarioPage() {
     }
 
     const overId = String(event.over.id)
-    if (!overId.startsWith('row:')) return
+    if (!overId.startsWith('row:') && !overId.startsWith('board:')) return
 
-    const maquinaId = overId.replace('row:', '')
+    const isBoardDrop = overId.startsWith('board:')
+    const maquinaId = overId.replace(isBoardDrop ? 'board:' : 'row:', '')
     const row = rowRefs.current[maquinaId]
     const translated = event.active.rect.current.translated
     if (!row || !translated) return
 
     const rect = row.getBoundingClientRect()
     const centerX = translated.left + translated.width / 2
-    const px = centerX - rect.left + row.scrollLeft
-    const inicio = snapDate(positionToDate(px, range.inicio, janela, dayWidth, pxPerMinute), janela.snapMinutes)
+    const centerY = translated.top + translated.height / 2
+    const x = centerX - rect.left + row.scrollLeft
+    const y = centerY - rect.top + row.scrollTop
+    const calendarMetrics = getCalendarMetrics(viewMode, zoomIndex)
+    const inicio = snapDate(
+      isBoardDrop
+        ? positionToCalendarDate(x, y, range.inicio, janela, calendarMetrics.columnWidth, calendarMetrics.pxPerMinute, range.dias.length)
+        : positionToDate(x, range.inicio, janela, dayWidth, pxPerMinute),
+      janela.snapMinutes
+    )
     await salvarAgenda(payload.ordemId, maquinaId, inicio)
   }
 
@@ -1108,6 +1640,48 @@ export default function CalendarioPage() {
     }
 
     setPendingDrop(null)
+    await carregarDados()
+  }
+
+  async function salvarConfiguracaoPedido(ordem: Ordem, setupMin: number, producaoMin: number, limpezaMin: number) {
+    if (!ordem.produto?.id) throw new Error('Pedido sem produto vinculado para configurar tempos.')
+    const maquinaId = ordem.maquina_id ?? selectedMachineId
+    if (!maquinaId) throw new Error('Selecione uma maquina para configurar o tempo de producao.')
+
+    const produtoAtualizado: Produto = {
+      ...ordem.produto,
+      tempo_limpeza_min: limpezaMin,
+      tempos_maquinas: {
+        ...(ordem.produto.tempos_maquinas ?? {}),
+        [maquinaId]: { setup: setupMin, producao: producaoMin },
+      },
+    }
+
+    const produtoRes = await fetch('/api/produtos', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: produtoAtualizado.id,
+        tempos_maquinas: produtoAtualizado.tempos_maquinas,
+        tempo_limpeza_min: produtoAtualizado.tempo_limpeza_min,
+      }),
+    })
+    const produtoData = await produtoRes.json().catch(() => ({}))
+    if (!produtoRes.ok) throw new Error(produtoData.error ?? 'Nao foi possivel salvar os tempos do produto.')
+
+    if (ordem.inicio_agendado) {
+      const inicio = new Date(ordem.inicio_agendado)
+      const duracaoPlanejada = Math.max(1, setupMin + producaoMin)
+      const result = await patchAgenda(
+        ordem.id,
+        maquinaId,
+        inicio,
+        calcularFim(inicio, duracaoPlanejada),
+        duracaoPlanejada
+      )
+      if (!result.ok) throw new Error(result.error ?? 'Tempos salvos, mas nao foi possivel recalcular a agenda.')
+    }
+
     await carregarDados()
   }
 
@@ -1223,7 +1797,7 @@ export default function CalendarioPage() {
         {mensagem && <div className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800">{mensagem}</div>}
 
         <main className="flex min-h-0 flex-1 gap-3 p-3">
-          <aside className="flex w-80 shrink-0 flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+          <aside className="flex w-72 shrink-0 flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
             <div className="border-b border-slate-200 p-3">
               <div className="flex items-center justify-between gap-2">
                 <div>
@@ -1276,83 +1850,95 @@ export default function CalendarioPage() {
           </aside>
 
           <section className="min-w-0 flex-1 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
-            <div className="h-full overflow-auto">
-              <div className="min-w-max">
-                <div className="sticky top-0 z-30 flex border-b border-slate-200 bg-white">
-                  <div className="sticky left-0 z-40 w-52 shrink-0 border-r border-slate-200 bg-slate-50 px-4 py-3 text-xs font-bold uppercase text-slate-500">
-                    Maquinas
+            <div className="flex h-full min-h-0 flex-col">
+              <div className="border-b border-slate-200 bg-white p-3">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <h2 className="text-base font-black text-slate-900">Calendario individual da maquina</h2>
+                    <p className="text-xs text-slate-500">
+                      {selectedMachine ? `${selectedMachine.nome} com ${selectedMachineOrdens.length} ordens agendadas` : 'Selecione uma maquina ativa'}
+                    </p>
                   </div>
-                  <div className="relative h-16" style={{ width: rowWidth }}>
-                    {range.dias.map((dia, dayIndex) => (
-                      <div
-                        key={formatYmd(dia)}
-                        className="absolute inset-y-0 border-r border-slate-200 bg-white"
-                        style={{ left: dayIndex * dayWidth, width: dayWidth }}
-                      >
-                        <div className="border-b border-slate-100 px-2 py-1 text-xs font-bold uppercase text-slate-700">
-                          {format(dia, "EEE dd/MM", { locale: ptBR })}
-                        </div>
-                        <div className="relative h-8">
-                          {Array.from({ length: janela.endHour - janela.startHour + 1 }, (_, index) => janela.startHour + index).map((hour) => (
-                            <span
-                              key={hour}
-                              className="absolute top-2 -translate-x-1/2 text-[10px] font-semibold text-slate-400"
-                              style={{ left: (hour - janela.startHour) * 60 * pxPerMinute }}
-                            >
-                              {String(hour).padStart(2, '0')}h
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                  {selectedMachine && (
+                    <div className="flex items-center gap-2 text-xs font-bold uppercase text-slate-500">
+                      <span className="rounded bg-slate-100 px-2 py-1">
+                        {calcularOcupacaoMaquina(selectedMachineOrdens, janela, range.dias).toFixed(0)}% ocupado
+                      </span>
+                      <span className="rounded bg-cyan-50 px-2 py-1 text-cyan-700">
+                        {selectedMachineOrdens.filter((ordem) => ordem.etapa === 'tanque').length} tanque
+                      </span>
+                      <span className="rounded bg-violet-50 px-2 py-1 text-violet-700">
+                        {selectedMachineOrdens.filter((ordem) => ordem.etapa === 'envase').length} envase
+                      </span>
+                    </div>
+                  )}
                 </div>
 
-                {maquinasAtivas.map((maquina) => (
-                  <MachineRow
-                    key={maquina.id}
-                    maquina={maquina}
-                    ordens={ordensAgendadas.filter((ordem) => ordem.maquina_id === maquina.id)}
+                <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
+                  {maquinasAtivas.map((maquina) => {
+                    const agendaMaquina = ordensAgendadas.filter((ordem) => ordem.maquina_id === maquina.id)
+                    const active = selectedMachineId === maquina.id
+                    return (
+                      <button
+                        key={maquina.id}
+                        type="button"
+                        onClick={() => setSelectedMachineId(maquina.id)}
+                        className={`min-w-48 rounded-md border px-3 py-2 text-left transition ${
+                          active ? 'border-blue-300 bg-blue-50 text-blue-900' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                        }`}
+                      >
+                        <div className="truncate text-sm font-bold">{maquina.nome}</div>
+                        <div className="mt-1 text-[11px] font-semibold text-slate-500">{agendaMaquina.length} ordens no periodo</div>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              <div className="min-h-0 flex-1 overflow-auto bg-slate-50">
+                {selectedMachine ? (
+                  <MachineCalendarBoard
+                    key={selectedMachine.id}
+                    maquina={selectedMachine}
+                    ordens={selectedMachineOrdens}
                     rangeStart={range.inicio}
                     dias={range.dias}
                     janela={janela}
-                    pxPerMinute={pxPerMinute}
-                    dayWidth={dayWidth}
-                    rowWidth={rowWidth}
                     viewMode={viewMode}
-                    selected={selectedMachineId === maquina.id}
-                    rowRef={(node) => {
-                      rowRefs.current[maquina.id] = node
+                    zoomIndex={zoomIndex}
+                    zoomLabel={zoom.label}
+                    boardRef={(node) => {
+                      rowRefs.current[selectedMachine.id] = node
                     }}
                     onRemove={desagendar}
-                    onSelect={(maquinaId) => setSelectedMachineId((current) => current === maquinaId ? null : maquinaId)}
+                    onOpenOrder={setConfigOrder}
                     onEdit={salvarAgendaComFim}
                   />
-                ))}
-
-                {maquinasAtivas.length === 0 && (
+                ) : (
                   <div className="p-10 text-center text-sm text-slate-400">Nenhuma maquina ativa cadastrada.</div>
                 )}
               </div>
+
+              {selectedMachine && (
+                <div className="border-t border-slate-200 bg-white p-3">
+                  <MachineInspector
+                    maquina={selectedMachine}
+                    ordens={selectedMachineOrdens}
+                    maquinas={maquinas}
+                    janela={janela}
+                    dias={range.dias}
+                    onClose={() => setSelectedMachineId(maquinasAtivas[0]?.id ?? null)}
+                    onSave={salvarAgenda}
+                    onRemove={desagendar}
+                    onFocusDia={(dia) => {
+                      setDiaBase(dia)
+                      setViewMode('dia')
+                    }}
+                  />
+                </div>
+              )}
             </div>
           </section>
-
-          {selectedMachine && (
-            <MachineInspector
-              maquina={selectedMachine}
-              ordens={selectedMachineOrdens}
-              maquinas={maquinas}
-              janela={janela}
-              dias={range.dias}
-              onClose={() => setSelectedMachineId(null)}
-              onSave={salvarAgenda}
-              onRemove={desagendar}
-              onFocusDia={(dia) => {
-                setDiaBase(dia)
-                setViewMode('dia')
-              }}
-            />
-          )}
         </main>
 
         {novaOrdemAberta && (
@@ -1375,6 +1961,15 @@ export default function CalendarioPage() {
             janela={janela}
             onClose={() => setPendingDrop(null)}
             onSave={salvarConflito}
+          />
+        )}
+
+        {configOrder && (
+          <OrderConfigModal
+            ordem={configOrder}
+            maquinas={maquinas}
+            onClose={() => setConfigOrder(null)}
+            onSave={salvarConfiguracaoPedido}
           />
         )}
 

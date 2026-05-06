@@ -42,12 +42,13 @@ export async function POST(req: NextRequest) {
 
 export async function PATCH(req: NextRequest) {
   const supabase = await createClient()
-  const { id, nome, volume_base, tempos_maquinas, cor } = await req.json()
+  const { id, nome, volume_base, tempos_maquinas, tempo_limpeza_min, cor } = await req.json()
 
-  const updates: Record<string, unknown> = { tempo_limpeza_min: 0 }
+  const updates: Record<string, unknown> = {}
   if (nome !== undefined) updates.nome = nome
   if (volume_base !== undefined) updates.volume_base = Number(volume_base)
   if (tempos_maquinas !== undefined) updates.tempos_maquinas = tempos_maquinas
+  if (tempo_limpeza_min !== undefined) updates.tempo_limpeza_min = Number(tempo_limpeza_min)
   if (cor !== undefined) updates.cor = cor
 
   const { data, error } = await supabase

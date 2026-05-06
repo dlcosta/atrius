@@ -46,6 +46,7 @@ export type Ordem = {
   fim_calculado: string | null    // ISO string
   inicio_operacao_em?: string | null
   fim_operacao_em?: string | null
+  duracao_planejada_min?: number | null
   quantidade_referencia_litros?: number | null
   status: StatusOrdem
   sincronizado_em: string
