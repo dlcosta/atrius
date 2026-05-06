@@ -26,6 +26,7 @@ function parseOrigemPedido(value: string | null): PedidoFiltro['origemPedido'] {
 export async function GET(request: NextRequest) {
   try {
     const search = request.nextUrl.searchParams
+    const orderBy = search.get('orderBy')
 
     const filtro: PedidoFiltro = {
       numero: parseInteger(search.get('numero')),
@@ -40,10 +41,7 @@ export async function GET(request: NextRequest) {
       idVendedor: parseInteger(search.get('idVendedor')),
       marcadores: search.getAll('marcadores'),
       origemPedido: parseOrigemPedido(search.get('origemPedido')),
-      orderBy:
-        search.get('orderBy') === 'asc' || search.get('orderBy') === 'desc'
-          ? search.get('orderBy')
-          : undefined,
+      orderBy: orderBy === 'asc' || orderBy === 'desc' ? orderBy : undefined,
       limit: parseInteger(search.get('limit')),
       offset: parseInteger(search.get('offset')),
     }

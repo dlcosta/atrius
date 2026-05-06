@@ -209,7 +209,7 @@ export async function listarPedidos(filtro: PedidoFiltro = {}): Promise<PedidosL
   const res = await olistFetch(`/pedidos?${params.toString()}`)
   const json = await res.json()
 
-  const itensRaw = Array.isArray(json?.itens) ? json.itens : []
+  const itensRaw: unknown[] = Array.isArray(json?.itens) ? json.itens : []
 
   return {
     itens: itensRaw.map(mapPedido),
@@ -245,7 +245,7 @@ export async function obterPedido(idPedido: number): Promise<PedidoDetalhe> {
   const res = await olistFetch(`/pedidos/${idPedido}`)
   const json = await res.json()
 
-  const itensRaw = Array.isArray(json?.itens) ? json.itens : []
+  const itensRaw: unknown[] = Array.isArray(json?.itens) ? json.itens : []
 
   return {
     id: parseInteger(json?.id) ?? idPedido,

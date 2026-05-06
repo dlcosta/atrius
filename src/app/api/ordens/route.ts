@@ -64,6 +64,8 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const data = searchParams.get('data')
   const diasParam = searchParams.get('dias')
+  const inicioParam = searchParams.get('inicio')
+  const fimParam = searchParams.get('fim')
 
   let query = supabase
     .from('ordens')
@@ -75,6 +77,22 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'data invalida' }, { status: 400 })
   }
 
+  if (inicioParam && !DATE_REGEX.test(inicioParam)) {
+    return NextResponse.json({ error: 'inicio invalido' }, { status: 400 })
+  }
+
+  if (fimParam && !DATE_REGEX.test(fimParam)) {
+    return NextResponse.json({ error: 'fim invalido' }, { status: 400 })
+  }
+
+  if ((inicioParam && !fimParam) || (!inicioParam && fimParam)) {
+    return NextResponse.json({ error: 'inicio e fim devem ser informados juntos' }, { status: 400 })
+  }
+
+  if (inicioParam && fimParam && inicioParam > fimParam) {
+    return NextResponse.json({ error: 'inicio deve ser menor ou igual ao fim' }, { status: 400 })
+  }
+
   let dias: number | null = null
   if (diasParam) {
     const parsed = Number(diasParam)
@@ -84,7 +102,11 @@ export async function GET(req: NextRequest) {
     dias = parsed
   }
 
-  if (data && !dias) {
+  if (inicioParam && fimParam) {
+    query = query.or(
+      `and(data_prevista.gte.${inicioParam},data_prevista.lte.${fimParam}),and(inicio_agendado.gte.${inicioParam}T00:00:00.000Z,inicio_agendado.lte.${fimParam}T23:59:59.999Z),and(fim_calculado.gte.${inicioParam}T00:00:00.000Z,fim_calculado.lte.${fimParam}T23:59:59.999Z),inicio_agendado.is.null`
+    )
+  } else if (data && !dias) {
     query = query.or(`data_prevista.eq.${data},inicio_agendado.is.null`)
   }
 
@@ -93,7 +115,21 @@ export async function GET(req: NextRequest) {
 
   let lista = Array.isArray(ordens) ? ordens : []
 
-  if (dias) {
+  if (inicioParam && fimParam) {
+    const inicioMs = new Date(`${inicioParam}T00:00:00`).getTime()
+    const fimDate = new Date(`${fimParam}T00:00:00`)
+    fimDate.setHours(23, 59, 59, 999)
+    const fimMs = fimDate.getTime()
+
+    lista = lista.filter((ordem) => {
+      return (
+        isDateOnlyInRange(ordem.data_prevista, inicioParam, fimParam) ||
+        isDateInRange(ordem.inicio_agendado, inicioMs, fimMs) ||
+        isDateInRange(ordem.fim_calculado, inicioMs, fimMs) ||
+        ordem.inicio_agendado === null
+      )
+    })
+  } else if (dias) {
     const baseDateYmd = data ?? new Date().toISOString().slice(0, 10)
     const base = new Date(`${baseDateYmd}T00:00:00`)
     const inicio = new Date(base)
@@ -147,6 +183,7 @@ export async function PATCH(req: NextRequest) {
 
   const id = body.id as string | undefined
   const inicio_agendado = body.inicio_agendado as string | null | undefined
+  const fim_calculado = body.fim_calculado as string | null | undefined
   const maquina_id = body.maquina_id as string | null | undefined
 
   if (!id) return NextResponse.json({ error: 'id obrigatorio' }, { status: 400 })
@@ -214,7 +251,16 @@ export async function PATCH(req: NextRequest) {
   const inicio = new Date(inicio_agendado)
   const tempos = produto.tempos_maquinas?.[maquina_id] || { setup: 0, producao: 0 }
   const duracaoMin = calcularDuracao(volumeReferencia, Number(produto.volume_base), tempos.setup, tempos.producao)
-  const fim = calcularFim(inicio, duracaoMin)
+  const fimManual = typeof fim_calculado === 'string' ? new Date(fim_calculado) : null
+  const fim = fimManual && Number.isFinite(fimManual.getTime()) ? fimManual : calcularFim(inicio, duracaoMin)
+
+  if (!Number.isFinite(inicio.getTime())) {
+    return NextResponse.json({ error: 'inicio_agendado invalido' }, { status: 422 })
+  }
+
+  if (!Number.isFinite(fim.getTime()) || fim <= inicio) {
+    return NextResponse.json({ error: 'fim_calculado deve ser maior que inicio_agendado' }, { status: 422 })
+  }
 
   const { data: ordensExistentes } = await supabase
     .from('ordens')
