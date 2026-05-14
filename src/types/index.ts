@@ -112,3 +112,28 @@ export type BlocoGantt = {
   duracao_min: number
   tanque?: string | null
 }
+
+export type ItemDemanda = {
+  data_prevista: string
+  categoria_produto: string
+  produto_descricao: string
+  numero_pedido: string
+  cliente_nome: string
+  quantidade: number
+  litros_por_unidade: number
+  unidades_por_embalagem: number
+  total_litros: number
+  alocado?: boolean
+  ordem_id?: string | null
+  ordem_status?: string | null
+}
+
+export type OrdemPedidoErp = {
+  id: string
+  ordem_id: string
+  numero_pedido: string
+  produto_descricao: string
+  quantidade: number
+  total_litros: number
+  criado_em: string
+}
