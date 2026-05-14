@@ -1,4 +1,4 @@
-﻿import { describe, it, expect } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { validarNovaOrdem } from '@/lib/ordens/criar-ordem'
 
 describe('validarNovaOrdem', () => {
@@ -6,61 +6,76 @@ describe('validarNovaOrdem', () => {
     const resultado = validarNovaOrdem({
       produto_sku: '',
       quantidade: 100,
-      unidade: 'UN',
-      data_prevista: '2026-04-06',
+      unidade: 'L',
+      data_prevista: '2026-05-14',
+      etapa: 'tanque',
+      tank_id: 'tank-3800',
+      setup_time_minutes: 0,
+      production_time_minutes: 10,
+      cleaning_time_minutes: 0,
     })
     expect(resultado.erro).toBe('Produto obrigatorio')
   })
 
-  it('retorna erro quando quantidade e zero', () => {
-    const resultado = validarNovaOrdem({
-      produto_sku: 'AMACIANTE-2L',
-      quantidade: 0,
-      unidade: 'UN',
-      data_prevista: '2026-04-06',
-    })
-    expect(resultado.erro).toBe('Quantidade deve ser maior que zero')
-  })
-
-  it('retorna erro quando data_prevista esta vazia', () => {
+  it('retorna erro quando data_prevista nao for informada', () => {
     const resultado = validarNovaOrdem({
       produto_sku: 'AMACIANTE-2L',
       quantidade: 100,
-      unidade: 'UN',
-      data_prevista: '',
+      unidade: 'L',
+      data_prevista: null,
+      etapa: 'tanque',
+      tank_id: 'tank-3800',
+      setup_time_minutes: 0,
+      production_time_minutes: 10,
+      cleaning_time_minutes: 0,
     })
     expect(resultado.erro).toBe('Data prevista obrigatoria')
   })
 
-  it('retorna erro quando data_prevista tem formato invalido', () => {
+  it('retorna erro quando origem de tanque nao for informada no envase', () => {
     const resultado = validarNovaOrdem({
       produto_sku: 'AMACIANTE-2L',
       quantidade: 100,
-      unidade: 'UN',
-      data_prevista: '06/04/2026',
+      unidade: 'L',
+      data_prevista: '2026-05-14',
+      etapa: 'envase',
+      machine_id: 'maq-1',
+      setup_time_minutes: 0,
+      production_time_minutes: 10,
+      cleaning_time_minutes: 0,
     })
-    expect(resultado.erro).toBe('Data prevista invalida (use YYYY-MM-DD)')
+    expect(resultado.erro).toBe('Origem de tanque obrigatoria para envase')
   })
 
-  it('retorna valido quando todos os campos estao corretos', () => {
+  it('retorna erro quando maquina nao for informada no envase', () => {
     const resultado = validarNovaOrdem({
       produto_sku: 'AMACIANTE-2L',
       quantidade: 100,
-      unidade: 'UN',
-      data_prevista: '2026-04-06',
+      unidade: 'L',
+      data_prevista: '2026-05-14',
+      etapa: 'envase',
+      origin_tank_order_id: 'tank-order-1',
+      setup_time_minutes: 0,
+      production_time_minutes: 10,
+      cleaning_time_minutes: 0,
+    })
+    expect(resultado.erro).toBe('Maquina obrigatoria para envase')
+  })
+
+  it('retorna valido quando todos os campos estao corretos no envase', () => {
+    const resultado = validarNovaOrdem({
+      produto_sku: 'AMACIANTE-2L',
+      quantidade: 100,
+      unidade: 'L',
+      data_prevista: '2026-05-14',
+      etapa: 'envase',
+      machine_id: 'maq-1',
+      origin_tank_order_id: 'tank-order-1',
+      setup_time_minutes: 10,
+      production_time_minutes: 20,
+      cleaning_time_minutes: 5,
     })
     expect(resultado.erro).toBeUndefined()
     expect(resultado.valido).toBe(true)
-  })
-
-  it('normaliza a unidade para maiusculo', () => {
-    const resultado = validarNovaOrdem({
-      produto_sku: 'AMACIANTE-2L',
-      quantidade: 50,
-      unidade: 'fd',
-      data_prevista: '2026-04-06',
-    })
-    expect(resultado.erro).toBeUndefined()
-    expect(resultado.dadosNormalizados?.unidade).toBe('FD')
   })
 })

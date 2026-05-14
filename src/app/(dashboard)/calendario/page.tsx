@@ -29,7 +29,7 @@ import {
   ZoomIn,
   ZoomOut,
 } from 'lucide-react'
-import type { Maquina, Ordem, Produto } from '@/types'
+import type { Maquina, Ordem, Produto, Tanque } from '@/types'
 import { NovaOrdemForm } from '@/components/planner/NovaOrdemForm'
 import { calcularDuracao, calcularFim, detectarConflito } from '@/lib/planning/engine'
 import {
@@ -58,6 +58,7 @@ type PendingDrop = {
 
 const VIEW_STORAGE_KEY = 'atrius:calendario:view'
 const MACHINE_STORAGE_KEY = 'atrius:calendario:maquina'
+const TAB_STORAGE_KEY = 'atrius:calendario:tab'
 const JANELA_STORAGE_KEY = 'atrius:planner:janela-producao'
 const SNAP_OPTIONS = [5, 15, 30, 60]
 const ZOOM_OPTIONS = [
@@ -87,6 +88,15 @@ function inputParaHora(valor: string, fallback: number): number {
 
 function normalizarBusca(valor: string): string {
   return valor.trim().toLowerCase()
+}
+
+function ordemPlanningStatus(ordem: Ordem): string {
+  if (ordem.planning_status) return ordem.planning_status
+  if (ordem.status === 'cancelada') return 'CANCELED'
+  if (ordem.status === 'concluida') return 'COMPLETED'
+  if (ordem.status === 'produzindo' || ordem.status === 'limpeza') return 'IN_PRODUCTION'
+  if (ordem.inicio_agendado) return 'SCHEDULED'
+  return 'BACKLOG'
 }
 
 function ordemLabel(ordem?: Ordem | null): string {
@@ -261,6 +271,16 @@ function DraggableBacklogCard({ ordem }: { ordem: Ordem }) {
       <div className="mt-1 flex gap-1 overflow-hidden text-[10px] text-slate-500">
         {ordem.data_prevista && <span className="rounded bg-slate-100 px-1.5 py-0.5">{ordem.data_prevista}</span>}
         {ordem.lote && <span className="truncate rounded bg-slate-100 px-1.5 py-0.5">{ordem.lote}</span>}
+        {ordem.tank_id && <span className="truncate rounded bg-cyan-50 px-1.5 py-0.5 text-cyan-700">{ordem.tank_id}</span>}
+        {ordem.maquina_id && <span className="truncate rounded bg-violet-50 px-1.5 py-0.5 text-violet-700">{ordem.maquina_id}</span>}
+      </div>
+      <div className="mt-1 flex flex-wrap gap-1 text-[10px] text-slate-500">
+        {ordem.total_duration_minutes ? (
+          <span className="rounded bg-slate-100 px-1.5 py-0.5">{ordem.total_duration_minutes} min</span>
+        ) : null}
+        {ordem.estimated_boxes !== null && ordem.estimated_boxes !== undefined ? (
+          <span className="rounded bg-emerald-50 px-1.5 py-0.5 text-emerald-700">{ordem.estimated_boxes} caixas</span>
+        ) : null}
       </div>
     </div>
   )
@@ -1417,6 +1437,7 @@ export default function CalendarioPage() {
   const [diaBase, setDiaBase] = useState<Date>(() => new Date())
   const [viewMode, setViewMode] = useState<ViewMode>('semana')
   const [maquinas, setMaquinas] = useState<Maquina[]>([])
+  const [tanques, setTanques] = useState<Tanque[]>([])
   const [ordens, setOrdens] = useState<Ordem[]>([])
   const [produtos, setProdutos] = useState<Produto[]>([])
   const [mensagem, setMensagem] = useState('')
@@ -1428,6 +1449,7 @@ export default function CalendarioPage() {
   const [activePayload, setActivePayload] = useState<DragPayload | null>(null)
   const [pendingDrop, setPendingDrop] = useState<PendingDrop | null>(null)
   const [configOrder, setConfigOrder] = useState<Ordem | null>(null)
+  const [resourceTab, setResourceTab] = useState<'tanque' | 'envase'>('envase')
   const [selectedMachineId, setSelectedMachineId] = useState<string | null>(null)
   const rowRefs = useRef<Record<string, HTMLDivElement | null>>({})
 
@@ -1442,13 +1464,15 @@ export default function CalendarioPage() {
   const carregarDados = useCallback(async () => {
     try {
       setMensagem('')
-      const [m, o, p] = await Promise.all([
+      const [m, t, o, p] = await Promise.all([
         fetch('/api/maquinas').then((r) => r.json()),
+        fetch('/api/tanques').then((r) => r.json()),
         fetch(`/api/ordens?inicio=${inicioYmd}&fim=${fimYmd}`).then((r) => r.json()),
         fetch('/api/produtos').then((r) => r.json()),
       ])
 
       setMaquinas(Array.isArray(m) ? m : [])
+      setTanques(Array.isArray(t) ? t : [])
       setOrdens(Array.isArray(o) ? o : [])
       setProdutos(Array.isArray(p) ? p : [])
 
@@ -1470,6 +1494,9 @@ export default function CalendarioPage() {
       const savedMachine = localStorage.getItem(MACHINE_STORAGE_KEY)
       if (savedMachine) setSelectedMachineId(savedMachine)
 
+      const savedTab = localStorage.getItem(TAB_STORAGE_KEY)
+      if (savedTab === 'tanque' || savedTab === 'envase') setResourceTab(savedTab)
+
       const salvo = localStorage.getItem(JANELA_STORAGE_KEY)
       if (salvo) setJanela(sanitizarJanelaProducao(JSON.parse(salvo)))
     } catch {
@@ -1486,38 +1513,64 @@ export default function CalendarioPage() {
   }, [selectedMachineId])
 
   useEffect(() => {
+    localStorage.setItem(TAB_STORAGE_KEY, resourceTab)
+  }, [resourceTab])
+
+  useEffect(() => {
     localStorage.setItem(JANELA_STORAGE_KEY, JSON.stringify(janela))
   }, [janela])
 
   const maquinasAtivas = useMemo(() => maquinas.filter((m) => m.ativa), [maquinas])
+  const tanquesAtivos = useMemo(() => tanques.filter((t) => t.ativo), [tanques])
+  const recursosAtivos = useMemo(
+    () =>
+      resourceTab === 'envase'
+        ? maquinasAtivas.map((m) => ({ id: m.id, nome: m.nome }))
+        : tanquesAtivos.map((t) => ({ id: t.id, nome: t.nome })),
+    [maquinasAtivas, tanquesAtivos, resourceTab]
+  )
   const ordensAtivas = useMemo(
-    () => ordens.filter((o) => o.status !== 'concluida' && o.status !== 'cancelada').filter((o) => isOrdemNaJanela(o, inicioYmd, fimYmd)),
+    () => ordens.filter((o) => o.status !== 'cancelada').filter((o) => isOrdemNaJanela(o, inicioYmd, fimYmd)),
     [ordens, inicioYmd, fimYmd]
   )
-  const ordensAgendadas = useMemo(() => ordensAtivas.filter((o) => o.inicio_agendado && o.maquina_id), [ordensAtivas])
+  const ordensAgendadas = useMemo(
+    () =>
+      ordensAtivas.filter((o) => {
+        if (!o.inicio_agendado) return false
+        if (resourceTab === 'envase') return Boolean(o.maquina_id)
+        return Boolean(o.tank_id)
+      }),
+    [ordensAtivas, resourceTab]
+  )
   const selectedMachine = useMemo(
-    () => maquinasAtivas.find((maquina) => maquina.id === selectedMachineId) ?? null,
-    [maquinasAtivas, selectedMachineId]
+    () => recursosAtivos.find((resource) => resource.id === selectedMachineId) ?? null,
+    [recursosAtivos, selectedMachineId]
   )
   const selectedMachineOrdens = useMemo(
-    () => selectedMachine ? ordensAgendadas.filter((ordem) => ordem.maquina_id === selectedMachine.id) : [],
-    [selectedMachine, ordensAgendadas]
+    () =>
+      selectedMachine
+        ? ordensAgendadas.filter((ordem) =>
+            resourceTab === 'envase' ? ordem.maquina_id === selectedMachine.id : ordem.tank_id === selectedMachine.id
+          )
+        : [],
+    [selectedMachine, ordensAgendadas, resourceTab]
   )
 
   useEffect(() => {
-    if (maquinasAtivas.length === 0) {
+    if (recursosAtivos.length === 0) {
       setSelectedMachineId(null)
       return
     }
 
-    if (!selectedMachineId || !maquinasAtivas.some((maquina) => maquina.id === selectedMachineId)) {
-      setSelectedMachineId(maquinasAtivas[0].id)
+    if (!selectedMachineId || !recursosAtivos.some((resource) => resource.id === selectedMachineId)) {
+      setSelectedMachineId(recursosAtivos[0].id)
     }
-  }, [maquinasAtivas, selectedMachineId])
+  }, [recursosAtivos, selectedMachineId])
   const ordensBacklog = useMemo(() => {
     const termo = normalizarBusca(busca)
     return ordensAtivas
-      .filter((o) => !o.inicio_agendado)
+      .filter((o) => ordemPlanningStatus(o) === 'BACKLOG')
+      .filter((o) => (resourceTab === 'envase' ? o.etapa === 'envase' : o.etapa === 'tanque'))
       .filter((o) => filtroEtapa === 'todas' || o.etapa === filtroEtapa)
       .filter((o) => {
         if (!termo) return true
@@ -1525,35 +1578,45 @@ export default function CalendarioPage() {
           .filter(Boolean)
           .some((value) => String(value).toLowerCase().includes(termo))
       })
-  }, [ordensAtivas, busca, filtroEtapa])
+  }, [ordensAtivas, busca, filtroEtapa, resourceTab])
 
   async function patchAgenda(
     ordemId: string,
     maquinaId: string | null,
     inicio: Date | null,
-    fim?: Date | null,
-    duracaoPlanejadaMin?: number | null
-  ): Promise<{ ok: boolean; error?: string }> {
+    fim?: Date | null
+  ): Promise<{ ok: boolean; status: number; error?: string }> {
     const res = await fetch('/api/ordens', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         id: ordemId,
-        maquina_id: maquinaId,
+        maquina_id: resourceTab === 'envase' ? maquinaId : null,
+        tank_id: resourceTab === 'tanque' ? maquinaId : undefined,
+        planning_status: inicio ? 'SCHEDULED' : 'BACKLOG',
         inicio_agendado: inicio?.toISOString() ?? null,
         ...(fim ? { fim_calculado: fim.toISOString() } : {}),
-        ...(duracaoPlanejadaMin ? { duracao_planejada_min: Math.round(duracaoPlanejadaMin) } : {}),
       }),
     })
     const data = await res.json().catch(() => ({}))
-    if (!res.ok) return { ok: false, error: data.error ?? 'Nao foi possivel salvar a agenda.' }
-    return { ok: true }
+    if (!res.ok) return { ok: false, status: res.status, error: data.error ?? 'Nao foi possivel salvar a agenda.' }
+    return { ok: true, status: res.status }
   }
 
   async function salvarAgenda(ordemId: string, maquinaId: string, inicio: Date, fim?: Date) {
     const result = await patchAgenda(ordemId, maquinaId, inicio, fim)
     if (result.ok) {
       await carregarDados()
+      return
+    }
+
+    if (result.status !== 409) {
+      setMensagem(result.error ?? 'Nao foi possivel salvar a agenda.')
+      return
+    }
+
+    if (resourceTab === 'tanque') {
+      setMensagem(result.error ?? 'Conflito no tanque selecionado.')
       return
     }
 
@@ -1676,8 +1739,7 @@ export default function CalendarioPage() {
         ordem.id,
         maquinaId,
         inicio,
-        calcularFim(inicio, duracaoPlanejada),
-        duracaoPlanejada
+        calcularFim(inicio, duracaoPlanejada)
       )
       if (!result.ok) throw new Error(result.error ?? 'Tempos salvos, mas nao foi possivel recalcular a agenda.')
     }
@@ -1698,7 +1760,7 @@ export default function CalendarioPage() {
           <div className="flex flex-wrap items-center gap-3">
             <div>
               <h1 className="text-lg font-black uppercase tracking-tight text-slate-900">Calendario de Producao</h1>
-              <p className="text-xs font-medium text-slate-500">Organizacao da esteira por maquinas</p>
+              <p className="text-xs font-medium text-slate-500">Separacao operacional por Tanques e Envase</p>
             </div>
 
             <div className="ml-auto flex flex-wrap items-center gap-2">
@@ -1854,9 +1916,11 @@ export default function CalendarioPage() {
               <div className="border-b border-slate-200 bg-white p-3">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
-                    <h2 className="text-base font-black text-slate-900">Calendario individual da maquina</h2>
+                    <h2 className="text-base font-black text-slate-900">
+                      {resourceTab === 'envase' ? 'Calendario de Envase (Maquinas)' : 'Calendario de Tanques'}
+                    </h2>
                     <p className="text-xs text-slate-500">
-                      {selectedMachine ? `${selectedMachine.nome} com ${selectedMachineOrdens.length} ordens agendadas` : 'Selecione uma maquina ativa'}
+                      {selectedMachine ? `${selectedMachine.nome} com ${selectedMachineOrdens.length} ordens agendadas` : 'Selecione um recurso ativo'}
                     </p>
                   </div>
                   {selectedMachine && (
@@ -1874,21 +1938,37 @@ export default function CalendarioPage() {
                   )}
                 </div>
 
+                <div className="mt-3 flex w-fit rounded-md border border-slate-300 bg-slate-50 p-1">
+                  {(['tanque', 'envase'] as const).map((tab) => (
+                    <button
+                      key={tab}
+                      onClick={() => setResourceTab(tab)}
+                      className={`h-7 rounded px-3 text-xs font-bold uppercase ${
+                        resourceTab === tab ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500'
+                      }`}
+                    >
+                      {tab === 'tanque' ? 'Tanques' : 'Envase'}
+                    </button>
+                  ))}
+                </div>
+
                 <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
-                  {maquinasAtivas.map((maquina) => {
-                    const agendaMaquina = ordensAgendadas.filter((ordem) => ordem.maquina_id === maquina.id)
-                    const active = selectedMachineId === maquina.id
+                  {recursosAtivos.map((resource) => {
+                    const agendaRecurso = ordensAgendadas.filter((ordem) =>
+                      resourceTab === 'envase' ? ordem.maquina_id === resource.id : ordem.tank_id === resource.id
+                    )
+                    const active = selectedMachineId === resource.id
                     return (
                       <button
-                        key={maquina.id}
+                        key={resource.id}
                         type="button"
-                        onClick={() => setSelectedMachineId(maquina.id)}
+                        onClick={() => setSelectedMachineId(resource.id)}
                         className={`min-w-48 rounded-md border px-3 py-2 text-left transition ${
                           active ? 'border-blue-300 bg-blue-50 text-blue-900' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
                         }`}
                       >
-                        <div className="truncate text-sm font-bold">{maquina.nome}</div>
-                        <div className="mt-1 text-[11px] font-semibold text-slate-500">{agendaMaquina.length} ordens no periodo</div>
+                        <div className="truncate text-sm font-bold">{resource.nome}</div>
+                        <div className="mt-1 text-[11px] font-semibold text-slate-500">{agendaRecurso.length} ordens no periodo</div>
                       </button>
                     )
                   })}
@@ -1899,7 +1979,7 @@ export default function CalendarioPage() {
                 {selectedMachine ? (
                   <MachineCalendarBoard
                     key={selectedMachine.id}
-                    maquina={selectedMachine}
+                    maquina={{ id: selectedMachine.id, nome: selectedMachine.nome, ativa: true, criado_em: '' }}
                     ordens={selectedMachineOrdens}
                     rangeStart={range.inicio}
                     dias={range.dias}
@@ -1915,19 +1995,19 @@ export default function CalendarioPage() {
                     onEdit={salvarAgendaComFim}
                   />
                 ) : (
-                  <div className="p-10 text-center text-sm text-slate-400">Nenhuma maquina ativa cadastrada.</div>
+                  <div className="p-10 text-center text-sm text-slate-400">Nenhum recurso ativo cadastrado.</div>
                 )}
               </div>
 
-              {selectedMachine && (
+              {selectedMachine && resourceTab === 'envase' && (
                 <div className="border-t border-slate-200 bg-white p-3">
                   <MachineInspector
-                    maquina={selectedMachine}
+                    maquina={{ id: selectedMachine.id, nome: selectedMachine.nome, ativa: true, criado_em: '' }}
                     ordens={selectedMachineOrdens}
                     maquinas={maquinas}
                     janela={janela}
                     dias={range.dias}
-                    onClose={() => setSelectedMachineId(maquinasAtivas[0]?.id ?? null)}
+                    onClose={() => setSelectedMachineId(recursosAtivos[0]?.id ?? null)}
                     onSave={salvarAgenda}
                     onRemove={desagendar}
                     onFocusDia={(dia) => {
@@ -1953,7 +2033,7 @@ export default function CalendarioPage() {
           />
         )}
 
-        {pendingDrop && (
+        {pendingDrop && resourceTab === 'envase' && (
           <ConflictModal
             pending={pendingDrop}
             ordens={ordensAtivas}
@@ -1979,7 +2059,7 @@ export default function CalendarioPage() {
               <div className="truncate text-sm font-bold text-slate-900">{ordemLabel(activeOrdem)}</div>
               <div className="mt-1 text-xs text-slate-500">
                 <RotateCcw size={12} className="mr-1 inline" />
-                Solte na maquina e horario desejados
+                {resourceTab === 'envase' ? 'Solte na maquina e horario desejados' : 'Solte no tanque e horario desejados'}
               </div>
             </div>
           ) : null}

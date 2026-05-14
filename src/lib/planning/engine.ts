@@ -24,10 +24,15 @@ export function detectarConflito(candidata: Ordem, existentes: Ordem[]): boolean
 
   const inicioC = new Date(candidata.inicio_agendado).getTime()
   const fimC = new Date(candidata.fim_calculado).getTime()
+  const isTank = candidata.etapa === 'tanque'
 
   return existentes.some((e) => {
     if (e.id === candidata.id) return false
-    if (e.maquina_id !== candidata.maquina_id) return false
+    if (isTank) {
+      if (!candidata.tank_id || e.tank_id !== candidata.tank_id) return false
+    } else if (e.maquina_id !== candidata.maquina_id) {
+      return false
+    }
     if (!e.inicio_agendado || !e.fim_calculado) return false
 
     const inicioE = new Date(e.inicio_agendado).getTime()

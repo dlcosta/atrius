@@ -5,6 +5,14 @@ export type Maquina = {
   criado_em: string
 }
 
+export type Tanque = {
+  id: string
+  nome: string
+  volume_liters: number
+  ativo: boolean
+  criado_em: string
+}
+
 export type TempoMaquina = {
   setup: number
   producao: number
@@ -31,6 +39,15 @@ export type StatusOrdem =
   | 'atrasada'
   | 'cancelada'
 
+export type PlanningStatus =
+  | 'BACKLOG'
+  | 'SCHEDULED'
+  | 'IN_PRODUCTION'
+  | 'COMPLETED'
+  | 'CANCELED'
+
+export type CalcMode = 'LITERS_MASTER' | 'BOXES_MASTER'
+
 export type Ordem = {
   id: string
   numero_externo: string
@@ -41,6 +58,24 @@ export type Ordem = {
   tanque: string | null
   lote: string | null
   etapa: EtapaOrdem
+  tank_id?: string | null
+  tank_volume_liters?: number | null
+  package_volume_liters?: number | null
+  units_per_box?: number | null
+  box_volume_liters?: number | null
+  estimated_boxes?: number | null
+  setup_time_minutes?: number | null
+  production_time_minutes?: number | null
+  cleaning_time_minutes?: number | null
+  total_duration_minutes?: number | null
+  planning_status?: PlanningStatus | null
+  calc_mode?: CalcMode | null
+  color?: string | null
+  origin_tank_order_id?: string | null
+  origin_tank_liters?: number | null
+  origin_tank_filled_liters?: number | null
+  origin_tank_delta_liters?: number | null
+  origin_tank_balance_status?: 'BALANCED' | 'UNDER' | 'OVER' | null
   data_prevista: string | null
   inicio_agendado: string | null  // ISO string
   fim_calculado: string | null    // ISO string
@@ -53,6 +88,7 @@ export type Ordem = {
   // join opcionais
   produto?: Produto
   maquina?: Maquina
+  tanque_ref?: Tanque
 }
 
 export type EventoTimer = {

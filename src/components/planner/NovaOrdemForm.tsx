@@ -1,7 +1,17 @@
-﻿'use client'
-import { useState } from 'react'
+'use client'
+
+import { useEffect, useMemo, useState } from 'react'
 import { format } from 'date-fns'
-import type { Produto } from '@/types'
+import type { Maquina, Produto, Tanque } from '@/types'
+import {
+  CalcMode,
+  calculateEstimatedBoxes,
+  calculateLitersFromBoxes,
+  calculateProductionEndTime,
+  calculateTankVolumeBalance,
+  calculateTotalDuration,
+  VOLUME_BALANCE_TOLERANCE_LITERS,
+} from '@/lib/planning/production'
 
 type Props = {
   produtos: Produto[]
@@ -10,38 +20,234 @@ type Props = {
   onFechar: () => void
 }
 
+type TankOriginOption = {
+  id: string
+  numero_externo: string
+  produto_sku: string | null
+  lote: string | null
+  litros_tanque: number
+  litros_envasados: number
+  saldo_litros: number
+  balance_status: 'BALANCED' | 'UNDER' | 'OVER'
+  data_prevista: string | null
+}
+
+function formatNumber(value: number, digits = 2): string {
+  return Number.isFinite(value) ? value.toFixed(digits) : '0.00'
+}
+
 export function NovaOrdemForm({ produtos, dataInicial, onSalvo, onFechar }: Props) {
+  const [maquinas, setMaquinas] = useState<Maquina[]>([])
+  const [tanques, setTanques] = useState<Tanque[]>([])
+  const [origensTanque, setOrigensTanque] = useState<TankOriginOption[]>([])
   const [produtoSku, setProdutoSku] = useState('')
-  const [quantidade, setQuantidade] = useState('')
-  const [unidade, setUnidade] = useState('L')
-  const [etapa, setEtapa] = useState<'tanque' | 'envase'>('envase')
-  const [tanque, setTanque] = useState('')
+  const [etapa, setEtapa] = useState<'tanque' | 'envase'>('tanque')
+  const [calcMode, setCalcMode] = useState<CalcMode>('LITERS_MASTER')
+  const [liters, setLiters] = useState('3800')
+  const [estimatedBoxesInput, setEstimatedBoxesInput] = useState('190')
+  const [setupTimeMinutes, setSetupTimeMinutes] = useState('10')
+  const [productionTimeMinutes, setProductionTimeMinutes] = useState('60')
+  const [cleaningTimeMinutes, setCleaningTimeMinutes] = useState('20')
   const [lote, setLote] = useState('')
-  const [dataPrevista, setDataPrevista] = useState(format(dataInicial, 'yyyy-MM-dd'))
+  const [notes, setNotes] = useState('')
+  const [tankId, setTankId] = useState('')
+  const [machineId, setMachineId] = useState('')
+  const [originTankOrderId, setOriginTankOrderId] = useState('')
+  const [packageVolumeLiters, setPackageVolumeLiters] = useState('5')
+  const [unitsPerBox, setUnitsPerBox] = useState('4')
+  const [cor, setCor] = useState('#5B9BD5')
+  const [dataProducao, setDataProducao] = useState(format(dataInicial, 'yyyy-MM-dd'))
+  const [usarHoraInicio, setUsarHoraInicio] = useState(false)
+  const [horaInicio, setHoraInicio] = useState('07:30')
   const [erro, setErro] = useState('')
   const [salvando, setSalvando] = useState(false)
+
+  useEffect(() => {
+    async function carregarRecursos() {
+      try {
+        const [m, t, o] = await Promise.all([
+          fetch('/api/maquinas').then((r) => r.json()),
+          fetch('/api/tanques').then((r) => r.json()),
+          fetch('/api/ordens/tanques-origem').then((r) => r.json()),
+        ])
+        setMaquinas(Array.isArray(m) ? m.filter((item) => item.ativa) : [])
+        setTanques(Array.isArray(t) ? t.filter((item) => item.ativo) : [])
+        setOrigensTanque(Array.isArray(o) ? o : [])
+      } catch {
+        // O formulario continua funcional mesmo sem carregar os recursos.
+      }
+    }
+    carregarRecursos()
+  }, [])
+
+  const originSelecionada = useMemo(
+    () => origensTanque.find((item) => item.id === originTankOrderId) ?? null,
+    [origensTanque, originTankOrderId]
+  )
+
+  useEffect(() => {
+    if (etapa === 'envase' && originSelecionada) {
+      setProdutoSku(originSelecionada.produto_sku ?? '')
+      setLote(originSelecionada.lote ?? '')
+      if (!liters || Number(liters) <= 0) {
+        setLiters(String(Math.max(originSelecionada.saldo_litros, 0)))
+      }
+    }
+    if (etapa === 'tanque') {
+      setOriginTankOrderId('')
+      setMachineId('')
+      setCalcMode('LITERS_MASTER')
+      setEstimatedBoxesInput('')
+      setPackageVolumeLiters('')
+      setUnitsPerBox('')
+    }
+  }, [etapa, originSelecionada]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const totalDurationMinutes = useMemo(() => {
+    return calculateTotalDuration({
+      setupTimeMinutes: Number(setupTimeMinutes || 0),
+      productionTimeMinutes: Number(productionTimeMinutes || 0),
+      cleaningTimeMinutes: Number(cleaningTimeMinutes || 0),
+    })
+  }, [setupTimeMinutes, productionTimeMinutes, cleaningTimeMinutes])
+
+  const boxVolumeLiters = useMemo(() => {
+    return Number(packageVolumeLiters || 0) * Number(unitsPerBox || 0)
+  }, [packageVolumeLiters, unitsPerBox])
+
+  const litersNumber = Number(liters || 0)
+  const estimatedBoxesCalculated = useMemo(() => {
+    if (boxVolumeLiters <= 0) return 0
+    return Math.floor(litersNumber / boxVolumeLiters)
+  }, [litersNumber, boxVolumeLiters])
+
+  const estimatedBoxesValue = calcMode === 'BOXES_MASTER'
+    ? Number(estimatedBoxesInput || 0)
+    : estimatedBoxesCalculated
+
+  useEffect(() => {
+    if (etapa !== 'envase') return
+    if (calcMode === 'LITERS_MASTER') {
+      setEstimatedBoxesInput(String(Math.max(0, estimatedBoxesCalculated)))
+    }
+  }, [calcMode, estimatedBoxesCalculated, etapa])
+
+  function onChangeLiters(value: string) {
+    setLiters(value)
+    if (etapa === 'envase' && calcMode === 'LITERS_MASTER' && boxVolumeLiters > 0) {
+      const nextBoxes = Math.floor(Number(value || 0) / boxVolumeLiters)
+      setEstimatedBoxesInput(String(Math.max(0, nextBoxes)))
+    }
+  }
+
+  function onChangeBoxes(value: string) {
+    setEstimatedBoxesInput(value)
+    if (etapa === 'envase' && calcMode === 'BOXES_MASTER') {
+      const litersFromBoxes = calculateLitersFromBoxes({
+        boxes: Number(value || 0),
+        packageVolumeLiters: Number(packageVolumeLiters || 0),
+        unitsPerBox: Number(unitsPerBox || 0),
+      })
+      setLiters(formatNumber(litersFromBoxes, 2))
+    }
+  }
+
+  function onChangePackaging(nextPackage: string, nextUnits: string) {
+    setPackageVolumeLiters(nextPackage)
+    setUnitsPerBox(nextUnits)
+
+    if (etapa !== 'envase') return
+
+    if (calcMode === 'BOXES_MASTER') {
+      const litersFromBoxes = calculateLitersFromBoxes({
+        boxes: Number(estimatedBoxesInput || 0),
+        packageVolumeLiters: Number(nextPackage || 0),
+        unitsPerBox: Number(nextUnits || 0),
+      })
+      setLiters(formatNumber(litersFromBoxes, 2))
+      return
+    }
+
+    const nextBoxVolume = Number(nextPackage || 0) * Number(nextUnits || 0)
+    if (nextBoxVolume > 0) {
+      const nextBoxes = Math.floor(Number(liters || 0) / nextBoxVolume)
+      setEstimatedBoxesInput(String(Math.max(0, nextBoxes)))
+    }
+  }
+
+  const preview = useMemo(() => {
+    const startAt = usarHoraInicio ? new Date(`${dataProducao}T${horaInicio}:00`) : null
+    const endAt = startAt && Number.isFinite(startAt.getTime())
+      ? calculateProductionEndTime(startAt, totalDurationMinutes)
+      : null
+    const { boxVolumeLiters: previewBoxVolume, estimatedBoxes } = calculateEstimatedBoxes({
+      liters: Number(liters || 0),
+      packageVolumeLiters: Number(packageVolumeLiters || 0),
+      unitsPerBox: Number(unitsPerBox || 0),
+    })
+    return {
+      startAt,
+      endAt,
+      boxVolumeLiters: previewBoxVolume,
+      estimatedBoxes,
+    }
+  }, [usarHoraInicio, dataProducao, horaInicio, totalDurationMinutes, liters, packageVolumeLiters, unitsPerBox])
+
+  const balancePreview = useMemo(() => {
+    if (etapa !== 'envase' || !originSelecionada) return null
+    return calculateTankVolumeBalance({
+      tankLiters: Number(originSelecionada.litros_tanque || 0),
+      alreadyFilledLiters: Number(originSelecionada.litros_envasados || 0),
+      currentFillingLiters: Number(liters || 0),
+      tolerance: VOLUME_BALANCE_TOLERANCE_LITERS,
+    })
+  }, [etapa, originSelecionada, liters])
+
+  const selectedProduct = useMemo(
+    () => produtos.find((item) => item.sku === produtoSku) ?? null,
+    [produtos, produtoSku]
+  )
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setErro('')
     setSalvando(true)
 
+    const startAtIso = usarHoraInicio ? new Date(`${dataProducao}T${horaInicio}:00`).toISOString() : null
+    const selectedTank = tanques.find((item) => item.id === tankId)
+
     try {
+      const payload = {
+        produto_sku: produtoSku,
+        etapa,
+        calc_mode: calcMode,
+        liters: Number(liters),
+        estimated_boxes: etapa === 'envase' ? Number(estimatedBoxesValue || 0) : null,
+        unidade: 'L',
+        lote: lote || null,
+        tanque: selectedTank?.nome ?? null,
+        tank_id: tankId || null,
+        maquina_id: etapa === 'envase' ? machineId || null : null,
+        origin_tank_order_id: etapa === 'envase' ? originTankOrderId || null : null,
+        setup_time_minutes: Number(setupTimeMinutes),
+        production_time_minutes: Number(productionTimeMinutes),
+        cleaning_time_minutes: Number(cleaningTimeMinutes),
+        package_volume_liters: etapa === 'envase' ? Number(packageVolumeLiters || 0) || null : null,
+        units_per_box: etapa === 'envase' ? Number(unitsPerBox || 0) || 1 : 1,
+        inicio_agendado: startAtIso,
+        data_prevista: dataProducao,
+        planning_status: startAtIso ? 'SCHEDULED' : 'BACKLOG',
+        color: cor || selectedProduct?.cor || null,
+        notes: notes || null,
+      }
+
       const res = await fetch('/api/ordens', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          produto_sku: produtoSku,
-          quantidade: Number(quantidade),
-          unidade,
-          etapa,
-          tanque: tanque || null,
-          lote: lote || null,
-          data_prevista: dataPrevista,
-        }),
+        body: JSON.stringify(payload),
       })
 
-      const data = await res.json()
+      const data = await res.json().catch(() => ({}))
       if (!res.ok) {
         setErro(data.error ?? 'Erro ao criar ordem')
       } else {
@@ -55,114 +261,278 @@ export function NovaOrdemForm({ produtos, dataInicial, onSalvo, onFechar }: Prop
   }
 
   return (
-    <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-lg p-6 border border-slate-200">
-        <h2 className="text-xl font-semibold text-slate-900 mb-1">Nova ordem manual</h2>
-        <p className="text-sm text-slate-500 mb-6">Preencha etapa, tanque e lote para manter o fluxo tanque para envase.</p>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm">
+      <div className="max-h-[95vh] w-full max-w-4xl overflow-y-auto rounded-lg border border-slate-200 bg-white p-6 shadow-xl">
+        <h2 className="text-xl font-semibold text-slate-900">Nova producao manual</h2>
+        <p className="mb-6 text-sm text-slate-500">Fluxo separado para Tanque e Envase com controle de volume operacional.</p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Produto</label>
-            <select
-              value={produtoSku}
-              onChange={(e) => setProdutoSku(e.target.value)}
-              required
-              className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
-            >
-              <option value="">Selecione...</option>
-              {produtos.map((p) => (
-                <option key={p.sku} value={p.sku}>
-                  {p.nome}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="grid grid-cols-3 gap-3">
-            <div className="col-span-2">
-              <label className="block text-sm font-medium text-slate-700 mb-1">Quantidade</label>
-              <input
-                type="number"
-                min="1"
-                value={quantidade}
-                onChange={(e) => setQuantidade(e.target.value)}
-                required
-                className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
-              />
-            </div>
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Unidade</label>
-              <input
-                type="text"
-                value={unidade}
-                onChange={(e) => setUnidade(e.target.value.toUpperCase())}
-                maxLength={8}
-                className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-3 gap-3">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Etapa</label>
+              <label className="mb-1 block text-sm font-medium text-slate-700">Tipo de producao</label>
               <select
                 value={etapa}
                 onChange={(e) => setEtapa(e.target.value as 'tanque' | 'envase')}
-                className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
               >
                 <option value="tanque">Tanque</option>
                 <option value="envase">Envase</option>
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Tanque</label>
+              <label className="mb-1 block text-sm font-medium text-slate-700">Data de producao</label>
+              <input
+                type="date"
+                required
+                value={dataProducao}
+                onChange={(e) => setDataProducao(e.target.value)}
+                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+              />
+            </div>
+          </div>
+
+          {etapa === 'envase' && (
+            <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
+              <label className="mb-1 block text-sm font-medium text-slate-700">Origem (ordem de tanque)</label>
+              <select
+                value={originTankOrderId}
+                onChange={(e) => setOriginTankOrderId(e.target.value)}
+                required
+                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+              >
+                <option value="">Selecione a ordem de tanque...</option>
+                {origensTanque.map((origem) => (
+                  <option key={origem.id} value={origem.id}>
+                    {origem.numero_externo} · {origem.produto_sku ?? 'SEM SKU'} · lote {origem.lote ?? '--'} · saldo {formatNumber(origem.saldo_litros, 2)}L
+                  </option>
+                ))}
+              </select>
+              {origensTanque.length === 0 && (
+                <p className="mt-1 text-xs text-amber-700">Nao ha ordens de tanque com saldo disponivel para envase.</p>
+              )}
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">Produto</label>
+              <select
+                value={produtoSku}
+                onChange={(e) => setProdutoSku(e.target.value)}
+                required
+                disabled={etapa === 'envase'}
+                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm disabled:bg-slate-100"
+              >
+                <option value="">Selecione...</option>
+                {produtos.map((p) => (
+                  <option key={p.sku} value={p.sku}>
+                    {p.nome}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">Lote</label>
               <input
                 type="text"
-                placeholder="tq3"
-                value={tanque}
-                onChange={(e) => setTanque(e.target.value.toLowerCase())}
-                className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                value={lote}
+                onChange={(e) => setLote(e.target.value)}
+                disabled={etapa === 'envase'}
+                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm disabled:bg-slate-100"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Lote</label>
-              <input
-                type="text"
-                placeholder="lt906"
-                value={lote}
-                onChange={(e) => setLote(e.target.value.toLowerCase())}
-                className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
-              />
+              <label className="mb-1 block text-sm font-medium text-slate-700">{etapa === 'tanque' ? 'Tanque' : 'Maquina'}</label>
+              {etapa === 'tanque' ? (
+                <select
+                  value={tankId}
+                  onChange={(e) => setTankId(e.target.value)}
+                  required
+                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                >
+                  <option value="">Selecione...</option>
+                  {tanques.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.nome}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <select
+                  value={machineId}
+                  onChange={(e) => setMachineId(e.target.value)}
+                  required
+                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                >
+                  <option value="">Selecione...</option>
+                  {maquinas.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.nome}
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Data prevista</label>
-            <input
-              type="date"
-              value={dataPrevista}
-              onChange={(e) => setDataPrevista(e.target.value)}
-              required
-              className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
-            />
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">Litros</label>
+              <input
+                type="number"
+                min={0}
+                step="0.01"
+                required
+                value={liters}
+                onChange={(e) => onChangeLiters(e.target.value)}
+                disabled={etapa === 'envase' && calcMode === 'BOXES_MASTER'}
+                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm disabled:bg-slate-100"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">Setup (min)</label>
+              <input type="number" min={0} required value={setupTimeMinutes} onChange={(e) => setSetupTimeMinutes(e.target.value)} className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">Producao (min)</label>
+              <input type="number" min={1} required value={productionTimeMinutes} onChange={(e) => setProductionTimeMinutes(e.target.value)} className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">Limpeza (min)</label>
+              <input type="number" min={0} required value={cleaningTimeMinutes} onChange={(e) => setCleaningTimeMinutes(e.target.value)} className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm" />
+            </div>
           </div>
+
+          {etapa === 'envase' && (
+            <>
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">Modo de calculo</label>
+                  <select
+                    value={calcMode}
+                    onChange={(e) => setCalcMode(e.target.value as CalcMode)}
+                    className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                  >
+                    <option value="LITERS_MASTER">Litros mestre</option>
+                    <option value="BOXES_MASTER">Caixas mestre</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">Quantidade de caixas</label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={estimatedBoxesInput}
+                    onChange={(e) => onChangeBoxes(e.target.value)}
+                    disabled={calcMode === 'LITERS_MASTER'}
+                    className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm disabled:bg-slate-100"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">Volume embalagem (L)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={packageVolumeLiters}
+                    onChange={(e) => onChangePackaging(e.target.value, unitsPerBox)}
+                    className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">Unidades por caixa</label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={unitsPerBox}
+                    onChange={(e) => onChangePackaging(packageVolumeLiters, e.target.value)}
+                    className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">Volume por caixa</label>
+                  <input
+                    type="text"
+                    value={`${formatNumber(boxVolumeLiters, 2)} L`}
+                    readOnly
+                    className="w-full rounded-md border border-slate-200 bg-slate-100 px-3 py-2 text-sm"
+                  />
+                </div>
+              </div>
+            </>
+          )}
+
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">Cor do card</label>
+              <input type="color" value={cor} onChange={(e) => setCor(e.target.value)} className="h-10 w-full rounded-md border border-slate-300 px-2" />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">Observacoes</label>
+              <input type="text" value={notes} onChange={(e) => setNotes(e.target.value)} className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm" />
+            </div>
+          </div>
+
+          <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
+            <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
+              <input type="checkbox" checked={usarHoraInicio} onChange={(e) => setUsarHoraInicio(e.target.checked)} />
+              Informar hora de inicio no cadastro (se desmarcado, vai para backlog com data)
+            </label>
+            {usarHoraInicio && (
+              <div className="mt-3">
+                <label className="mb-1 block text-sm font-medium text-slate-700">Hora de inicio</label>
+                <input type="time" value={horaInicio} onChange={(e) => setHoraInicio(e.target.value)} className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm md:w-48" />
+              </div>
+            )}
+          </div>
+
+          <div className="rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
+            <div>Tempo total: <span className="font-semibold">{totalDurationMinutes} min</span></div>
+            {preview.startAt && preview.endAt && (
+              <div>
+                Inicio planejado: <span className="font-semibold">{format(preview.startAt, 'dd/MM/yyyy HH:mm')}</span> | Fim previsto: <span className="font-semibold">{format(preview.endAt, 'dd/MM/yyyy HH:mm')}</span>
+              </div>
+            )}
+            {etapa === 'envase' ? (
+              <div>
+                Estimativa: <span className="font-semibold">{estimatedBoxesValue}</span> caixas de {unitsPerBox || '0'} unidades de {packageVolumeLiters || '0'}L
+              </div>
+            ) : (
+              <div>Produção em tanque: <span className="font-semibold">{formatNumber(Number(liters || 0), 2)} L</span></div>
+            )}
+          </div>
+
+          {etapa === 'envase' && balancePreview && (
+            <div className={`rounded-md border p-3 text-sm ${
+              balancePreview.status === 'OVER'
+                ? 'border-red-200 bg-red-50 text-red-800'
+                : balancePreview.status === 'UNDER'
+                  ? 'border-amber-200 bg-amber-50 text-amber-800'
+                  : 'border-emerald-200 bg-emerald-50 text-emerald-800'
+            }`}>
+              <div className="font-semibold">
+                {balancePreview.status === 'OVER' ? 'Atenção: volume excedente no envase' : balancePreview.status === 'UNDER' ? 'Atenção: ainda faltará volume para envase total' : 'Volume balanceado com o tanque'}
+              </div>
+              <div className="mt-1">
+                Tanque: {formatNumber(originSelecionada?.litros_tanque ?? 0, 2)} L | Envasado atual: {formatNumber(originSelecionada?.litros_envasados ?? 0, 2)} L | Com esta ordem: {formatNumber(balancePreview.totalFilledLiters, 2)} L
+              </div>
+              {Math.abs(balancePreview.deltaLiters) > VOLUME_BALANCE_TOLERANCE_LITERS && (
+                <div className="mt-1 font-medium">{balancePreview.warning}</div>
+              )}
+            </div>
+          )}
 
           {erro && <p className="text-sm font-medium text-red-600">{erro}</p>}
 
-          <div className="flex justify-end gap-3 pt-4">
-            <button
-              type="button"
-              onClick={onFechar}
-              className="px-4 py-2 border border-slate-300 rounded-md text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
-            >
+          <div className="flex justify-end gap-3 pt-2">
+            <button type="button" onClick={onFechar} className="rounded-md border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
               Cancelar
             </button>
-            <button
-              type="submit"
-              disabled={salvando}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 shadow-sm transition-colors"
-            >
-              {salvando ? 'Salvando...' : 'Criar ordem'}
+            <button type="submit" disabled={salvando} className="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50">
+              {salvando ? 'Salvando...' : 'Salvar producao'}
             </button>
           </div>
         </form>

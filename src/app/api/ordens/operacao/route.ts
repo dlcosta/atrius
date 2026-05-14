@@ -1,7 +1,8 @@
-﻿import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { calcularDuracao, calcularFim } from '@/lib/planning/engine'
 import { mapearVolumeReferenciaPorOrdem, obterVolumeReferenciaLitros } from '@/lib/ordens/volume'
+import { calculateTankVolumeBalance, VOLUME_BALANCE_TOLERANCE_LITERS } from '@/lib/planning/production'
 import type { EtapaOrdem } from '@/types'
 
 type AcaoOperacao = 'iniciar' | 'finalizar'
@@ -25,6 +26,7 @@ type OrdemOperacao = {
   unidade: string | null
   lote: string | null
   etapa: EtapaOrdem | null
+  origin_tank_order_id: string | null
   produto_sku: string | null
   produto: { volume_base: number; tempos_maquinas: Record<string, { setup?: number; producao?: number }> } | null
 }
@@ -82,6 +84,49 @@ async function calcularDuracaoPlanejadaMin(
   return calculado > 0 ? calculado : 1
 }
 
+async function validarBalanceamentoConclusaoEnvase(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  ordem: OrdemOperacao
+): Promise<string | null> {
+  if (ordem.etapa !== 'envase' || !ordem.origin_tank_order_id) return null
+
+  const { data: origem, error: origemError } = await supabase
+    .from('ordens')
+    .select('id, etapa, quantidade')
+    .eq('id', ordem.origin_tank_order_id)
+    .maybeSingle()
+
+  if (origemError || !origem || origem.etapa !== 'tanque') {
+    return 'Origem de tanque invalida para concluir envase.'
+  }
+
+  const { data: envases } = await supabase
+    .from('ordens')
+    .select('id, quantidade, planning_status, status')
+    .eq('etapa', 'envase')
+    .eq('origin_tank_order_id', ordem.origin_tank_order_id)
+    .neq('status', 'cancelada')
+    .neq('id', ordem.id)
+
+  const litrosOutrosEnvases = (envases ?? []).reduce((acc, row) => {
+    if (row.planning_status === 'CANCELED' || row.status === 'cancelada') return acc
+    return acc + Number(row.quantidade || 0)
+  }, 0)
+
+  const balance = calculateTankVolumeBalance({
+    tankLiters: Number(origem.quantidade || 0),
+    alreadyFilledLiters: litrosOutrosEnvases,
+    currentFillingLiters: Number(ordem.quantidade || 0),
+    tolerance: VOLUME_BALANCE_TOLERANCE_LITERS,
+  })
+
+  if (Math.abs(balance.deltaLiters) > VOLUME_BALANCE_TOLERANCE_LITERS) {
+    return `Nao e possivel concluir envase: ${balance.warning ?? 'diferenca de volume com tanque de origem'}`
+  }
+
+  return null
+}
+
 export async function POST(req: NextRequest) {
   const supabase = await createClient()
   const body = await req.json()
@@ -99,7 +144,7 @@ export async function POST(req: NextRequest) {
   const { data: ordemRaw, error: erroOrdem } = await supabase
     .from('ordens')
     .select(
-      'id, maquina_id, status, inicio_operacao_em, inicio_agendado, fim_calculado, quantidade, unidade, lote, etapa, produto_sku, produto:produtos(volume_base, tempos_maquinas)'
+      'id, maquina_id, status, inicio_operacao_em, inicio_agendado, fim_calculado, quantidade, unidade, lote, etapa, origin_tank_order_id, produto_sku, produto:produtos(volume_base, tempos_maquinas)'
     )
     .eq('id', ordemId)
     .single()
@@ -150,6 +195,7 @@ export async function POST(req: NextRequest) {
       .from('ordens')
       .update({
         status: 'produzindo',
+        planning_status: 'IN_PRODUCTION',
         inicio_operacao_em: inicioRealIso,
         fim_operacao_em: null,
         fim_calculado: fimPrevistoIso,
@@ -178,10 +224,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Ordem ja encerrada' }, { status: 409 })
   }
 
+  const erroBalanceamento = await validarBalanceamentoConclusaoEnvase(supabase, ordem)
+  if (erroBalanceamento) {
+    return NextResponse.json({ error: erroBalanceamento }, { status: 422 })
+  }
+
   const { data: atualizada, error: erroUpdate } = await supabase
     .from('ordens')
     .update({
       status: 'concluida',
+      planning_status: 'COMPLETED',
       inicio_operacao_em: ordem.inicio_operacao_em ?? agora,
       fim_operacao_em: agora,
     })
