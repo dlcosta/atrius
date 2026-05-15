@@ -29,8 +29,11 @@ export async function POST() {
 
     if (err instanceof OlistApiError) {
       console.error(`[CATEGORIAS] API Olist ${err.status}:`, err.message)
+      const details = err.status === 403
+        ? 'Verificando permissões. A API pode exigir escopo diferente ou o endpoint pode não estar disponível nessa versão.'
+        : err.message
       return NextResponse.json(
-        { error: `API Olist retornou ${err.status}`, details: err.message },
+        { error: `API Olist retornou ${err.status}`, details },
         { status: 502 }
       )
     }

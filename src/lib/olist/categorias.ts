@@ -71,19 +71,31 @@ export function extrairCategoriasResposta(payload: unknown): CategoriaArvore[] {
 }
 
 export async function fetchCategoriasArvore(): Promise<CategoriaArvore[]> {
-  try {
-    const res = await olistFetch('/categorias/todas')
-    return extrairCategoriasResposta(await res.json())
-  } catch (error) {
-    // Se falhar com /categorias/todas, tentar /categorias
+  // Tentar endpoints em ordem de preferência
+  const endpoints = [
+    '/categorias?limit=999999',
+    '/categorias',
+    '/categorias/todas',
+  ]
+
+  let lastError: unknown = null
+
+  for (const endpoint of endpoints) {
     try {
-      const res = await olistFetch('/categorias')
-      return extrairCategoriasResposta(await res.json())
-    } catch {
-      // Se ambas falharem, retornar erro original
-      throw error
+      console.log(`[fetchCategoriasArvore] Tentando ${endpoint}`)
+      const res = await olistFetch(endpoint)
+      const json = await res.json()
+      console.log(`[fetchCategoriasArvore] Sucesso com ${endpoint}`)
+      return extrairCategoriasResposta(json)
+    } catch (error) {
+      console.log(`[fetchCategoriasArvore] Falhou ${endpoint}:`, String(error).slice(0, 100))
+      lastError = error
+      continue
     }
   }
+
+  // Se todos falharem, lançar último erro
+  throw lastError || new Error('Nenhum endpoint de categorias funcionou')
 }
 
 export async function getCategoria(id: number): Promise<Categoria> {
