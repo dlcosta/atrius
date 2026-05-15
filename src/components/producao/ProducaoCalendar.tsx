@@ -5,7 +5,6 @@ import { format, addDays, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { ChevronLeft, ChevronRight, Calendar, Clock } from 'lucide-react'
 import type { Ordem, Tanque } from '@/types'
-import { OrdemSelector } from './OrdemSelector'
 
 type Props = {
   ordens: Ordem[]
@@ -101,6 +100,12 @@ export function ProducaoCalendar({ ordens, tanques }: Props) {
     setAgendamentos(novoAgendamento)
   }
 
+  function handleTanqueClick(data: string, turnoId: string, tanqueId: string) {
+    if (ordemSelecionada) {
+      handleAgendar(ordemSelecionada, data, turnoId, tanqueId)
+    }
+  }
+
   return (
     <div className="space-y-6">
       {/* Cabeçalho */}
@@ -186,22 +191,13 @@ export function ProducaoCalendar({ ordens, tanques }: Props) {
                     {/* Tanques do turno */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       {turnoProducao.tanques.map((tanqueProducao) => (
-                        <div
+                        <button
                           key={tanqueProducao.tanque.id}
-                          onClick={() => {
-                            if (ordemSelecionada) {
-                              handleAgendar(
-                                ordemSelecionada,
-                                dia.data,
-                                turnoProducao.turno.id,
-                                tanqueProducao.tanque.id
-                              )
-                            }
-                          }}
-                          className={`p-3 rounded-lg border-2 transition-all ${
+                          onClick={() => handleTanqueClick(dia.data, turnoProducao.turno.id, tanqueProducao.tanque.id)}
+                          className={`p-3 rounded-lg border-2 transition-all text-left ${
                             ordemSelecionada
                               ? 'border-dashed border-blue-400 bg-blue-25 cursor-pointer hover:bg-blue-50'
-                              : 'border-slate-200 bg-slate-50'
+                              : 'border-slate-200 bg-slate-50 cursor-default'
                           }`}
                         >
                           <div className="flex items-center justify-between mb-2">
@@ -259,7 +255,7 @@ export function ProducaoCalendar({ ordens, tanques }: Props) {
                             ).toLocaleString('pt-BR')}
                             L
                           </div>
-                        </div>
+                        </button>
                       ))}
                     </div>
                   </div>
@@ -270,13 +266,6 @@ export function ProducaoCalendar({ ordens, tanques }: Props) {
         </div>
       </div>
 
-      {/* Modal de seleção */}
-      {ordemSelecionada && (
-        <OrdemSelector
-          ordem={ordemSelecionada}
-          onCancel={() => setOrdemSelecionada(null)}
-        />
-      )}
     </div>
   )
 }
