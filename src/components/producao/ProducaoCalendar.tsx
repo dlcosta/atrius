@@ -147,7 +147,7 @@ export function ProducaoCalendar({ ordens, tanques }: Props) {
           <h2 className="text-sm font-semibold text-slate-700 mb-3">Ordens BACKLOG ({ordensBacklog.length})</h2>
           <div className="space-y-2 max-h-96 overflow-y-auto">
             {ordensBacklog.map((ordem) => {
-              const agendada = agendamentos.has(ordem.id)
+              const agendada = !!agendamentos[ordem.id]
               return (
                 <button
                   key={ordem.id}
