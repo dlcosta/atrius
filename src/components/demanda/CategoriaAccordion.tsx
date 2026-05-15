@@ -148,19 +148,22 @@ export function CategoriaAccordion({
             />
           </div>
 
-          {/* Lista de itens agrupada por data */}
+          {/* Lista de itens agrupada por data → pedido */}
           <div className="px-2 py-1">
             {(() => {
-              const porData = new Map<string, ItemDemanda[]>()
+              const porData = new Map<string, Map<string, ItemDemanda[]>>()
               for (const item of itens) {
                 const dataKey = item.data_prevista?.slice(0, 10) ?? 'sem-data'
-                if (!porData.has(dataKey)) porData.set(dataKey, [])
-                porData.get(dataKey)!.push(item)
+                const pedidoKey = item.numero_pedido
+                if (!porData.has(dataKey)) porData.set(dataKey, new Map())
+                const porPedido = porData.get(dataKey)!
+                if (!porPedido.has(pedidoKey)) porPedido.set(pedidoKey, [])
+                porPedido.get(pedidoKey)!.push(item)
               }
               return Array.from(porData.entries())
                 .sort(([a], [b]) => a.localeCompare(b))
-                .map(([dataKey, itensDaData]) => (
-                  <div key={dataKey} className="mb-2">
+                .map(([dataKey, porPedido]) => (
+                  <div key={dataKey} className="mb-3">
                     <div className="flex items-center gap-2 px-2 py-1.5 bg-slate-100 rounded text-xs font-semibold text-slate-600 uppercase">
                       {(() => {
                         try {
@@ -170,16 +173,27 @@ export function CategoriaAccordion({
                         }
                       })()}
                     </div>
-                    <div className="divide-y divide-slate-100">
-                      {itensDaData.map((item) => (
-                        <ItemPedidoRow
-                          key={itemKey(item)}
-                          item={item}
-                          selecionado={selecionados.has(itemKey(item))}
-                          bloqueado={cheio}
-                          onChange={handleChange}
-                        />
-                      ))}
+                    <div className="mt-1 space-y-2">
+                      {Array.from(porPedido.entries())
+                        .sort(([a], [b]) => a.localeCompare(b))
+                        .map(([pedidoKey, itensPedido]) => (
+                          <div key={pedidoKey} className="ml-2 border-l-2 border-slate-200 pl-2">
+                            <div className="text-xs font-semibold text-slate-700 py-1">
+                              Pedido {pedidoKey}
+                            </div>
+                            <div className="divide-y divide-slate-100">
+                              {itensPedido.map((item) => (
+                                <ItemPedidoRow
+                                  key={itemKey(item)}
+                                  item={item}
+                                  selecionado={selecionados.has(itemKey(item))}
+                                  bloqueado={cheio}
+                                  onChange={handleChange}
+                                />
+                              ))}
+                            </div>
+                          </div>
+                        ))}
                     </div>
                   </div>
                 ))
