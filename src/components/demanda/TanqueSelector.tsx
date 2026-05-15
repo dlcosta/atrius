@@ -65,9 +65,9 @@ export function TanqueSelector({
 
   // Calcular utilização do tanque no dia/turno selecionado
   const utilizacaoTanque = useMemo(() => {
-    if (!tanqueSelecionado || !ordensAgendadas) return 0
+    if (!tanqueSelecionado || !ordensAgendadas) return { litros: 0, percentual: 0 }
     const tanque = tanques.find((t) => t.id === tanqueSelecionado)
-    if (!tanque) return 0
+    if (!tanque) return { litros: 0, percentual: 0 }
 
     const ordensNoTanque = ordensAgendadas.filter(
       (o) =>
@@ -85,14 +85,15 @@ export function TanqueSelector({
       }))
     })
 
-    const litersNoTurno = ordensNoTanque.reduce((acc, o) => acc + (o.quantidade ?? 0), 0)
+    const litersUsados = ordensNoTanque.reduce((acc, o) => acc + (o.quantidade ?? 0), 0)
+    const percentualUsado = (litersUsados / tanque.volume_liters) * 100
 
-    return (litersNoTurno / tanque.volume_liters) * 100
+    return { litros: litersUsados, percentual: percentualUsado }
   }, [tanqueSelecionado, diaExecucao, tanques, ordensAgendadas])
 
   const tanqueObj = tanques.find((t) => t.id === tanqueSelecionado)
   const capacidadeDisponivel = tanqueObj
-    ? Math.max(0, tanqueObj.volume_liters - (utilizacaoTanque / 100) * tanqueObj.volume_liters)
+    ? Math.max(0, tanqueObj.volume_liters - utilizacaoTanque.litros)
     : 0
   const podeAgendar = litrosSelecionados > 0 && litrosSelecionados <= capacidadeDisponivel
 
@@ -321,12 +322,12 @@ export function TanqueSelector({
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm font-semibold text-slate-900">Disponibilidade</span>
               <span className="text-sm font-bold text-slate-600">
-                {utilizacaoTanque.toFixed(0)}% / {capacidadeDisponivel.toLocaleString('pt-BR')}L livres
+                {utilizacaoTanque.percentual.toFixed(0)}% / {capacidadeDisponivel.toLocaleString('pt-BR')}L livres
               </span>
             </div>
             <TanqueProgressBar
-              litrosSelecionados={utilizacaoTanque}
-              capacidadeTanque={100}
+              litrosSelecionados={utilizacaoTanque.litros}
+              capacidadeTanque={tanqueObj?.volume_liters ?? 0}
             />
           </div>
         </div>
