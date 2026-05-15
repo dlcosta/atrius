@@ -27,11 +27,13 @@ async function buscarTanques(): Promise<Tanque[]> {
 
 async function buscarOrdens(): Promise<Ordem[]> {
   const supabase = await createClient()
+  // Only fetch SCHEDULED and IN_PRODUCTION orders that have agendamentos
+  // BACKLOG orders don't affect tank availability yet since they're not scheduled
   const { data, error } = await supabase
     .from('ordens')
     .select(`
       *,
-      agendamentos_producao!left (
+      agendamentos_producao!inner (
         id,
         tank_id,
         data_agendamento,
@@ -39,7 +41,7 @@ async function buscarOrdens(): Promise<Ordem[]> {
       )
     `)
     .eq('etapa', 'tanque')
-    .in('planning_status', ['BACKLOG', 'SCHEDULED', 'IN_PRODUCTION'])
+    .in('planning_status', ['SCHEDULED', 'IN_PRODUCTION'])
   if (error) {
     console.error('[demanda] erro ao buscar ordens:', error.message)
     return []
@@ -48,7 +50,7 @@ async function buscarOrdens(): Promise<Ordem[]> {
   // Flatten agendamentos data into orden
   const ordensComAgendamento = (data as any[])?.map(ordem => {
     const agendamento = ordem.agendamentos_producao?.[0]
-    // Use agendamento data if exists, otherwise use ordem's original data
+    // Convert date to YYYY-MM-DD format
     const dataAgendamento = agendamento?.data_agendamento
       ? (typeof agendamento.data_agendamento === 'string'
           ? agendamento.data_agendamento
@@ -57,8 +59,9 @@ async function buscarOrdens(): Promise<Ordem[]> {
 
     return {
       ...ordem,
-      tank_id: agendamento?.tank_id || ordem.tank_id,
+      tank_id: agendamento?.tank_id,
       data_prevista: dataAgendamento,
+      planning_status: ordem.planning_status,
     }
   }) ?? []
 
