@@ -3,12 +3,11 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Calendar, BarChart3, Settings, LayoutDashboard, ChevronLeft, ChevronRight, ClipboardList, Droplet } from 'lucide-react'
+import { Calendar, BarChart3, Settings, LayoutDashboard, ChevronLeft, ChevronRight, ClipboardList } from 'lucide-react'
 
 const navItems = [
   { name: 'Dashboard', href: '/planner', icon: LayoutDashboard },
   { name: 'Calendário', href: '/calendario', icon: Calendar },
-  { name: 'Produção', href: '/producao', icon: Droplet },
   { name: 'Monitoramento', href: '/monitoramento', icon: BarChart3 },
   { name: 'Demanda', href: '/demanda', icon: ClipboardList },
   { name: 'Admin', href: '/admin', icon: Settings },

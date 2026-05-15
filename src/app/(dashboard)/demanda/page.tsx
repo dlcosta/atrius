@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
-import { DemandaContainer } from '@/components/demanda/DemandaContainer'
-import type { ItemDemanda, Tanque } from '@/types'
+import { DemandaProducaoContainer } from '@/components/demanda/DemandaProducaoContainer'
+import type { ItemDemanda, Ordem, Tanque } from '@/types'
 
 async function buscarItens(): Promise<ItemDemanda[]> {
   const supabase = await createClient()
@@ -25,8 +25,32 @@ async function buscarTanques(): Promise<Tanque[]> {
   return (data as Tanque[]) ?? []
 }
 
-export default async function DemandaPage() {
-  const [itens, tanques] = await Promise.all([buscarItens(), buscarTanques()])
+async function buscarOrdens(): Promise<Ordem[]> {
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from('ordens')
+    .select('*')
+    .eq('etapa', 'tanque')
+    .in('planning_status', ['BACKLOG', 'SCHEDULED', 'IN_PRODUCTION'])
+  if (error) {
+    console.error('[demanda] erro ao buscar ordens:', error.message)
+    return []
+  }
+  return (data as Ordem[]) ?? []
+}
 
-  return <DemandaContainer itensIniciais={itens} tanques={tanques} />
+export default async function DemandaPage() {
+  const [itens, tanques, ordens] = await Promise.all([
+    buscarItens(),
+    buscarTanques(),
+    buscarOrdens(),
+  ])
+
+  return (
+    <DemandaProducaoContainer
+      itensIniciais={itens}
+      ordensIniciais={ordens}
+      tanques={tanques}
+    />
+  )
 }
