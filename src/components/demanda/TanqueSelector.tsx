@@ -459,18 +459,22 @@ export function TanqueSelector({
             {(() => {
               const porData = new Map<string, ItemDemanda[]>()
               for (const item of itensDaCategoria) {
-                const data = item.data_prevista?.slice(0, 10) || '__sem_data__'
-                if (!porData.has(data)) porData.set(data, [])
-                porData.get(data)!.push(item)
+                const dataKey = item.data_prevista?.slice(0, 10).trim() || '__sem_data__'
+                if (!porData.has(dataKey)) porData.set(dataKey, [])
+                porData.get(dataKey)!.push(item)
               }
-              const datasOrdenadas = Array.from(porData.keys()).sort()
-              return datasOrdenadas.map((data) => (
-                <div key={data}>
+              const datasOrdenadas = Array.from(porData.keys()).sort((a, b) => {
+                if (a === '__sem_data__') return 1
+                if (b === '__sem_data__') return -1
+                return a.localeCompare(b)
+              })
+              return datasOrdenadas.map((dataKey) => (
+                <div key={dataKey}>
                   <div className="text-xs font-bold text-blue-600 px-3 py-2">
-                    Entrega: {data === '__sem_data__' ? 'Sem data' : format(parseISO(data), 'dd/MM/yyyy', { locale: ptBR })}
+                    Entrega: {dataKey === '__sem_data__' ? 'Sem data' : format(parseISO(dataKey), 'dd/MM/yyyy', { locale: ptBR })}
                   </div>
                   <div className="divide-y divide-slate-100 border border-slate-200 rounded-lg overflow-hidden">
-                    {porData.get(data)!.map((item) => (
+                    {porData.get(dataKey)!.map((item) => (
                       <ItemPedidoRow
                         key={itemKey(item)}
                         item={item}
