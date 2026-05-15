@@ -1,5 +1,7 @@
 'use client'
 
+import { format, parseISO } from 'date-fns'
+import { ptBR } from 'date-fns/locale'
 import type { ItemDemanda } from '@/types'
 
 type Props = {
@@ -42,6 +44,11 @@ export function ItemPedidoRow({ item, selecionado, bloqueado, onChange }: Props)
           </span>
         </div>
         <p className="text-xs text-slate-500 truncate mt-0.5">{item.produto_descricao}</p>
+        {item.data_prevista && (
+          <p className="text-xs text-blue-600 font-semibold mt-1">
+            Entrega: {format(parseISO(item.data_prevista), 'dd/MM/yyyy', { locale: ptBR })}
+          </p>
+        )}
         {item.alocado && (
           <span className="inline-block mt-1 text-[10px] font-bold uppercase tracking-wide text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">
             {item.ordem_status ?? 'alocado'}
