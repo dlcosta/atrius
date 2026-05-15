@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react'
 import { ChevronLeft, Plus } from 'lucide-react'
-import { format, parseISO, addDays } from 'date-fns'
+import { format, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import type { ItemDemanda, Ordem, Tanque } from '@/types'
 import { TanqueProgressBar } from './TanqueProgressBar'
@@ -31,8 +31,28 @@ const TURNOS_PADRAO: Turno[] = [
   { id: 'noite', nome: 'Noite', horaInicio: 22, horaFim: 6 },
 ]
 
+const SEM_DATA_KEY = '__sem_data__'
+
+function getDataKey(item: ItemDemanda) {
+  return item.data_prevista?.slice(0, 10) || SEM_DATA_KEY
+}
+
+function getHojeYmd() {
+  return format(new Date(), 'yyyy-MM-dd')
+}
+
+function formatDataSelecionada(data: string) {
+  if (data === SEM_DATA_KEY) return 'sem entrega prevista'
+  return format(parseISO(data), 'dd/MM/yyyy', { locale: ptBR })
+}
+
 function itemKey(item: ItemDemanda) {
   return `${item.numero_pedido}::${item.produto_descricao}::${item.data_prevista?.slice(0, 10) ?? ''}`
+}
+
+function turnoLabel(turnoId: string) {
+  const turno = TURNOS_PADRAO.find((item) => item.id === turnoId)
+  return turno ? `${turno.nome} (${turno.horaInicio}h - ${turno.horaFim}h)` : turnoId
 }
 
 export function TanqueSelector({
@@ -47,7 +67,7 @@ export function TanqueSelector({
   const [tanqueSelecionado, setTanqueSelecionado] = useState<string | null>(null)
   const [selecionados, setSelecionados] = useState<Set<string>>(new Set())
   const [nomeOrdem, setNomeOrdem] = useState<string>('')
-  const [diaExecucao, setDiaExecucao] = useState<string>(dataSelecionada)
+  const [diaExecucao, setDiaExecucao] = useState<string>(getHojeYmd())
   const [turnoId, setTurnoId] = useState<string>('manha')
   const [criando, setCriando] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
@@ -55,9 +75,14 @@ export function TanqueSelector({
   // Itens da categoria selecionada
   const itensDaCategoria = useMemo(() => {
     return itensIniciais.filter(
-      (item) => item.categoria_produto === categoriaSelecionada && !item.alocado
+      (item) =>
+        item.categoria_produto === categoriaSelecionada &&
+        getDataKey(item) === dataSelecionada &&
+        !item.alocado
     )
-  }, [itensIniciais, categoriaSelecionada])
+  }, [itensIniciais, categoriaSelecionada, dataSelecionada])
+
+  const litrosDaCategoria = itensDaCategoria.reduce((acc, item) => acc + item.total_litros, 0)
 
   const litrosSelecionados = itensDaCategoria
     .filter((item) => selecionados.has(itemKey(item)))
@@ -72,7 +97,8 @@ export function TanqueSelector({
     const ordensNoTanque = ordensAgendadas.filter(
       (o) =>
         o.tank_id === tanqueSelecionado &&
-        o.data_prevista?.slice(0, 10) === diaExecucao
+        o.data_prevista?.slice(0, 10) === diaExecucao &&
+        (o.turno_id ?? 'manha') === turnoId
     )
 
     console.log(`[TanqueSelector] Tanque ${tanqueSelecionado} em ${diaExecucao}:`, {
@@ -89,13 +115,17 @@ export function TanqueSelector({
     const percentualUsado = (litersUsados / tanque.volume_liters) * 100
 
     return { litros: litersUsados, percentual: percentualUsado }
-  }, [tanqueSelecionado, diaExecucao, tanques, ordensAgendadas])
+  }, [tanqueSelecionado, diaExecucao, turnoId, tanques, ordensAgendadas])
 
   const tanqueObj = tanques.find((t) => t.id === tanqueSelecionado)
   const capacidadeDisponivel = tanqueObj
     ? Math.max(0, tanqueObj.volume_liters - utilizacaoTanque.litros)
     : 0
   const podeAgendar = litrosSelecionados > 0 && litrosSelecionados <= capacidadeDisponivel
+  const itensSelecionaveis = itensDaCategoria.filter((item) => item.total_litros <= capacidadeDisponivel)
+  const todosSelecionados =
+    itensSelecionaveis.length > 0 &&
+    itensSelecionaveis.every((item) => selecionados.has(itemKey(item)))
 
   function handleChange(item: ItemDemanda, checked: boolean) {
     setSelecionados((prev) => {
@@ -106,6 +136,26 @@ export function TanqueSelector({
     })
   }
 
+  function handleSelecionarTodos(checked: boolean) {
+    if (!checked) {
+      setSelecionados(new Set())
+      return
+    }
+
+    const next = new Set<string>()
+    let litrosAcumulados = 0
+
+    for (const item of itensDaCategoria) {
+      const proximoTotal = litrosAcumulados + item.total_litros
+      if (proximoTotal <= capacidadeDisponivel) {
+        next.add(itemKey(item))
+        litrosAcumulados = proximoTotal
+      }
+    }
+
+    setSelecionados(next)
+  }
+
   async function handleCriarOrdem() {
     if (!podeAgendar || !tanqueSelecionado || !nomeOrdem.trim() || !diaExecucao) return
 
@@ -114,7 +164,7 @@ export function TanqueSelector({
     const dataPrevista = itensSelecionados
       .map((i) => i.data_prevista?.slice(0, 10) ?? '')
       .filter(Boolean)
-      .sort()[0] ?? ''
+      .sort()[0] ?? diaExecucao
 
     const turno = TURNOS_PADRAO.find((t) => t.id === turnoId)
     if (!turno) {
@@ -174,7 +224,7 @@ export function TanqueSelector({
 
       setSelecionados(new Set())
       setNomeOrdem('')
-      setDiaExecucao(dataSelecionada)
+      setDiaExecucao(getHojeYmd())
       setTurnoId('manha')
       onOrdemCriada()
     } catch {
@@ -199,27 +249,69 @@ export function TanqueSelector({
         <div className="bg-white rounded-lg shadow overflow-hidden">
           <div className="bg-gradient-to-r from-blue-50 to-blue-25 px-6 py-4 border-b border-slate-200">
             <h2 className="text-xl font-bold text-slate-900">{categoriaSelecionada}</h2>
-            <p className="text-sm text-slate-600 mt-1">Selecione um tanque para produção</p>
+            <p className="text-sm text-slate-600 mt-1">Entrega prevista: {formatDataSelecionada(dataSelecionada)}</p>
+            <p className="text-sm text-slate-700 mt-2">
+              <span className="font-semibold">{litrosDaCategoria.toLocaleString('pt-BR')}L</span> a produzir em{' '}
+              <span className="font-semibold">{itensDaCategoria.length}</span>{' '}
+              {itensDaCategoria.length === 1 ? 'item' : 'itens'}
+            </p>
           </div>
 
           <div className="p-6 space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-semibold text-slate-600 block mb-1">Data de producao</label>
+              <input
+                type="date"
+                value={diaExecucao}
+                onChange={(e) => {
+                  setDiaExecucao(e.target.value)
+                  setSelecionados(new Set())
+                }}
+                className="w-full text-sm border border-slate-300 rounded-md px-3 py-2 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-slate-600 block mb-1">Turno de producao</label>
+              <select
+                value={turnoId}
+                onChange={(e) => {
+                  setTurnoId(e.target.value)
+                  setSelecionados(new Set())
+                }}
+                className="w-full text-sm border border-slate-300 rounded-md px-3 py-2 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                {TURNOS_PADRAO.map((turno) => (
+                  <option key={turno.id} value={turno.id}>
+                    {turno.nome} ({turno.horaInicio}h - {turno.horaFim}h)
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
           {/* Resumo de disponibilidade */}
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
             <h3 className="text-sm font-semibold text-slate-900 mb-3">
-              Disponibilidade em {format(parseISO(dataSelecionada), 'dd/MM/yyyy', { locale: ptBR })}
+              Disponibilidade em {format(parseISO(diaExecucao), 'dd/MM/yyyy', { locale: ptBR })} - {turnoLabel(turnoId)}
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
               {tanques.map((tanque) => {
                 // Filtrar ordens que estão agendadas para este tanque e data
                 const ordensNoTanque = (ordensAgendadas || []).filter((o) => {
                   const dataAgend = o.data_prevista?.slice(0, 10)
-                  return o.tank_id === tanque.id && dataAgend === dataSelecionada
+                  return (
+                    o.tank_id === tanque.id &&
+                    dataAgend === diaExecucao &&
+                    (o.turno_id ?? 'manha') === turnoId
+                  )
                 })
                 const litersUsados = ordensNoTanque.reduce((acc, o) => acc + (o.quantidade ?? 0), 0)
                 const percentualUsado = (litersUsados / tanque.volume_liters) * 100
                 const livres = tanque.volume_liters - litersUsados
 
-                console.log(`Tanque ${tanque.id} (${dataSelecionada}): ${litersUsados}L de ${tanque.volume_liters}L, ordens: ${ordensNoTanque.length}`)
+                console.log(`Tanque ${tanque.id} (${diaExecucao}): ${litersUsados}L de ${tanque.volume_liters}L, ordens: ${ordensNoTanque.length}`)
 
                 return (
                   <div key={tanque.id} className="bg-white rounded p-3 text-sm">
@@ -244,7 +336,7 @@ export function TanqueSelector({
 
           {/* Seletor de tanque */}
           <div>
-            <h3 className="text-sm font-semibold text-slate-900 mb-3">Selecionar Tanque para {categoriaSelecionada}</h3>
+            <h3 className="text-sm font-semibold text-slate-900 mb-3">Escolher tanque para esta producao</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
               {tanques.map((tanque) => (
                 <button
@@ -284,6 +376,11 @@ export function TanqueSelector({
             <p className="text-sm text-slate-600 mt-1">
               Tanque: <span className="font-semibold">{tanqueObj?.nome}</span>
             </p>
+            <p className="text-sm text-slate-700 mt-2">
+              <span className="font-semibold">{litrosDaCategoria.toLocaleString('pt-BR')}L</span> a produzir em{' '}
+              <span className="font-semibold">{itensDaCategoria.length}</span>{' '}
+              {itensDaCategoria.length === 1 ? 'item' : 'itens'}
+            </p>
           </div>
         </div>
 
@@ -322,20 +419,35 @@ export function TanqueSelector({
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm font-semibold text-slate-900">Disponibilidade</span>
               <span className="text-sm font-bold text-slate-600">
-                {utilizacaoTanque.percentual.toFixed(0)}% / {capacidadeDisponivel.toLocaleString('pt-BR')}L livres
+                {((utilizacaoTanque.litros + litrosSelecionados) / (tanqueObj?.volume_liters ?? 1) * 100).toFixed(0)}%
+                {' '} / {(capacidadeDisponivel - litrosSelecionados).toLocaleString('pt-BR')}L livres
               </span>
             </div>
             <TanqueProgressBar
-              litrosSelecionados={utilizacaoTanque.litros}
+              litrosSelecionados={utilizacaoTanque.litros + litrosSelecionados}
               capacidadeTanque={tanqueObj?.volume_liters ?? 0}
             />
+            <div className="mt-2 flex items-center justify-between text-xs text-slate-600">
+              <span>Ja agendado: {utilizacaoTanque.litros.toLocaleString('pt-BR')}L</span>
+              <span>Selecionado agora: {litrosSelecionados.toLocaleString('pt-BR')}L</span>
+            </div>
           </div>
         </div>
 
         {/* Lista de itens */}
         <div className="px-6 py-4 max-h-96 overflow-y-auto space-y-3">
-          <div className="text-sm font-semibold text-slate-700 mb-3">
-            Itens disponíveis ({itensDaCategoria.length})
+          <div className="flex items-center justify-between gap-3 text-sm font-semibold text-slate-700 mb-3">
+            <span>Itens disponiveis ({itensDaCategoria.length})</span>
+            <label className="flex items-center gap-2 text-xs font-semibold text-slate-600 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={todosSelecionados}
+                disabled={itensDaCategoria.length === 0 || capacidadeDisponivel <= 0}
+                onChange={(event) => handleSelecionarTodos(event.target.checked)}
+                className="accent-blue-600"
+              />
+              Selecionar todos
+            </label>
           </div>
           <div className="divide-y divide-slate-100 border border-slate-200 rounded-lg overflow-hidden">
             {itensDaCategoria.map((item) => (
