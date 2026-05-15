@@ -63,8 +63,6 @@ export function DemandaCalendar({ itensIniciais, ordensAgendadas, tanques, onOrd
           setCategoriaSelecionada(null)
         }}
         onOrdemCriada={() => {
-          setDataSelecionada(null)
-          setCategoriaSelecionada(null)
           onOrdemCriada?.()
         }}
       />
