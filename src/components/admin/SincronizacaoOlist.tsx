@@ -27,6 +27,13 @@ export function SincronizacaoOlist() {
     })
 
     try {
+      // Renovar token antes de sincronizar
+      const refreshRes = await fetch('/api/olist/refresh-token', { method: 'POST' })
+      if (!refreshRes.ok) {
+        const refreshData = await refreshRes.json()
+        throw new Error(`Falha ao renovar token: ${refreshData.error}`)
+      }
+
       let url = ''
       switch (tipo) {
         case 'pedidos':
