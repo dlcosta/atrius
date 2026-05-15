@@ -1,7 +1,9 @@
-﻿import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { listarPedidos, pedidoParaUpsert } from '@/lib/olist/pedidos'
 import { OlistAuthError, OlistApiError } from '@/lib/olist/errors'
+
+const CHECKPOINT_KEY = 'pedidos_data_atualizacao'
 
 function parsePositiveInt(value: string | null, fallback: number): number {
   if (!value) return fallback
@@ -10,84 +12,176 @@ function parsePositiveInt(value: string | null, fallback: number): number {
   return Math.floor(n)
 }
 
+function formatDateYmd(date: Date): string {
+  return date.toISOString().slice(0, 10)
+}
+
+async function carregarPedidosExistentes(
+  supabase: Awaited<ReturnType<typeof createClient>>
+) {
+  const ids = new Set<number>()
+  const pageSize = 1000
+
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await supabase
+      .from('pedidos_erp')
+      .select('id_olist')
+      .range(from, from + pageSize - 1)
+
+    if (error) throw error
+
+    data?.forEach((pedido) => ids.add(Number(pedido.id_olist)))
+
+    if (!data || data.length < pageSize) break
+  }
+
+  return ids
+}
+
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient()
     const params = request.nextUrl.searchParams
-    const mode = params.get('mode') ?? 'backfill'
+    const mode = params.get('mode') === 'full' ? 'full' : 'incremental'
+    const numeroPedido = parsePositiveInt(params.get('numero'), 0)
 
     const limit = Math.min(parsePositiveInt(params.get('limit'), 100), 100)
-    const pages = parsePositiveInt(params.get('pages'), 40)
+    const pages = parsePositiveInt(params.get('pages'), mode === 'full' ? 100000 : 40)
 
-    // Buscar primeiro para saber o total
-    const primeiraPage = await listarPedidos({ limit, offset: 0, orderBy: 'desc' })
-    const total = primeiraPage.paginacao.total
+    if (numeroPedido > 0) {
+      const page = await listarPedidos({
+        numero: numeroPedido,
+        limit: 1,
+        offset: 0,
+      })
 
-    let startOffset = 0
-
-    if (mode === 'backfill') {
-      // Em backfill, buscar apenas pedidos novos (offset = count de existentes)
-      const { count, error: countError } = await supabase
-        .from('pedidos_erp')
-        .select('*', { count: 'exact', head: true })
-
-      if (countError) {
-        throw new Error(`Erro ao contar pedidos_erp: ${countError.message}`)
-      }
-
-      startOffset = count ?? 0
-      if (startOffset >= total) {
+      if (page.itens.length === 0) {
         return NextResponse.json({
-          mode,
-          total_api: total,
-          start_offset: startOffset,
+          mode: 'pedido',
+          numero_pedido: numeroPedido,
           importados: 0,
           erros: 0,
-          no_op: true,
+          encontrado: false,
         })
       }
-    }
-
-    const maxPages = mode === 'full' ? Math.ceil(total / limit) : pages
-
-    let importados = 0
-    let erros = 0
-    let pagesProcessadas = 0
-
-    for (let i = 0; i < maxPages; i++) {
-      const offset = startOffset + i * limit
-      if (offset >= total) break
-
-      // Buscar a página com o offset correto
-      // NÃO reutilizar primeiraPage se estiver em modo backfill com startOffset > 0
-      const page = (offset === 0 && mode === 'full')
-        ? primeiraPage
-        : await listarPedidos({ limit, offset, orderBy: 'desc' })
-
-      if (page.itens.length === 0) break
 
       const rows = page.itens.map(pedidoParaUpsert)
       const { error } = await supabase
         .from('pedidos_erp')
         .upsert(rows, { onConflict: 'id_olist' })
 
-      pagesProcessadas++
+      if (error) throw new Error(`Erro upsert pedido ${numeroPedido}: ${error.message}`)
 
-      if (error) {
-        console.error(`Erro upsert pedidos offset ${offset}:`, error.message)
-        erros += rows.length
-        continue
+      return NextResponse.json({
+        mode: 'pedido',
+        numero_pedido: numeroPedido,
+        importados: rows.length,
+        erros: 0,
+        encontrado: true,
+      })
+    }
+
+    let checkpointAnterior: string | null = null
+    const pedidosExistentes = mode === 'incremental'
+      ? await carregarPedidosExistentes(supabase)
+      : new Set<number>()
+
+    if (mode === 'incremental') {
+      const { data, error } = await supabase
+        .from('sincronizacao_erp_controle')
+        .select('valor_texto')
+        .eq('chave', CHECKPOINT_KEY)
+        .limit(1)
+
+      if (error) throw new Error(`Falha ao ler checkpoint de pedidos: ${error.message}`)
+
+      checkpointAnterior = data?.[0]?.valor_texto ?? null
+    }
+
+    let total = 0
+    let importados = 0
+    let pulados = 0
+    let erros = 0
+    let pagesProcessadas = 0
+
+    for (let i = 0; i < pages; i++) {
+      const offset = i * limit
+      const page = await listarPedidos({
+        limit,
+        offset,
+        orderBy: 'desc',
+        dataAtualizacao: mode === 'incremental' ? checkpointAnterior ?? undefined : undefined,
+      })
+
+      if (i === 0) {
+        total = page.paginacao.total
       }
 
-      importados += rows.length
+      if (page.itens.length === 0) break
+
+      const pedidosParaImportar = mode === 'incremental' && !checkpointAnterior
+        ? page.itens.filter((pedido) => {
+            if (pedidosExistentes.has(pedido.id)) {
+              pulados++
+              return false
+            }
+            return true
+          })
+        : page.itens
+
+      if (pedidosParaImportar.length > 0) {
+        const rows = pedidosParaImportar.map(pedidoParaUpsert)
+        const { error } = await supabase
+          .from('pedidos_erp')
+          .upsert(rows, { onConflict: 'id_olist' })
+
+        if (error) {
+          console.error(`Erro upsert pedidos offset ${offset}:`, error.message)
+          erros += rows.length
+        } else {
+          importados += rows.length
+        }
+      }
+
+      pagesProcessadas++
+      if (offset + limit >= page.paginacao.total) break
+    }
+
+    if (mode === 'incremental') {
+      const checkpointNovo = formatDateYmd(new Date(Date.now() - 24 * 60 * 60 * 1000))
+      const { error: checkpointError } = await supabase
+        .from('sincronizacao_erp_controle')
+        .upsert(
+          {
+            chave: CHECKPOINT_KEY,
+            valor_texto: checkpointNovo,
+            atualizado_em: new Date().toISOString(),
+          },
+          { onConflict: 'chave' }
+        )
+
+      if (checkpointError) {
+        throw new Error(`Falha ao atualizar checkpoint de pedidos: ${checkpointError.message}`)
+      }
+
+      return NextResponse.json({
+        mode,
+        checkpoint_anterior: checkpointAnterior,
+        checkpoint_novo: checkpointNovo,
+        total_api: total,
+        pages_processadas: pagesProcessadas,
+        importados,
+        pulados,
+        erros,
+      })
     }
 
     return NextResponse.json({
       mode,
       total_api: total,
-      start_offset: startOffset,
       pages_processadas: pagesProcessadas,
       importados,
+      pulados,
       erros,
     })
   } catch (err) {

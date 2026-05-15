@@ -59,6 +59,7 @@ export type Ordem = {
   lote: string | null
   etapa: EtapaOrdem
   tank_id?: string | null
+  turno_id?: string | null
   tank_volume_liters?: number | null
   package_volume_liters?: number | null
   units_per_box?: number | null
@@ -129,7 +130,9 @@ export type BlocoGantt = {
 }
 
 export type ItemDemanda = {
-  data_prevista: string
+  data_pedido?: string | null
+  pedido_situacao?: number | null
+  data_prevista: string | null
   categoria_produto: string
   produto_descricao: string
   numero_pedido: string

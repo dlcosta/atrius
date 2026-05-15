@@ -1,7 +1,7 @@
 import { NextResponse, NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import {
-  listarProdutosIds,
+  listarProdutosResumos,
   buscarProdutoDetalhe,
   buscarProducaoFabricado,
   produtoParaUpsert,
@@ -10,11 +10,40 @@ import { OlistAuthError, OlistApiError } from '@/lib/olist/errors'
 
 const CHECKPOINT_KEY = 'produtos_full_sincronizado_em'
 
+async function carregarProdutosExistentes(
+  supabase: Awaited<ReturnType<typeof createClient>>
+) {
+  const ids = new Set<number>()
+  const pageSize = 1000
+
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await supabase
+      .from('produtos_erp')
+      .select('id_olist')
+      .range(from, from + pageSize - 1)
+
+    if (error) {
+      throw error
+    }
+
+    data?.forEach((produto) => ids.add(Number(produto.id_olist)))
+
+    if (!data || data.length < pageSize) {
+      break
+    }
+  }
+
+  return ids
+}
+
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient()
     const search = request.nextUrl.searchParams
     const full = search.get('full') === '1'
+
+    console.log('[PRODUTOS] Iniciando sincronização (full=' + full + ')')
+    const inicio = Date.now()
 
     // Se não for full, usar checkpoint para evitar reprocessar tudo
     let checkpointAnterior: string | null = null
@@ -30,13 +59,17 @@ export async function POST(request: NextRequest) {
       if (!error && data?.[0]?.valor_texto) {
         checkpointAnterior = data[0].valor_texto
         listarTodos = false
+        console.log('[PRODUTOS] Modo incremental - checkpoint anterior:', checkpointAnterior)
       } else {
-        // Se não houver checkpoint, fazer full na primeira vez
-        listarTodos = true
+        // Se não houver checkpoint, usar modo incremental (sem data base)
+        listarTodos = false
+        console.log('[PRODUTOS] Primeira sincronização - modo incremental')
       }
     }
 
-    const ids = await listarProdutosIds()
+    console.log('[PRODUTOS] Listando produtos...')
+    const produtos = await listarProdutosResumos()
+    console.log('[PRODUTOS] Total de produtos encontrados:', produtos.length)
 
     let importados = 0
     let erros = 0
@@ -45,15 +78,35 @@ export async function POST(request: NextRequest) {
 
     const agora = new Date()
     const checkpointAnteriorDate = checkpointAnterior ? new Date(checkpointAnterior) : null
+    const produtosExistentes = new Set<number>()
 
-    for (const id of ids) {
+    if (!listarTodos) {
+      const existentes = await carregarProdutosExistentes(supabase)
+      existentes.forEach((id) => produtosExistentes.add(id))
+    }
+
+    for (let idx = 0; idx < produtos.length; idx++) {
+      const produto = produtos[idx]
+      const id = produto.id
       try {
+        if (idx % 50 === 0) {
+          console.log(`[PRODUTOS] Progresso: ${idx}/${produtos.length}`)
+        }
+
+        if (!listarTodos && produtosExistentes.has(id)) {
+          const resumoAtualizadoEm = produto.dataAlteracao ? new Date(produto.dataAlteracao) : null
+          if (!resumoAtualizadoEm || !checkpointAnteriorDate || resumoAtualizadoEm <= checkpointAnteriorDate) {
+            pulados++
+            continue
+          }
+        }
+
         const detalhe = await buscarProdutoDetalhe(id)
         const row = produtoParaUpsert(detalhe)
 
         // Se não for full, verificar se produto foi atualizado após checkpoint
         if (!listarTodos && checkpointAnteriorDate) {
-          const produtoAtualizadoEm = detalhe.atualizado_em ? new Date(detalhe.atualizado_em) : null
+          const produtoAtualizadoEm = detalhe.dataAlteracao ? new Date(detalhe.dataAlteracao) : null
           if (produtoAtualizadoEm && produtoAtualizadoEm <= checkpointAnteriorDate) {
             pulados++
             continue
@@ -134,11 +187,14 @@ export async function POST(request: NextRequest) {
       console.error('Erro ao atualizar checkpoint de produtos:', checkpointError.message)
     }
 
+    const duracao = ((Date.now() - inicio) / 1000).toFixed(1)
+    console.log(`[PRODUTOS] Sincronização concluída em ${duracao}s - ${importados} importados, ${pulados} pulados, ${erros} erros`)
+
     return NextResponse.json({
       modo: listarTodos ? 'full' : 'incremental',
       checkpoint_anterior: checkpointAnterior,
       checkpoint_novo: novoCheckpoint,
-      total: ids.length,
+      total: produtos.length,
       importados,
       pulados,
       producao_importada: producaoImportada,

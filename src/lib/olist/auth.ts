@@ -14,6 +14,10 @@ export function buildAuthUrl(state: string): string {
 }
 
 async function postToken(body: URLSearchParams): Promise<StoredTokens> {
+  console.log('[OAuth] Tentando trocar código no endpoint:', OLIST_CONFIG.tokenUrl)
+  console.log('[OAuth] Client ID:', OLIST_CONFIG.clientId.substring(0, 30) + '...')
+  console.log('[OAuth] Redirect URI:', OLIST_CONFIG.redirectUri)
+
   const res = await fetch(OLIST_CONFIG.tokenUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -22,6 +26,8 @@ async function postToken(body: URLSearchParams): Promise<StoredTokens> {
 
   if (!res.ok) {
     const text = await res.text()
+    console.error('[OAuth] Erro ao trocar código - Status:', res.status)
+    console.error('[OAuth] Resposta completa:', text)
     if (text.includes('invalid_grant')) {
       throw new OlistAuthError('refresh_failed', 'Refresh token inválido ou expirado.')
     }

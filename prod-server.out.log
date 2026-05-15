@@ -1,0 +1,44 @@
+
+> atrius-planner@0.1.0 start
+> next start
+
+▲ Next.js 16.2.2
+- Local:         http://localhost:3000
+- Network:       http://192.168.0.2:3000
+✓ Ready in 271ms
+[PRODUTOS] Iniciando sincronização (full=false)
+[PRODUTOS] Primeira sincronização - modo incremental
+[PRODUTOS] Listando produtos...
+[PRODUTOS] Total de produtos encontrados: 1521
+[PRODUTOS] Progresso: 0/1521
+[PRODUTOS] Progresso: 50/1521
+[PRODUTOS] Progresso: 100/1521
+[PRODUTOS] Progresso: 150/1521
+[PRODUTOS] Progresso: 200/1521
+[PRODUTOS] Progresso: 250/1521
+[PRODUTOS] Progresso: 300/1521
+[PRODUTOS] Progresso: 350/1521
+[PRODUTOS] Progresso: 400/1521
+[PRODUTOS] Progresso: 450/1521
+[PRODUTOS] Progresso: 500/1521
+[PRODUTOS] Progresso: 550/1521
+[PRODUTOS] Progresso: 600/1521
+[PRODUTOS] Progresso: 650/1521
+[PRODUTOS] Progresso: 700/1521
+[PRODUTOS] Progresso: 750/1521
+[PRODUTOS] Progresso: 800/1521
+[PRODUTOS] Progresso: 850/1521
+[PRODUTOS] Progresso: 900/1521
+[PRODUTOS] Progresso: 950/1521
+[PRODUTOS] Progresso: 1000/1521
+[PRODUTOS] Progresso: 1050/1521
+[PRODUTOS] Progresso: 1100/1521
+[PRODUTOS] Progresso: 1150/1521
+[PRODUTOS] Progresso: 1200/1521
+[PRODUTOS] Progresso: 1250/1521
+[PRODUTOS] Progresso: 1300/1521
+[PRODUTOS] Progresso: 1350/1521
+[PRODUTOS] Progresso: 1400/1521
+[PRODUTOS] Progresso: 1450/1521
+[PRODUTOS] Progresso: 1500/1521
+[PRODUTOS] Sincronização concluída em 13.3s - 0 importados, 1521 pulados, 0 erros

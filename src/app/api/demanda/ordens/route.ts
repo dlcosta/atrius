@@ -60,6 +60,7 @@ export async function GET(req: NextRequest) {
     return {
       ...ordem,
       tank_id: agendamento?.tank_id,
+      turno_id: agendamento?.turno_id,
       data_prevista: dataAgendamento,
       planning_status: ordem.planning_status,
     }

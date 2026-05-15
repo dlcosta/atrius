@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { ChevronDown, ChevronRight, Package } from 'lucide-react'
+import { CalendarDays, ChevronDown, ChevronRight, Package } from 'lucide-react'
 import type { ItemDemanda } from '@/types'
 
 type Props = {
@@ -11,11 +11,20 @@ type Props = {
 type PedidoAgrupado = {
   numero_pedido: string
   cliente_nome: string
+  dataPedido: string | null
+  dataPrevista: string | null
   itens: ItemDemanda[]
   totalLitros: number
   alocadoLitros: number
   pendenteLitros: number
   percentualAlocado: number
+}
+
+function formatDate(value?: string | null): string {
+  if (!value) return 'Sem data'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value.slice(0, 10)
+  return new Intl.DateTimeFormat('pt-BR', { timeZone: 'UTC' }).format(date)
 }
 
 export function PedidoStatusView({ itens }: Props) {
@@ -41,6 +50,8 @@ export function PedidoStatusView({ itens }: Props) {
         return {
           numero_pedido,
           cliente_nome: itensPedido[0]?.cliente_nome ?? 'Desconhecido',
+          dataPedido: itensPedido.find((item) => item.data_pedido)?.data_pedido ?? null,
+          dataPrevista: itensPedido.find((item) => item.data_prevista)?.data_prevista ?? null,
           itens: itensPedido,
           totalLitros,
           alocadoLitros,
@@ -79,6 +90,16 @@ export function PedidoStatusView({ itens }: Props) {
               <div className="min-w-0 flex-1">
                 <div className="font-semibold text-slate-900">Pedido {pedido.numero_pedido}</div>
                 <div className="text-xs text-slate-600 truncate">{pedido.cliente_nome}</div>
+                <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
+                  <span className="inline-flex items-center gap-1">
+                    <CalendarDays size={13} />
+                    Pedido: <span className="font-semibold text-slate-700">{formatDate(pedido.dataPedido)}</span>
+                  </span>
+                  <span className="inline-flex items-center gap-1">
+                    <CalendarDays size={13} />
+                    Prevista: <span className="font-semibold text-slate-700">{formatDate(pedido.dataPrevista)}</span>
+                  </span>
+                </div>
               </div>
             </div>
 

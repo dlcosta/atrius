@@ -15,6 +15,30 @@ async function doFetch(path: string, init: RequestInit | undefined, accessToken:
   })
 }
 
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+async function fetchWithRateLimitRetry(
+  path: string,
+  init: RequestInit | undefined,
+  accessToken: string
+): Promise<Response> {
+  let res = await doFetch(path, init, accessToken)
+
+  for (let tentativa = 1; res.status === 429 && tentativa <= 8; tentativa++) {
+    const retryAfter = Number(res.headers.get('retry-after'))
+    const waitMs = Number.isFinite(retryAfter) && retryAfter > 0
+      ? retryAfter * 1000
+      : 5000 * tentativa
+
+    await delay(waitMs)
+    res = await doFetch(path, init, accessToken)
+  }
+
+  return res
+}
+
 export async function olistFetch(path: string, init?: RequestInit): Promise<Response> {
   const stored = await getStoredTokens()
 
@@ -31,12 +55,12 @@ export async function olistFetch(path: string, init?: RequestInit): Promise<Resp
     refreshToken = fresh.refreshToken
   }
 
-  let res = await doFetch(path, init, accessToken)
+  let res = await fetchWithRateLimitRetry(path, init, accessToken)
 
   if (res.status === 401) {
     const fresh = await refreshTokens(refreshToken)
     await saveTokens(fresh)
-    res = await doFetch(path, init, fresh.accessToken)
+    res = await fetchWithRateLimitRetry(path, init, fresh.accessToken)
 
     if (res.status === 401) {
       throw new OlistAuthError('unauthorized')

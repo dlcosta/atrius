@@ -132,6 +132,28 @@ async function processPedidosConcurrently(
   return { pedidosProcessados, itensImportados, erros }
 }
 
+async function carregarPedidosComItensExistentes(
+  supabase: Awaited<ReturnType<typeof createClient>>
+) {
+  const ids = new Set<number>()
+  const pageSize = 1000
+
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await supabase
+      .from('pedidos_erp_itens')
+      .select('pedido_id_olist')
+      .range(from, from + pageSize - 1)
+
+    if (error) throw error
+
+    data?.forEach((item) => ids.add(Number(item.pedido_id_olist)))
+
+    if (!data || data.length < pageSize) break
+  }
+
+  return ids
+}
+
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient()
@@ -140,10 +162,11 @@ export async function POST(request: NextRequest) {
     const full = search.get('full') === '1'
     const limit = Math.min(parsePositiveInt(search.get('limit'), 100), 100)
     const pages = parsePositiveInt(search.get('pages'), full ? 5 : 3)
-    const concurrency = Math.min(parsePositiveInt(search.get('concurrency'), 8), 12)
+    const concurrency = Math.min(parsePositiveInt(search.get('concurrency'), 1), 12)
 
     let offsetInicial = 0
     let checkpointAnterior: string | null = null
+    let pedidosComItensExistentes = new Set<number>()
 
     if (full) {
       const { data, error } = await supabase
@@ -166,12 +189,17 @@ export async function POST(request: NextRequest) {
       if (error) throw new Error(`Falha ao ler checkpoint incremental: ${error.message}`)
 
       checkpointAnterior = data?.[0]?.valor_texto ?? null
+
+      if (!checkpointAnterior) {
+        pedidosComItensExistentes = await carregarPedidosComItensExistentes(supabase)
+      }
     }
 
     let totalPedidosEncontrados = 0
     let pedidosProcessados = 0
     let itensImportados = 0
     let erros = 0
+    let pulados = 0
     let pagesProcessadas = 0
     let offsetAtual = offsetInicial
 
@@ -189,7 +217,17 @@ export async function POST(request: NextRequest) {
 
       if (page.itens.length === 0) break
 
-      const result = await processPedidosConcurrently(supabase, page.itens, concurrency)
+      const pedidosParaProcessar = !full && !checkpointAnterior
+        ? page.itens.filter((pedido) => {
+            if (pedidosComItensExistentes.has(pedido.id)) {
+              pulados++
+              return false
+            }
+            return true
+          })
+        : page.itens
+
+      const result = await processPedidosConcurrently(supabase, pedidosParaProcessar, concurrency)
       pedidosProcessados += result.pedidosProcessados
       itensImportados += result.itensImportados
       erros += result.erros
@@ -255,6 +293,7 @@ export async function POST(request: NextRequest) {
       pages_processadas: pagesProcessadas,
       pedidos_processados: pedidosProcessados,
       itens_importados: itensImportados,
+      pulados,
       erros,
     })
   } catch (err) {

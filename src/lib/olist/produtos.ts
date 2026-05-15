@@ -70,7 +70,12 @@ function parseDataOlist(val: unknown): string | null {
 }
 
 export async function listarProdutosIds(situacao?: 'A' | 'I' | 'E'): Promise<number[]> {
-  const ids: number[] = []
+  const produtos = await listarProdutosResumos(situacao)
+  return produtos.map((p) => p.id)
+}
+
+export async function listarProdutosResumos(situacao?: 'A' | 'I' | 'E'): Promise<ProdutoResumo[]> {
+  const produtos: ProdutoResumo[] = []
   let offset = 0
   const limit = 100
 
@@ -82,7 +87,7 @@ export async function listarProdutosIds(situacao?: 'A' | 'I' | 'E'): Promise<num
     const json = await res.json()
 
     const itens: ProdutoResumo[] = json.itens ?? []
-    ids.push(...itens.map((p) => p.id))
+    produtos.push(...itens)
 
     const total: number = json.paginacao?.total ?? 0
     offset += limit
@@ -90,7 +95,7 @@ export async function listarProdutosIds(situacao?: 'A' | 'I' | 'E'): Promise<num
     if (offset >= total) break
   }
 
-  return ids
+  return produtos
 }
 
 export async function buscarProdutoDetalhe(id: number): Promise<ProdutoDetalhe> {

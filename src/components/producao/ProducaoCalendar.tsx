@@ -268,7 +268,12 @@ export function ProducaoCalendar({ ordens, tanques }: Props) {
                         <button
                           key={tanqueProducao.tanque.id}
                           onClick={() => handleTanqueClick(dia.data, turnoProducao.turno.id, tanqueProducao.tanque.id)}
-                          disabled={ordemSelecionada && tanqueProducao.utilizacao + ((ordemSelecionada.quantidade ?? 0) / tanqueProducao.tanque.volume_liters) * 100 > 100}
+                          disabled={Boolean(
+                            ordemSelecionada &&
+                              tanqueProducao.utilizacao +
+                                ((ordemSelecionada.quantidade ?? 0) / tanqueProducao.tanque.volume_liters) * 100 >
+                                100
+                          )}
                           className={`p-3 rounded-lg border-2 transition-all text-left ${
                             ordemSelecionada
                               ? tanqueProducao.utilizacao + ((ordemSelecionada.quantidade ?? 0) / tanqueProducao.tanque.volume_liters) * 100 > 100

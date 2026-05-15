@@ -1,17 +1,16 @@
 import { createClient } from '@/lib/supabase/server'
 import { DemandaProducaoContainer } from '@/components/demanda/DemandaProducaoContainer'
+import { buscarItensDemanda } from '@/lib/demanda/itens'
 import type { ItemDemanda, Ordem, Tanque } from '@/types'
 
 async function buscarItens(): Promise<ItemDemanda[]> {
   const supabase = await createClient()
-  const { data, error } = await supabase.rpc('demanda_itens_pendentes', {
-    p_mostrar_alocados: false,
-  })
-  if (error) {
-    console.error('[demanda] erro ao buscar itens:', error.message)
+  try {
+    return await buscarItensDemanda(supabase, false)
+  } catch (error) {
+    console.error('[demanda] erro ao buscar itens:', error)
     return []
   }
-  return (data as ItemDemanda[]) ?? []
 }
 
 async function buscarTanques(): Promise<Tanque[]> {
@@ -60,6 +59,7 @@ async function buscarOrdens(): Promise<Ordem[]> {
     return {
       ...ordem,
       tank_id: agendamento?.tank_id,
+      turno_id: agendamento?.turno_id,
       data_prevista: dataAgendamento,
       planning_status: ordem.planning_status,
     }

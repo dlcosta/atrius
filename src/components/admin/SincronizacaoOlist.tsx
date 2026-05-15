@@ -1,7 +1,13 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { RefreshCw, Zap } from 'lucide-react'
+
+type ConnectionStatus = {
+  connected: boolean
+  expiresAt?: string
+  obtainedAt?: string
+}
 
 type SyncResult = {
   tipo: 'pedidos' | 'itens' | 'produtos' | 'categorias'
@@ -12,8 +18,25 @@ type SyncResult = {
 }
 
 export function SincronizacaoOlist() {
+  const [status, setStatus] = useState<ConnectionStatus>({ connected: false })
   const [resultados, setResultados] = useState<SyncResult[]>([])
   const [carregandoGlobal, setCarregandoGlobal] = useState(false)
+
+  useEffect(() => {
+    checkStatus()
+    const interval = setInterval(checkStatus, 5000)
+    return () => clearInterval(interval)
+  }, [])
+
+  const checkStatus = async () => {
+    try {
+      const res = await fetch('/api/olist/oauth/status')
+      const data = await res.json()
+      setStatus(data)
+    } catch (err) {
+      console.error('Erro ao verificar status:', err)
+    }
+  }
 
   const sincronizar = async (tipo: 'pedidos' | 'itens' | 'produtos' | 'categorias', full: boolean = false) => {
     setResultados((prev) => {
@@ -80,7 +103,6 @@ export function SincronizacaoOlist() {
 
   const sincronizarTudo = async (full: boolean = false) => {
     setCarregandoGlobal(true)
-    await sincronizar('categorias')
     await sincronizar('produtos', full)
     await sincronizar('pedidos', full)
     await sincronizar('itens', full)
@@ -91,13 +113,32 @@ export function SincronizacaoOlist() {
 
   return (
     <div className="space-y-6">
+      <div className="p-4 rounded-lg border" style={{backgroundColor: status.connected ? '#f0fdf4' : '#fef2f2', borderColor: status.connected ? '#86efac' : '#fecaca'}}>
+        <div className="flex items-start justify-between">
+          <div>
+            <h3 className="text-lg font-semibold" style={{color: status.connected ? '#15803d' : '#991b1b'}}>
+              {status.connected ? '✓ Olist ERP Conectado' : '✕ Olist ERP Desconectado'}
+            </h3>
+            {status.connected && status.expiresAt && (
+              <div className="text-sm mt-2 space-y-1" style={{color: '#166534'}}>
+                <p>Token válido até: {new Date(status.expiresAt).toLocaleString('pt-BR')}</p>
+              </div>
+            )}
+          </div>
+          <div className="flex gap-2">
+            <a href="/api/olist/oauth/login" className="px-4 py-2 text-white text-sm font-semibold rounded-lg whitespace-nowrap" style={{backgroundColor: status.connected ? '#64748b' : '#dc2626'}}>
+              {status.connected ? 'Reconectar' : 'Conectar'}
+            </a>
+            <button onClick={checkStatus} className="px-4 py-2 text-slate-700 text-sm font-semibold rounded-lg whitespace-nowrap border border-slate-300 hover:bg-slate-100">
+              Recarregar
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {status.connected && (
       <div>
         <h3 className="text-lg font-semibold text-slate-900 mb-4">Sincronizar com Olist</h3>
-
-        {/* Botões de ação rápida */}
-        <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800">
-          <strong>⚠️ Categorias:</strong> Desabilitado. Token Olist não tem permissão para acessar essa API.
-        </div>
 
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-6">
           <button
@@ -119,20 +160,30 @@ export function SincronizacaoOlist() {
           </button>
 
           <button
+            onClick={() => sincronizar('categorias')}
+            disabled={true}
+            className="flex items-center justify-center gap-2 px-4 py-2 bg-gray-400 cursor-not-allowed text-white text-sm font-semibold rounded-lg transition-colors"
+            title="Token não tem permissão para acessar categorias"
+          >
+            <RefreshCw size={16} />
+            Categorias (indisponível)
+          </button>
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-2 gap-3 mb-6">
+          <button
             onClick={() => sincronizar('produtos')}
             disabled={carregandoGlobal}
-            className="flex items-center justify-center gap-2 px-4 py-2 bg-slate-600 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-lg transition-colors"
+            className="flex items-center justify-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-lg transition-colors"
           >
             <RefreshCw size={16} />
             Produtos
           </button>
-        </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-6">
           <button
             onClick={() => sincronizar('pedidos')}
             disabled={carregandoGlobal}
-            className="flex items-center justify-center gap-2 px-4 py-2 bg-slate-600 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-lg transition-colors"
+            className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-lg transition-colors"
           >
             <RefreshCw size={16} />
             Pedidos
@@ -141,17 +192,16 @@ export function SincronizacaoOlist() {
           <button
             onClick={() => sincronizar('itens')}
             disabled={carregandoGlobal}
-            className="flex items-center justify-center gap-2 px-4 py-2 bg-slate-600 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-lg transition-colors"
+            className="flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-lg transition-colors"
           >
             <RefreshCw size={16} />
             Itens de Pedidos
           </button>
         </div>
-      </div>
 
-      {/* Resultados */}
-      {resultados.length > 0 && (
-        <div className="space-y-3">
+        {/* Resultados */}
+        {resultados.length > 0 && (
+          <div className="space-y-3">
           <h4 className="text-sm font-semibold text-slate-900">Resultados</h4>
           <div className="space-y-2">
             {resultados.map((resultado) => {
@@ -206,6 +256,14 @@ export function SincronizacaoOlist() {
               )
             })}
           </div>
+        </div>
+        )}
+      </div>
+      )}
+
+      {!status.connected && (
+        <div className="p-4 rounded-lg border border-gray-200 bg-gray-50 text-center">
+          <p className="text-gray-700 text-sm">Conecte-se com o Olist ERP para acessar as opções de sincronização.</p>
         </div>
       )}
     </div>
