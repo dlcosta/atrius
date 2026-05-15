@@ -75,11 +75,18 @@ export function TanqueSelector({
   // Itens da categoria selecionada
   const itensDaCategoria = useMemo(() => {
     return itensIniciais.filter(
-      (item) =>
-        item.categoria_produto === categoriaSelecionada &&
-        !item.alocado
+      (item) => {
+        const itemData = item.data_prevista?.slice(0, 10) || ''
+        const dataSelecionadaKey = dataSelecionada === SEM_DATA_KEY ? '' : dataSelecionada
+        const passaFiltroData = !dataSelecionadaKey || !itemData || itemData >= dataSelecionadaKey
+        return (
+          item.categoria_produto === categoriaSelecionada &&
+          !item.alocado &&
+          passaFiltroData
+        )
+      }
     )
-  }, [itensIniciais, categoriaSelecionada])
+  }, [itensIniciais, categoriaSelecionada, dataSelecionada])
 
   const litrosDaCategoria = itensDaCategoria.reduce((acc, item) => acc + item.total_litros, 0)
 
