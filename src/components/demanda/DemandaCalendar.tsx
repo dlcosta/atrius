@@ -67,7 +67,7 @@ export function DemandaCalendar({ itensIniciais, tanques }: Props) {
   }
 
   return (
-    <div className="p-6 max-w-6xl mx-auto space-y-6">
+    <div className="space-y-6">
       {/* Dias de entrega */}
       <div className="bg-white rounded-lg shadow p-4">
         <h3 className="text-sm font-semibold text-slate-700 mb-3">Dias com Demanda</h3>
