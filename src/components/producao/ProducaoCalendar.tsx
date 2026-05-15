@@ -34,6 +34,11 @@ type TanqueProducao = {
   utilizacao: number
 }
 
+type Agendamento = {
+  turnoId: string
+  tanqueId: string
+}
+
 const TURNOS_PADRAO: Turno[] = [
   { id: 'manha', nome: 'Manhã', horaInicio: 6, horaFim: 14 },
   { id: 'tarde', nome: 'Tarde', horaInicio: 14, horaFim: 22 },
@@ -43,11 +48,11 @@ export function ProducaoCalendar({ ordens, tanques }: Props) {
   const [diaBase, setDiaBase] = useState(new Date())
   const [turnos, setTurnos] = useState<Turno[]>(TURNOS_PADRAO)
   const [ordemSelecionada, setOrdemSelecionada] = useState<Ordem | null>(null)
-  const [agendamentos, setAgendamentos] = useState<Map<string, { turnoId: string; tanqueId: string }>>(new Map())
+  const [agendamentos, setAgendamentos] = useState<Record<string, Agendamento>>({})
 
   // Ordens BACKLOG disponíveis (sem agendamentos)
   const ordensBacklog = useMemo(() => {
-    return ordens.filter((o) => o.planning_status === 'BACKLOG' && !agendamentos.has(o.id))
+    return ordens.filter((o) => o.planning_status === 'BACKLOG' && !agendamentos[o.id])
   }, [ordens, agendamentos])
 
   // Gerar 7 dias a partir de hoje
@@ -65,8 +70,8 @@ export function ProducaoCalendar({ ordens, tanques }: Props) {
       turnos: turnos.map((turno) => ({
         turno,
         tanques: tanques.map((tanque) => {
-          const ordensDoTanque = ordensBacklog.filter((o) => {
-            const agendamento = agendamentos.get(o.id)
+          const ordensDoTanque = ordens.filter((o) => {
+            const agendamento = agendamentos[o.id]
             return (
               agendamento &&
               agendamento.turnoId === turno.id &&
@@ -85,19 +90,22 @@ export function ProducaoCalendar({ ordens, tanques }: Props) {
         }),
       })),
     }))
-  }, [dias, turnos, tanques, ordensBacklog, agendamentos])
+  }, [dias, turnos, tanques, ordens, agendamentos])
 
   function handleAgendar(ordem: Ordem, data: string, turnoId: string, tanqueId: string) {
-    const novoAgendamento = new Map(agendamentos)
-    novoAgendamento.set(ordem.id, { turnoId, tanqueId })
-    setAgendamentos(novoAgendamento)
+    setAgendamentos((prev) => ({
+      ...prev,
+      [ordem.id]: { turnoId, tanqueId },
+    }))
     setOrdemSelecionada(null)
   }
 
   function handleDesagendar(ordemId: string) {
-    const novoAgendamento = new Map(agendamentos)
-    novoAgendamento.delete(ordemId)
-    setAgendamentos(novoAgendamento)
+    setAgendamentos((prev) => {
+      const next = { ...prev }
+      delete next[ordemId]
+      return next
+    })
   }
 
   function handleTanqueClick(data: string, turnoId: string, tanqueId: string) {
