@@ -49,7 +49,7 @@ export function DemandaCalendar({ itensIniciais, ordensAgendadas, tanques, onOrd
       if (!porData.has(dataKey)) porData.set(dataKey, [])
       porData.get(dataKey)!.push(item)
     }
-    return Array.from(porData.entries())
+    const dias = Array.from(porData.entries())
       .sort(([a], [b]) => {
         if (a === SEM_DATA_KEY) return -1
         if (b === SEM_DATA_KEY) return 1
@@ -60,6 +60,8 @@ export function DemandaCalendar({ itensIniciais, ordensAgendadas, tanques, onOrd
         itens,
         categorias: [...new Set(itens.map((i) => i.categoria_produto))].sort(),
       }))
+    console.log('[DemandaCalendar] Datas encontradas:', dias.map(d => d.data))
+    return dias
   }, [itensIniciais])
 
   // Criar mapa para lookup rápido

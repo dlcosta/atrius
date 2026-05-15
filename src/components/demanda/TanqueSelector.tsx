@@ -78,7 +78,8 @@ export function TanqueSelector({
       (item) => {
         const itemData = item.data_prevista?.slice(0, 10) || ''
         const dataSelecionadaKey = dataSelecionada === SEM_DATA_KEY ? '' : dataSelecionada
-        const passaFiltroData = !dataSelecionadaKey || !itemData || itemData >= dataSelecionadaKey
+        // Mostrar itens que têm data >= data selecionada (não mostrar datas passadas)
+        const passaFiltroData = !dataSelecionadaKey || (itemData && itemData >= dataSelecionadaKey)
         return (
           item.categoria_produto === categoriaSelecionada &&
           !item.alocado &&
