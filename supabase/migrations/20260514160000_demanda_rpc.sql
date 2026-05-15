@@ -22,7 +22,7 @@ as $$
     select
       v.data_prevista,
       v.produto_descricao,
-      v.numero_pedido,
+      v.numero_pedido::text,
       v.cliente_nome,
       v.quantidade,
       trim(
