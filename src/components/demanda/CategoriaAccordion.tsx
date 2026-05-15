@@ -2,6 +2,8 @@
 
 import { useState } from 'react'
 import { ChevronDown, ChevronRight, Plus } from 'lucide-react'
+import { format, parseISO } from 'date-fns'
+import { ptBR } from 'date-fns/locale'
 import type { ItemDemanda, Tanque } from '@/types'
 import { TanqueProgressBar } from './TanqueProgressBar'
 import { ItemPedidoRow } from './ItemPedidoRow'
@@ -53,7 +55,10 @@ export function CategoriaAccordion({
   async function handleCriarOrdem() {
     if (selecionados.size === 0 || !tanqueId) return
     const itensSelecionados = itens.filter((item) => selecionados.has(itemKey(item)))
-    const dataPrevista = itensSelecionados[0]?.data_prevista ?? ''
+    const dataPrevista = itensSelecionados
+      .map((i) => i.data_prevista?.slice(0, 10) ?? '')
+      .filter(Boolean)
+      .sort()[0] ?? ''
 
     setCriando(true)
     setErro(null)
@@ -143,17 +148,42 @@ export function CategoriaAccordion({
             />
           </div>
 
-          {/* Lista de itens */}
-          <div className="divide-y divide-slate-100 px-2 py-1">
-            {itens.map((item) => (
-              <ItemPedidoRow
-                key={itemKey(item)}
-                item={item}
-                selecionado={selecionados.has(itemKey(item))}
-                bloqueado={cheio}
-                onChange={handleChange}
-              />
-            ))}
+          {/* Lista de itens agrupada por data */}
+          <div className="px-2 py-1">
+            {(() => {
+              const porData = new Map<string, ItemDemanda[]>()
+              for (const item of itens) {
+                const dataKey = item.data_prevista?.slice(0, 10) ?? 'sem-data'
+                if (!porData.has(dataKey)) porData.set(dataKey, [])
+                porData.get(dataKey)!.push(item)
+              }
+              return Array.from(porData.entries())
+                .sort(([a], [b]) => a.localeCompare(b))
+                .map(([dataKey, itensDaData]) => (
+                  <div key={dataKey} className="mb-2">
+                    <div className="flex items-center gap-2 px-2 py-1.5 bg-slate-100 rounded text-xs font-semibold text-slate-600 uppercase">
+                      {(() => {
+                        try {
+                          return format(parseISO(dataKey), "dd 'de' MMMM", { locale: ptBR })
+                        } catch {
+                          return dataKey
+                        }
+                      })()}
+                    </div>
+                    <div className="divide-y divide-slate-100">
+                      {itensDaData.map((item) => (
+                        <ItemPedidoRow
+                          key={itemKey(item)}
+                          item={item}
+                          selecionado={selecionados.has(itemKey(item))}
+                          bloqueado={cheio}
+                          onChange={handleChange}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                ))
+            })()}
           </div>
 
           {/* Erro */}

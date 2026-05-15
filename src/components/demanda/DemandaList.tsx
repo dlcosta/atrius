@@ -1,8 +1,6 @@
 'use client'
 
 import { useState, useCallback, useMemo } from 'react'
-import { format, parseISO } from 'date-fns'
-import { ptBR } from 'date-fns/locale'
 import { Calendar } from 'lucide-react'
 import type { ItemDemanda, Tanque } from '@/types'
 import { CategoriaAccordion } from './CategoriaAccordion'
@@ -12,43 +10,29 @@ type Props = {
   tanques: Tanque[]
 }
 
-type GrupoData = {
-  data: string
-  categorias: GrupoCategoria[]
-}
-
 type GrupoCategoria = {
   categoria: string
   itens: ItemDemanda[]
 }
 
-function agrupar(itens: ItemDemanda[]): GrupoData[] {
-  const porData = new Map<string, Map<string, ItemDemanda[]>>()
+function agrupar(itens: ItemDemanda[]): GrupoCategoria[] {
+  const porCategoria = new Map<string, ItemDemanda[]>()
 
   for (const item of itens) {
-    const dataKey = item.data_prevista?.slice(0, 10) ?? 'sem-data'
-    if (!porData.has(dataKey)) porData.set(dataKey, new Map())
-    const porCategoria = porData.get(dataKey)!
     if (!porCategoria.has(item.categoria_produto)) porCategoria.set(item.categoria_produto, [])
     porCategoria.get(item.categoria_produto)!.push(item)
   }
 
-  return Array.from(porData.entries())
+  return Array.from(porCategoria.entries())
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(([data, categorias]) => ({
-      data,
-      categorias: Array.from(categorias.entries())
-        .sort(([a], [b]) => a.localeCompare(b))
-        .map(([categoria, itens]) => ({ categoria, itens })),
+    .map(([categoria, itens]) => ({
+      categoria,
+      itens: itens.sort((a, b) => {
+        const da = a.data_prevista?.slice(0, 10) ?? ''
+        const db = b.data_prevista?.slice(0, 10) ?? ''
+        return da.localeCompare(db)
+      }),
     }))
-}
-
-function formatarData(dataIso: string): string {
-  try {
-    return format(parseISO(dataIso), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })
-  } catch {
-    return dataIso
-  }
 }
 
 export function DemandaList({ itensIniciais, tanques }: Props) {
@@ -110,33 +94,18 @@ export function DemandaList({ itensIniciais, tanques }: Props) {
         <div className="text-center py-4 text-sm text-slate-400">Atualizando...</div>
       )}
 
-      {/* Grupos por data */}
-      <div className="space-y-8">
-        {grupos.map((grupo) => (
-          <div key={grupo.data}>
-            <div className="flex items-center gap-2 mb-3">
-              <Calendar size={16} className="text-slate-400" />
-              <h2 className="text-sm font-bold text-slate-500 uppercase tracking-wide">
-                {formatarData(grupo.data)}
-              </h2>
-            </div>
-            <div className="space-y-2">
-              {grupo.categorias.map((cat) => {
-                const key = `${grupo.data}::${cat.categoria}`
-                return (
-                  <CategoriaAccordion
-                    key={key}
-                    categoria={cat.categoria}
-                    itens={cat.itens}
-                    tanques={tanques}
-                    expandido={expandido === key}
-                    onToggle={() => toggleExpandido(key)}
-                    onOrdemCriada={recarregar}
-                  />
-                )
-              })}
-            </div>
-          </div>
+      {/* Grupos por categoria */}
+      <div className="space-y-2">
+        {grupos.map((cat) => (
+          <CategoriaAccordion
+            key={cat.categoria}
+            categoria={cat.categoria}
+            itens={cat.itens}
+            tanques={tanques}
+            expandido={expandido === cat.categoria}
+            onToggle={() => toggleExpandido(cat.categoria)}
+            onOrdemCriada={recarregar}
+          />
         ))}
       </div>
     </div>
