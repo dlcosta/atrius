@@ -95,7 +95,11 @@ export function SincronizacaoOlist() {
         <h3 className="text-lg font-semibold text-slate-900 mb-4">Sincronizar com Olist</h3>
 
         {/* Botões de ação rápida */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+        <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800">
+          <strong>⚠️ Categorias:</strong> Desabilitado. Token Olist não tem permissão para acessar essa API.
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-6">
           <button
             onClick={() => sincronizarTudo(false)}
             disabled={carregandoGlobal}
@@ -112,15 +116,6 @@ export function SincronizacaoOlist() {
           >
             <Zap size={16} />
             Tudo (full)
-          </button>
-
-          <button
-            onClick={() => sincronizar('categorias')}
-            disabled={carregandoGlobal}
-            className="flex items-center justify-center gap-2 px-4 py-2 bg-slate-600 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-lg transition-colors"
-          >
-            <RefreshCw size={16} />
-            Categorias
           </button>
 
           <button

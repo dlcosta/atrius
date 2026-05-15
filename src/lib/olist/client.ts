@@ -45,6 +45,7 @@ export async function olistFetch(path: string, init?: RequestInit): Promise<Resp
 
   if (!res.ok) {
     const body = await res.text()
+    console.error(`[olistFetch] ${res.status} at ${path}:`, body.slice(0, 500))
     throw new OlistApiError(res.status, body)
   }
 

@@ -28,8 +28,9 @@ export async function POST() {
     }
 
     if (err instanceof OlistApiError) {
+      console.error(`[CATEGORIAS] API Olist ${err.status}:`, err.message)
       return NextResponse.json(
-        { error: `API Olist retornou ${err.status}` },
+        { error: `API Olist retornou ${err.status}`, details: err.message },
         { status: 502 }
       )
     }

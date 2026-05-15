@@ -12,20 +12,26 @@ async function testEndpoint(baseUrl: string, path: string, token: string) {
       cache: 'no-store',
     })
     const body = await res.text()
+    let parsedBody: unknown = body
+    try {
+      parsedBody = JSON.parse(body)
+    } catch {
+      // not json, keep as string
+    }
     return {
       path,
       status: res.status,
       ok: res.ok,
-      body: body.slice(0, 500),
-      error: !res.ok ? `HTTP ${res.status}` : null,
+      body: parsedBody,
+      statusText: res.statusText,
     }
   } catch (err) {
     return {
       path,
       status: 0,
       ok: false,
-      body: '',
-      error: String(err),
+      body: String(err),
+      error: 'Network error',
     }
   }
 }
@@ -44,6 +50,7 @@ export async function GET() {
   const endpointsToTest = [
     '/categorias/todas',
     '/categorias',
+    '/categorias?limit=10',
     '/produtos',
     '/pedidos',
   ]
