@@ -1,0 +1,154 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
+
+type PostBody = {
+  ordem_id: string
+  tank_id: string
+  turno_id: string
+  turno_nome: string
+  data_agendamento: string
+}
+
+function validar(body: Partial<PostBody>): string | null {
+  if (!body.ordem_id?.trim()) return 'ordem_id obrigatório'
+  if (!body.tank_id?.trim()) return 'tank_id obrigatório'
+  if (!body.turno_id?.trim()) return 'turno_id obrigatório'
+  if (!body.turno_nome?.trim()) return 'turno_nome obrigatório'
+  if (!body.data_agendamento?.trim()) return 'data_agendamento obrigatório'
+  return null
+}
+
+export async function POST(req: NextRequest) {
+  const supabase = await createClient()
+  const body: Partial<PostBody> = await req.json()
+
+  const erroValidacao = validar(body)
+  if (erroValidacao) return NextResponse.json({ error: erroValidacao }, { status: 422 })
+
+  const { ordem_id, tank_id, turno_id, turno_nome, data_agendamento } = body as PostBody
+
+  // Verificar se ordem existe e está em BACKLOG
+  const { data: ordem, error: ordemError } = await supabase
+    .from('ordens')
+    .select('id, planning_status')
+    .eq('id', ordem_id)
+    .single()
+
+  if (ordemError || !ordem) {
+    return NextResponse.json({ error: 'Ordem não encontrada' }, { status: 404 })
+  }
+
+  if (ordem.planning_status !== 'BACKLOG') {
+    return NextResponse.json(
+      { error: `Ordem não está em BACKLOG (status atual: ${ordem.planning_status})` },
+      { status: 422 }
+    )
+  }
+
+  // Verificar se tanque existe
+  const { data: tanque, error: tanqueError } = await supabase
+    .from('tanques')
+    .select('id, volume_liters')
+    .eq('id', tank_id)
+    .single()
+
+  if (tanqueError || !tanque) {
+    return NextResponse.json({ error: 'Tanque não encontrado' }, { status: 404 })
+  }
+
+  // Criar agendamento
+  const { data: agendamento, error: agendamentoError } = await supabase
+    .from('agendamentos_producao')
+    .insert({
+      ordem_id,
+      tank_id,
+      turno_id,
+      turno_nome,
+      data_agendamento,
+      status: 'SCHEDULED',
+    })
+    .select('*')
+    .single()
+
+  if (agendamentoError || !agendamento) {
+    return NextResponse.json(
+      { error: `Erro ao criar agendamento: ${agendamentoError?.message}` },
+      { status: 500 }
+    )
+  }
+
+  // Atualizar status da ordem para SCHEDULED
+  const { error: updateError } = await supabase
+    .from('ordens')
+    .update({ planning_status: 'SCHEDULED' })
+    .eq('id', ordem_id)
+
+  if (updateError) {
+    // Se falhar ao atualizar ordem, deletar agendamento
+    await supabase.from('agendamentos_producao').delete().eq('id', agendamento.id)
+    return NextResponse.json(
+      { error: `Erro ao atualizar status da ordem: ${updateError.message}` },
+      { status: 500 }
+    )
+  }
+
+  return NextResponse.json(agendamento, { status: 201 })
+}
+
+// DELETE: Desagendar (volta para BACKLOG)
+export async function DELETE(req: NextRequest) {
+  const supabase = await createClient()
+  const { searchParams } = new URL(req.url)
+  const agendamentoId = searchParams.get('id')
+
+  if (!agendamentoId) {
+    return NextResponse.json({ error: 'id obrigatório' }, { status: 422 })
+  }
+
+  // Buscar agendamento
+  const { data: agendamento, error: agendamentoError } = await supabase
+    .from('agendamentos_producao')
+    .select('ordem_id, status')
+    .eq('id', agendamentoId)
+    .single()
+
+  if (agendamentoError || !agendamento) {
+    return NextResponse.json({ error: 'Agendamento não encontrado' }, { status: 404 })
+  }
+
+  // Só pode desagendar se estiver em SCHEDULED ou PAUSED
+  if (!['SCHEDULED', 'PAUSED'].includes(agendamento.status)) {
+    return NextResponse.json(
+      { error: `Não pode desagendar ordem com status ${agendamento.status}` },
+      { status: 422 }
+    )
+  }
+
+  // Deletar agendamento
+  const { error: deleteError } = await supabase
+    .from('agendamentos_producao')
+    .delete()
+    .eq('id', agendamentoId)
+
+  if (deleteError) {
+    return NextResponse.json(
+      { error: `Erro ao deletar agendamento: ${deleteError.message}` },
+      { status: 500 }
+    )
+  }
+
+  // Voltar ordem para BACKLOG
+  const { error: updateError } = await supabase
+    .from('ordens')
+    .update({ planning_status: 'BACKLOG' })
+    .eq('id', agendamento.ordem_id)
+
+  if (updateError) {
+    return NextResponse.json(
+      { error: `Erro ao atualizar status da ordem: ${updateError.message}` },
+      { status: 500 }
+    )
+  }
+
+  return NextResponse.json({ success: true })
+}

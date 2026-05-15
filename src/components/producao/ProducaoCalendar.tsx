@@ -92,20 +92,66 @@ export function ProducaoCalendar({ ordens, tanques }: Props) {
     }))
   }, [dias, turnos, tanques, ordens, agendamentos])
 
-  function handleAgendar(ordem: Ordem, data: string, turnoId: string, tanqueId: string) {
-    setAgendamentos((prev) => ({
-      ...prev,
-      [ordem.id]: { turnoId, tanqueId },
-    }))
-    setOrdemSelecionada(null)
+  async function handleAgendar(ordem: Ordem, data: string, turnoId: string, tanqueId: string) {
+    try {
+      // Encontrar turno para pegar nome
+      const turno = turnos.find((t) => t.id === turnoId)
+      if (!turno) throw new Error('Turno não encontrado')
+
+      const res = await fetch('/api/producao/agendamentos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ordem_id: ordem.id,
+          tank_id: tanqueId,
+          turno_id: turnoId,
+          turno_nome: turno.nome,
+          data_agendamento: data,
+        }),
+      })
+
+      if (!res.ok) {
+        const erro = await res.json()
+        alert(`Erro ao agendar: ${erro.error}`)
+        return
+      }
+
+      // Só atualiza local se salvou no banco
+      setAgendamentos((prev) => ({
+        ...prev,
+        [ordem.id]: { turnoId, tanqueId },
+      }))
+      setOrdemSelecionada(null)
+    } catch (err) {
+      alert(`Erro ao agendar: ${err instanceof Error ? err.message : 'desconhecido'}`)
+    }
   }
 
-  function handleDesagendar(ordemId: string) {
-    setAgendamentos((prev) => {
-      const next = { ...prev }
-      delete next[ordemId]
-      return next
-    })
+  async function handleDesagendar(ordemId: string) {
+    try {
+      // Encontrar agendamento para pegar ID
+      const agendamento = Object.entries(agendamentos).find(([id]) => id === ordemId)
+      if (!agendamento) throw new Error('Agendamento não encontrado')
+
+      const res = await fetch(`/api/producao/agendamentos?id=${ordemId}`, {
+        method: 'DELETE',
+      })
+
+      if (!res.ok) {
+        const erro = await res.json()
+        alert(`Erro ao desagendar: ${erro.error}`)
+        return
+      }
+
+      // Só remove local se deletou no banco
+      setAgendamentos((prev) => {
+        const next = { ...prev }
+        delete next[ordemId]
+        return next
+      })
+    } catch (err) {
+      alert(`Erro ao desagendar: ${err instanceof Error ? err.message : 'desconhecido'}`)
+    }
   }
 
   function handleTanqueClick(data: string, turnoId: string, tanqueId: string) {
