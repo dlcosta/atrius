@@ -12,6 +12,7 @@ type Props = {
   itensIniciais: ItemDemanda[]
   ordensAgendadas: Ordem[]
   tanques: Tanque[]
+  onOrdemCriada?: () => void
 }
 
 type DiaAgrupado = {
@@ -20,7 +21,7 @@ type DiaAgrupado = {
   categorias: string[]
 }
 
-export function DemandaCalendar({ itensIniciais, ordensAgendadas, tanques }: Props) {
+export function DemandaCalendar({ itensIniciais, ordensAgendadas, tanques, onOrdemCriada }: Props) {
   const [dataSelecionada, setDataSelecionada] = useState<string | null>(null)
   const [categoriaSelecionada, setCategoriaSelecionada] = useState<string | null>(null)
 
@@ -64,6 +65,7 @@ export function DemandaCalendar({ itensIniciais, ordensAgendadas, tanques }: Pro
         onOrdemCriada={() => {
           setDataSelecionada(null)
           setCategoriaSelecionada(null)
+          onOrdemCriada?.()
         }}
       />
     )

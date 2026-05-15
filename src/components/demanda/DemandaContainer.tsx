@@ -18,6 +18,15 @@ export function DemandaContainer({ itensIniciais, ordensIniciais, tanques }: Pro
   const [view, setView] = useState<ViewMode>('calendario')
   const [ordens, setOrdens] = useState<Ordem[]>(ordensIniciais)
 
+  const handleOrdemCriada = () => {
+    fetch('/api/demanda/ordens')
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data)) setOrdens(data)
+      })
+      .catch(console.error)
+  }
+
   return (
     <div className="min-h-screen bg-slate-50">
       <div className="p-6 max-w-6xl mx-auto">
@@ -53,6 +62,7 @@ export function DemandaContainer({ itensIniciais, ordensIniciais, tanques }: Pro
             itensIniciais={itensIniciais}
             ordensAgendadas={ordens}
             tanques={tanques}
+            onOrdemCriada={handleOrdemCriada}
           />
         )}
         {view === 'pedidos' && <PedidoStatusView itens={itensIniciais} />}
