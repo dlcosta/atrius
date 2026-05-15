@@ -10,6 +10,7 @@ type ItemBody = {
 
 type PostBody = {
   categoria_produto: string
+  nome_ordem: string
   data_prevista: string
   tank_id: string
   total_litros: number
@@ -18,6 +19,7 @@ type PostBody = {
 
 function validar(body: Partial<PostBody>): string | null {
   if (!body.categoria_produto?.trim()) return 'categoria_produto obrigatória'
+  if (!body.nome_ordem?.trim()) return 'nome_ordem obrigatório'
   if (!body.data_prevista?.trim()) return 'data_prevista obrigatória'
   if (!body.tank_id?.trim()) return 'tank_id obrigatório'
   if (!body.total_litros || body.total_litros <= 0) return 'total_litros deve ser maior que zero'
@@ -32,7 +34,7 @@ export async function POST(req: NextRequest) {
   const erroValidacao = validar(body)
   if (erroValidacao) return NextResponse.json({ error: erroValidacao }, { status: 422 })
 
-  const { categoria_produto, data_prevista, tank_id, total_litros, itens } = body as PostBody
+  const { categoria_produto, nome_ordem, data_prevista, tank_id, total_litros, itens } = body as PostBody
 
   const { data: tanque, error: tanqueError } = await supabase
     .from('tanques')
@@ -54,7 +56,7 @@ export async function POST(req: NextRequest) {
   const { data: ordem, error: ordemError } = await supabase
     .from('ordens')
     .insert({
-      numero_externo: `DEM-${Date.now()}`,
+      numero_externo: nome_ordem,
       produto_sku: null,
       quantidade: total_litros,
       unidade: 'L',

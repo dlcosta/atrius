@@ -27,6 +27,7 @@ export function CategoriaAccordion({
 }: Props) {
   const [tanqueId, setTanqueId] = useState<string>(tanques[0]?.id ?? '')
   const [selecionados, setSelecionados] = useState<Set<string>>(new Set())
+  const [nomeOrdem, setNomeOrdem] = useState<string>('')
   const [criando, setCriando] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
 
@@ -53,7 +54,7 @@ export function CategoriaAccordion({
   }
 
   async function handleCriarOrdem() {
-    if (selecionados.size === 0 || !tanqueId) return
+    if (selecionados.size === 0 || !tanqueId || !nomeOrdem.trim()) return
     const itensSelecionados = itens.filter((item) => selecionados.has(itemKey(item)))
     const dataPrevista = itensSelecionados
       .map((i) => i.data_prevista?.slice(0, 10) ?? '')
@@ -69,6 +70,7 @@ export function CategoriaAccordion({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           categoria_produto: categoria,
+          nome_ordem: nomeOrdem.trim(),
           data_prevista: dataPrevista,
           tank_id: tanqueId,
           total_litros: litrosSelecionados,
@@ -88,6 +90,7 @@ export function CategoriaAccordion({
       }
 
       setSelecionados(new Set())
+      setNomeOrdem('')
       onOrdemCriada()
     } catch {
       setErro('Erro de rede ao criar ordem')
@@ -207,13 +210,20 @@ export function CategoriaAccordion({
             </div>
           )}
 
-          {/* Botão criar */}
+          {/* Nome da ordem + Botão criar */}
           {selecionados.size > 0 && (
-            <div className="px-4 py-3 border-t border-slate-100 flex justify-end">
+            <div className="px-4 py-3 border-t border-slate-100 space-y-3">
+              <input
+                type="text"
+                placeholder="Digite um nome para a ordem..."
+                value={nomeOrdem}
+                onChange={(e) => setNomeOrdem(e.target.value)}
+                className="w-full text-sm border border-slate-300 rounded-md px-3 py-2 bg-white text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
               <button
                 onClick={handleCriarOrdem}
-                disabled={criando}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-semibold rounded-lg transition-colors"
+                disabled={criando || !nomeOrdem.trim()}
+                className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-lg transition-colors"
               >
                 <Plus size={16} />
                 {criando
