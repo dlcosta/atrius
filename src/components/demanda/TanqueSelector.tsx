@@ -65,7 +65,7 @@ export function TanqueSelector({
 
   // Calcular utilização do tanque no dia/turno selecionado
   const utilizacaoTanque = useMemo(() => {
-    if (!tanqueSelecionado) return 0
+    if (!tanqueSelecionado || !ordensAgendadas) return 0
     const tanque = tanques.find((t) => t.id === tanqueSelecionado)
     if (!tanque) return 0
 
@@ -192,20 +192,58 @@ export function TanqueSelector({
             <p className="text-sm text-slate-600 mt-1">Selecione um tanque para produção</p>
           </div>
 
-          <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {tanques.map((tanque) => (
-              <button
-                key={tanque.id}
-                onClick={() => setTanqueSelecionado(tanque.id)}
-                className="p-4 rounded-lg border-2 border-slate-200 bg-white hover:border-blue-400 hover:shadow-md transition-all text-left"
-              >
-                <div className="font-semibold text-slate-900">{tanque.nome}</div>
-                <div className="text-sm text-slate-600 mt-2">
-                  {tanque.volume_liters.toLocaleString('pt-BR')}L
-                </div>
-              </button>
-            ))}
+          <div className="p-6 space-y-6">
+          {/* Resumo de disponibilidade */}
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <h3 className="text-sm font-semibold text-slate-900 mb-3">Disponibilidade Hoje</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {tanques.map((tanque) => {
+                const ordensNoTanque = (ordensAgendadas || []).filter(
+                  (o) => o.tank_id === tanque.id && o.data_prevista?.slice(0, 10) === dataSelecionada
+                )
+                const litersUsados = ordensNoTanque.reduce((acc, o) => acc + (o.quantidade ?? 0), 0)
+                const percentualUsado = (litersUsados / tanque.volume_liters) * 100
+                const livres = tanque.volume_liters - litersUsados
+
+                return (
+                  <div key={tanque.id} className="bg-white rounded p-3 text-sm">
+                    <div className="font-semibold text-slate-900">{tanque.nome}</div>
+                    <div className="text-xs text-slate-600 mt-1">
+                      Livre: <span className="font-bold">{livres.toLocaleString('pt-BR')}L</span>
+                    </div>
+                    <div className="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden mt-2">
+                      <div
+                        className={`h-full transition-all ${
+                          percentualUsado > 90 ? 'bg-red-500' : percentualUsado > 70 ? 'bg-orange-500' : 'bg-green-500'
+                        }`}
+                        style={{ width: `${Math.min(percentualUsado, 100)}%` }}
+                      />
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
           </div>
+
+          {/* Seletor de tanque */}
+          <div>
+            <h3 className="text-sm font-semibold text-slate-900 mb-3">Selecionar Tanque para {categoriaSelecionada}</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {tanques.map((tanque) => (
+                <button
+                  key={tanque.id}
+                  onClick={() => setTanqueSelecionado(tanque.id)}
+                  className="p-4 rounded-lg border-2 border-slate-200 bg-white hover:border-blue-400 hover:shadow-md transition-all text-left"
+                >
+                  <div className="font-semibold text-slate-900">{tanque.nome}</div>
+                  <div className="text-sm text-slate-600 mt-2">
+                    {tanque.volume_liters.toLocaleString('pt-BR')}L
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
         </div>
       </div>
     )
