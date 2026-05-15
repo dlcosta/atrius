@@ -8,6 +8,13 @@ import type { ItemDemanda, Tanque } from '@/types'
 import { TanqueProgressBar } from './TanqueProgressBar'
 import { ItemPedidoRow } from './ItemPedidoRow'
 
+type Turno = {
+  id: string
+  nome: string
+  horaInicio: number
+  horaFim: number
+}
+
 type Props = {
   dataSelecionada: string
   categoriaSelecionada: string
@@ -16,6 +23,12 @@ type Props = {
   onBack: () => void
   onOrdemCriada: () => void
 }
+
+const TURNOS_PADRAO: Turno[] = [
+  { id: 'manha', nome: 'Manhã', horaInicio: 6, horaFim: 14 },
+  { id: 'tarde', nome: 'Tarde', horaInicio: 14, horaFim: 22 },
+  { id: 'noite', nome: 'Noite', horaInicio: 22, horaFim: 6 },
+]
 
 type ItemComProxDias = ItemDemanda & {
   diasAfrente: number
@@ -32,6 +45,8 @@ export function CategoriaSelector({
   const [tanqueId, setTanqueId] = useState<string>(tanques[0]?.id ?? '')
   const [selecionados, setSelecionados] = useState<Set<string>>(new Set())
   const [nomeOrdem, setNomeOrdem] = useState<string>('')
+  const [diaExecucao, setDiaExecucao] = useState<string>(dataSelecionada)
+  const [turnoId, setTurnoId] = useState<string>('manha')
   const [criando, setCriando] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
 
@@ -84,7 +99,7 @@ export function CategoriaSelector({
   }, [dataSelecionada, categoriaSelecionada, itensIniciais])
 
   async function handleCriarOrdem() {
-    if (selecionados.size === 0 || !tanqueId || !nomeOrdem.trim()) return
+    if (selecionados.size === 0 || !tanqueId || !nomeOrdem.trim() || !diaExecucao) return
 
     const itensSelecionados = itensIniciais.filter(
       (item) =>
@@ -97,11 +112,18 @@ export function CategoriaSelector({
       .filter(Boolean)
       .sort()[0] ?? ''
 
+    const turno = TURNOS_PADRAO.find((t) => t.id === turnoId)
+    if (!turno) {
+      setErro('Turno inválido')
+      return
+    }
+
     setCriando(true)
     setErro(null)
 
     try {
-      const res = await fetch('/api/demanda/ordens', {
+      // 1. Criar ordem
+      const resOrdem = await fetch('/api/demanda/ordens', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -119,14 +141,37 @@ export function CategoriaSelector({
         }),
       })
 
-      if (!res.ok) {
-        const json = await res.json()
+      if (!resOrdem.ok) {
+        const json = await resOrdem.json()
         setErro(json.error ?? 'Erro ao criar ordem')
+        return
+      }
+
+      const ordem = await resOrdem.json()
+
+      // 2. Agendar produção
+      const resAgendamento = await fetch('/api/producao/agendamentos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ordem_id: ordem.id,
+          tank_id: tanqueId,
+          turno_id: turnoId,
+          turno_nome: turno.nome,
+          data_agendamento: diaExecucao,
+        }),
+      })
+
+      if (!resAgendamento.ok) {
+        const json = await resAgendamento.json()
+        setErro(`Ordem criada mas erro ao agendar: ${json.error}`)
         return
       }
 
       setSelecionados(new Set())
       setNomeOrdem('')
+      setDiaExecucao(dataSelecionada)
+      setTurnoId('manha')
       onOrdemCriada()
     } catch {
       setErro('Erro de rede ao criar ordem')
@@ -222,9 +267,10 @@ export function CategoriaSelector({
           </div>
         )}
 
-        {/* Nome + Botão */}
+        {/* Formulário: Nome + Tanque + Dia + Turno + Botão */}
         {selecionados.size > 0 && (
           <div className="border-t border-slate-200 bg-slate-50 px-6 py-4 space-y-3">
+            {/* Nome da ordem */}
             <input
               type="text"
               placeholder="Digite um nome para a ordem..."
@@ -232,9 +278,57 @@ export function CategoriaSelector({
               onChange={(e) => setNomeOrdem(e.target.value)}
               className="w-full text-sm border border-slate-300 rounded-md px-3 py-2 bg-white text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
+
+            {/* Grid: Tanque + Dia + Turno */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              {/* Tanque */}
+              <div>
+                <label className="text-xs font-semibold text-slate-600 block mb-1">Tanque</label>
+                <select
+                  value={tanqueId}
+                  onChange={(e) => setTanqueId(e.target.value)}
+                  className="w-full text-sm border border-slate-300 rounded-md px-3 py-2 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  {tanques.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.nome}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Dia de Execução */}
+              <div>
+                <label className="text-xs font-semibold text-slate-600 block mb-1">Dia de Execução</label>
+                <input
+                  type="date"
+                  value={diaExecucao}
+                  onChange={(e) => setDiaExecucao(e.target.value)}
+                  className="w-full text-sm border border-slate-300 rounded-md px-3 py-2 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              {/* Turno */}
+              <div>
+                <label className="text-xs font-semibold text-slate-600 block mb-1">Turno</label>
+                <select
+                  value={turnoId}
+                  onChange={(e) => setTurnoId(e.target.value)}
+                  className="w-full text-sm border border-slate-300 rounded-md px-3 py-2 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  {TURNOS_PADRAO.map((turno) => (
+                    <option key={turno.id} value={turno.id}>
+                      {turno.nome} ({turno.horaInicio}h - {turno.horaFim}h)
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Botão */}
             <button
               onClick={handleCriarOrdem}
-              disabled={criando || !nomeOrdem.trim()}
+              disabled={criando || !nomeOrdem.trim() || !diaExecucao}
               className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-lg transition-colors"
             >
               <Plus size={16} />
