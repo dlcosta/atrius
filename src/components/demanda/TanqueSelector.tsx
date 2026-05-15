@@ -77,10 +77,9 @@ export function TanqueSelector({
     return itensIniciais.filter(
       (item) =>
         item.categoria_produto === categoriaSelecionada &&
-        getDataKey(item) === dataSelecionada &&
         !item.alocado
     )
-  }, [itensIniciais, categoriaSelecionada, dataSelecionada])
+  }, [itensIniciais, categoriaSelecionada])
 
   const litrosDaCategoria = itensDaCategoria.reduce((acc, item) => acc + item.total_litros, 0)
 
