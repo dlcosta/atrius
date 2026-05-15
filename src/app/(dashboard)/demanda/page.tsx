@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { DemandaList } from '@/components/demanda/DemandaList'
+import { DemandaCalendar } from '@/components/demanda/DemandaCalendar'
 import type { ItemDemanda, Tanque } from '@/types'
 
 async function buscarItens(): Promise<ItemDemanda[]> {
@@ -28,9 +28,5 @@ async function buscarTanques(): Promise<Tanque[]> {
 export default async function DemandaPage() {
   const [itens, tanques] = await Promise.all([buscarItens(), buscarTanques()])
 
-  return (
-    <div className="p-6 max-w-4xl mx-auto">
-      <DemandaList itensIniciais={itens} tanques={tanques} />
-    </div>
-  )
+  return <DemandaCalendar itensIniciais={itens} tanques={tanques} />
 }

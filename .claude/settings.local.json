@@ -1,0 +1,29 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node node_modules/.bin/next dev --turbopack)",
+      "Bash(taskkill /PID 26008 /F)",
+      "PowerShell(Stop-Process -Id 26008 -Force)",
+      "Skill(superpowers:using-superpowers)",
+      "Skill(superpowers:using-superpowers:*)",
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\Douglas Costa\\\\Documents\\\\Projetos Pessoais\\\\atrius\" -Force)",
+      "Bash(Select-Object Name, PSIsContainer)",
+      "Bash(Format-Table -AutoSize)",
+      "Bash(grep -E \"\\\\.\\(ts|tsx\\)$\")",
+      "Skill(superpowers:brainstorming)",
+      "Skill(superpowers:brainstorming:*)",
+      "Skill(superpowers:writing-plans)",
+      "Skill(superpowers:writing-plans:*)",
+      "Skill(superpowers:subagent-driven-development)",
+      "Skill(superpowers:subagent-driven-development:*)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\Douglas Costa\\\\Documents\\\\Projetos Pessoais\\\\atrius\\\\src\\\\app\\\\api\" -Directory)",
+      "PowerShell(New-Item -ItemType Directory -Path \"C:\\\\Users\\\\Douglas Costa\\\\Documents\\\\Projetos Pessoais\\\\atrius\\\\src\\\\app\\\\api\\\\demanda\\\\ordens\" -Force)",
+      "PowerShell(New-Item -ItemType Directory -Path \"C:\\\\Users\\\\Douglas Costa\\\\Documents\\\\Projetos Pessoais\\\\atrius\\\\src\\\\components\\\\demanda\" -Force)",
+      "PowerShell(New-Item -ItemType Directory -Path \"C:\\\\Users\\\\Douglas Costa\\\\Documents\\\\Projetos Pessoais\\\\atrius\\\\src\\\\app\\\\\\(dashboard\\)\\\\demanda\" -Force)",
+      "Skill(superpowers:finishing-a-development-branch)",
+      "Skill(superpowers:finishing-a-development-branch:*)",
+      "Bash(netstat -ano)",
+      "Bash(findstr :3000)"
+    ]
+  }
+}
