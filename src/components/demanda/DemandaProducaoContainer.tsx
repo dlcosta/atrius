@@ -20,9 +20,11 @@ export function DemandaProducaoContainer({ itensIniciais, ordensIniciais, tanque
 
   const handleOrdemCriada = () => {
     // Recarregar ordens após criar nova
-    fetch('/api/ordens')
+    fetch('/api/demanda/ordens')
       .then((res) => res.json())
-      .then((data) => setOrdens(data))
+      .then((data) => {
+        if (Array.isArray(data)) setOrdens(data)
+      })
       .catch(console.error)
   }
 
@@ -59,6 +61,7 @@ export function DemandaProducaoContainer({ itensIniciais, ordensIniciais, tanque
         {view === 'demanda' && (
           <DemandaContainer
             itensIniciais={itensIniciais}
+            ordensIniciais={ordens}
             tanques={tanques}
           />
         )}

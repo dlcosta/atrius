@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import type { Ordem } from '@/types'
 
 type ItemBody = {
   numero_pedido: string
@@ -25,6 +26,46 @@ function validar(body: Partial<PostBody>): string | null {
   if (!body.total_litros || body.total_litros <= 0) return 'total_litros deve ser maior que zero'
   if (!Array.isArray(body.itens) || body.itens.length === 0) return 'itens não pode ser vazio'
   return null
+}
+
+export async function GET(req: NextRequest) {
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from('ordens')
+    .select(`
+      *,
+      agendamentos_producao!inner (
+        id,
+        tank_id,
+        data_agendamento,
+        turno_id
+      )
+    `)
+    .eq('etapa', 'tanque')
+    .in('planning_status', ['SCHEDULED', 'IN_PRODUCTION'])
+
+  if (error) {
+    console.error('[demanda/ordens] erro ao buscar:', error.message)
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+
+  const ordensComAgendamento = (data as any[])?.map(ordem => {
+    const agendamento = ordem.agendamentos_producao?.[0]
+    const dataAgendamento = agendamento?.data_agendamento
+      ? (typeof agendamento.data_agendamento === 'string'
+          ? agendamento.data_agendamento
+          : new Date(agendamento.data_agendamento).toISOString().split('T')[0])
+      : ordem.data_prevista
+
+    return {
+      ...ordem,
+      tank_id: agendamento?.tank_id,
+      data_prevista: dataAgendamento,
+      planning_status: ordem.planning_status,
+    }
+  }) ?? []
+
+  return NextResponse.json(ordensComAgendamento)
 }
 
 export async function POST(req: NextRequest) {
