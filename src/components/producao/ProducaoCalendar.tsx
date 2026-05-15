@@ -109,9 +109,29 @@ export function ProducaoCalendar({ ordens, tanques }: Props) {
   }
 
   function handleTanqueClick(data: string, turnoId: string, tanqueId: string) {
-    if (ordemSelecionada) {
-      handleAgendar(ordemSelecionada, data, turnoId, tanqueId)
+    if (!ordemSelecionada) return
+
+    // Encontrar tanque para validar capacidade
+    const tanque = tanques.find((t) => t.id === tanqueId)
+    if (!tanque) return
+
+    // Calcular utilização atual do tanque neste turno
+    const ordensDoTanque = ordens.filter((o) => {
+      const agendamento = agendamentos[o.id]
+      return agendamento && agendamento.turnoId === turnoId && agendamento.tanqueId === tanqueId
+    })
+
+    const utilizacaoAtual = ordensDoTanque.reduce((acc, o) => acc + (o.quantidade ?? 0), 0)
+    const novaUtilizacao = utilizacaoAtual + (ordemSelecionada.quantidade ?? 0)
+
+    if (novaUtilizacao > tanque.volume_liters) {
+      alert(
+        `❌ Capacidade insuficiente!\n\n${tanque.nome}: ${tanque.volume_liters.toLocaleString('pt-BR')}L\n\nAtual: ${utilizacaoAtual.toLocaleString('pt-BR')}L\nNova ordem: ${(ordemSelecionada.quantidade ?? 0).toLocaleString('pt-BR')}L\nTotal: ${novaUtilizacao.toLocaleString('pt-BR')}L`
+      )
+      return
     }
+
+    handleAgendar(ordemSelecionada, data, turnoId, tanqueId)
   }
 
   return (
@@ -202,9 +222,12 @@ export function ProducaoCalendar({ ordens, tanques }: Props) {
                         <button
                           key={tanqueProducao.tanque.id}
                           onClick={() => handleTanqueClick(dia.data, turnoProducao.turno.id, tanqueProducao.tanque.id)}
+                          disabled={ordemSelecionada && tanqueProducao.utilizacao + ((ordemSelecionada.quantidade ?? 0) / tanqueProducao.tanque.volume_liters) * 100 > 100}
                           className={`p-3 rounded-lg border-2 transition-all text-left ${
                             ordemSelecionada
-                              ? 'border-dashed border-blue-400 bg-blue-25 cursor-pointer hover:bg-blue-50'
+                              ? tanqueProducao.utilizacao + ((ordemSelecionada.quantidade ?? 0) / tanqueProducao.tanque.volume_liters) * 100 > 100
+                                ? 'border-red-300 bg-red-50 cursor-not-allowed opacity-50'
+                                : 'border-dashed border-blue-400 bg-blue-25 cursor-pointer hover:bg-blue-50'
                               : 'border-slate-200 bg-slate-50 cursor-default'
                           }`}
                         >
