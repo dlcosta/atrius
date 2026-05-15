@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextResponse, NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import {
   listarProdutosIds,
@@ -8,19 +8,57 @@ import {
 } from '@/lib/olist/produtos'
 import { OlistAuthError, OlistApiError } from '@/lib/olist/errors'
 
-export async function POST() {
+const CHECKPOINT_KEY = 'produtos_full_sincronizado_em'
+
+export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient()
+    const search = request.nextUrl.searchParams
+    const full = search.get('full') === '1'
+
+    // Se não for full, usar checkpoint para evitar reprocessar tudo
+    let checkpointAnterior: string | null = null
+    let listarTodos = full
+
+    if (!full) {
+      const { data, error } = await supabase
+        .from('sincronizacao_erp_controle')
+        .select('valor_texto')
+        .eq('chave', CHECKPOINT_KEY)
+        .limit(1)
+
+      if (!error && data?.[0]?.valor_texto) {
+        checkpointAnterior = data[0].valor_texto
+        listarTodos = false
+      } else {
+        // Se não houver checkpoint, fazer full na primeira vez
+        listarTodos = true
+      }
+    }
+
     const ids = await listarProdutosIds()
 
     let importados = 0
     let erros = 0
     let producaoImportada = 0
+    let pulados = 0
+
+    const agora = new Date()
+    const checkpointAnteriorDate = checkpointAnterior ? new Date(checkpointAnterior) : null
 
     for (const id of ids) {
       try {
         const detalhe = await buscarProdutoDetalhe(id)
         const row = produtoParaUpsert(detalhe)
+
+        // Se não for full, verificar se produto foi atualizado após checkpoint
+        if (!listarTodos && checkpointAnteriorDate) {
+          const produtoAtualizadoEm = detalhe.atualizado_em ? new Date(detalhe.atualizado_em) : null
+          if (produtoAtualizadoEm && produtoAtualizadoEm <= checkpointAnteriorDate) {
+            pulados++
+            continue
+          }
+        }
 
         const { error } = await supabase
           .from('produtos_erp')
@@ -79,9 +117,30 @@ export async function POST() {
       }
     }
 
+    // Atualizar checkpoint
+    const novoCheckpoint = agora.toISOString()
+    const { error: checkpointError } = await supabase
+      .from('sincronizacao_erp_controle')
+      .upsert(
+        {
+          chave: CHECKPOINT_KEY,
+          valor_texto: novoCheckpoint,
+          atualizado_em: novoCheckpoint,
+        },
+        { onConflict: 'chave' }
+      )
+
+    if (checkpointError) {
+      console.error('Erro ao atualizar checkpoint de produtos:', checkpointError.message)
+    }
+
     return NextResponse.json({
+      modo: listarTodos ? 'full' : 'incremental',
+      checkpoint_anterior: checkpointAnterior,
+      checkpoint_novo: novoCheckpoint,
       total: ids.length,
       importados,
+      pulados,
       producao_importada: producaoImportada,
       erros,
     })

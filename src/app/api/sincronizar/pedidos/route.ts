@@ -19,12 +19,14 @@ export async function POST(request: NextRequest) {
     const limit = Math.min(parsePositiveInt(params.get('limit'), 100), 100)
     const pages = parsePositiveInt(params.get('pages'), 40)
 
+    // Buscar primeiro para saber o total
     const primeiraPage = await listarPedidos({ limit, offset: 0, orderBy: 'desc' })
     const total = primeiraPage.paginacao.total
 
     let startOffset = 0
 
     if (mode === 'backfill') {
+      // Em backfill, buscar apenas pedidos novos (offset = count de existentes)
       const { count, error: countError } = await supabase
         .from('pedidos_erp')
         .select('*', { count: 'exact', head: true })
@@ -56,7 +58,9 @@ export async function POST(request: NextRequest) {
       const offset = startOffset + i * limit
       if (offset >= total) break
 
-      const page = offset === 0
+      // Buscar a página com o offset correto
+      // NÃO reutilizar primeiraPage se estiver em modo backfill com startOffset > 0
+      const page = (offset === 0 && mode === 'full')
         ? primeiraPage
         : await listarPedidos({ limit, offset, orderBy: 'desc' })
 
