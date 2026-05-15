@@ -21,6 +21,22 @@ type DiaAgrupado = {
   categorias: string[]
 }
 
+const SEM_DATA_KEY = '__sem_data__'
+
+function getDataKey(item: ItemDemanda) {
+  return item.data_prevista?.slice(0, 10) || SEM_DATA_KEY
+}
+
+function formatDiaLabel(data: string) {
+  if (data === SEM_DATA_KEY) return 'Sem entrega'
+  return format(parseISO(data), 'dd/MM')
+}
+
+function formatDiaTitulo(data: string) {
+  if (data === SEM_DATA_KEY) return 'Itens sem entrega prevista'
+  return format(parseISO(data), "EEEE, dd 'de' MMMM", { locale: ptBR })
+}
+
 export function DemandaCalendar({ itensIniciais, ordensAgendadas, tanques, onOrdemCriada }: Props) {
   const [dataSelecionada, setDataSelecionada] = useState<string | null>(null)
   const [categoriaSelecionada, setCategoriaSelecionada] = useState<string | null>(null)
@@ -29,16 +45,21 @@ export function DemandaCalendar({ itensIniciais, ordensAgendadas, tanques, onOrd
   const diasComDemanda = useMemo(() => {
     const porData = new Map<string, ItemDemanda[]>()
     for (const item of itensIniciais) {
-      const dataKey = item.data_prevista?.slice(0, 10) ?? ''
-      if (!dataKey) continue
+      const dataKey = getDataKey(item)
       if (!porData.has(dataKey)) porData.set(dataKey, [])
       porData.get(dataKey)!.push(item)
     }
-    return Array.from(porData.entries()).map(([data, itens]) => ({
-      data,
-      itens,
-      categorias: [...new Set(itens.map((i) => i.categoria_produto))].sort(),
-    }))
+    return Array.from(porData.entries())
+      .sort(([a], [b]) => {
+        if (a === SEM_DATA_KEY) return -1
+        if (b === SEM_DATA_KEY) return 1
+        return a.localeCompare(b)
+      })
+      .map(([data, itens]) => ({
+        data,
+        itens,
+        categorias: [...new Set(itens.map((i) => i.categoria_produto))].sort(),
+      }))
   }, [itensIniciais])
 
   // Criar mapa para lookup rápido
@@ -52,11 +73,18 @@ export function DemandaCalendar({ itensIniciais, ordensAgendadas, tanques, onOrd
 
 
   if (categoriaSelecionada && dataSelecionada) {
+    // Filtrar itens para mostrar apenas aqueles que existem no calendário
+    const datasValidas = new Set(diasComDemanda.map(dia => dia.data))
+    const itensValidos = itensIniciais.filter(item => {
+      const dataKey = getDataKey(item)
+      return datasValidas.has(dataKey)
+    })
+
     return (
       <TanqueSelector
         dataSelecionada={dataSelecionada}
         categoriaSelecionada={categoriaSelecionada}
-        itensIniciais={itensIniciais}
+        itensIniciais={itensValidos}
         ordensAgendadas={ordensAgendadas}
         tanques={tanques}
         onBack={() => {
@@ -73,7 +101,7 @@ export function DemandaCalendar({ itensIniciais, ordensAgendadas, tanques, onOrd
     <div className="space-y-6">
       {/* Dias de entrega */}
       <div className="bg-white rounded-lg shadow p-4">
-        <h3 className="text-sm font-semibold text-slate-700 mb-3">Dias com Demanda</h3>
+        <h3 className="text-sm font-semibold text-slate-700 mb-3">Dias com entrega prevista</h3>
         <div className="flex flex-wrap gap-2">
           {diasComDemanda.length > 0 ? (
             diasComDemanda.map((dia) => (
@@ -86,7 +114,7 @@ export function DemandaCalendar({ itensIniciais, ordensAgendadas, tanques, onOrd
                     : 'bg-slate-100 text-slate-700 hover:bg-blue-100 hover:text-blue-700'
                 }`}
               >
-                <div>{format(parseISO(dia.data), 'dd/MM')}</div>
+                <div>{formatDiaLabel(dia.data)}</div>
                 <div className="text-xs font-normal opacity-75 mt-0.5">
                   {dia.itens.reduce((acc, i) => acc + i.total_litros, 0).toLocaleString('pt-BR')}L
                 </div>
@@ -103,7 +131,7 @@ export function DemandaCalendar({ itensIniciais, ordensAgendadas, tanques, onOrd
         <div className="bg-white rounded-lg shadow p-6">
           <div className="mb-6">
             <h3 className="text-lg font-semibold text-slate-900">
-              {format(parseISO(dataSelecionada), "EEEE, dd 'de' MMMM", { locale: ptBR })}
+              {formatDiaTitulo(dataSelecionada)}
             </h3>
             <p className="text-sm text-slate-600 mt-1">
               {diaMap.get(dataSelecionada)!.itens.reduce((acc, i) => acc + i.total_litros, 0).toLocaleString('pt-BR')}L em {diaMap.get(dataSelecionada)!.categorias.length} categoria{diaMap.get(dataSelecionada)!.categorias.length > 1 ? 's' : ''}
@@ -123,7 +151,7 @@ export function DemandaCalendar({ itensIniciais, ordensAgendadas, tanques, onOrd
                     {cat}
                   </div>
                   <div className="text-sm text-slate-600 mt-2">
-                    {totalLitros.toLocaleString('pt-BR')}L • {itensCat.length} item{itensCat.length > 1 ? 'ns' : ''}
+                    {totalLitros.toLocaleString('pt-BR')}L - {itensCat.length} {itensCat.length === 1 ? 'item' : 'itens'}
                   </div>
                 </button>
               )
