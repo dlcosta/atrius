@@ -29,14 +29,40 @@ async function buscarOrdens(): Promise<Ordem[]> {
   const supabase = await createClient()
   const { data, error } = await supabase
     .from('ordens')
-    .select('*')
+    .select(`
+      *,
+      agendamentos_producao!left (
+        id,
+        tank_id,
+        data_agendamento,
+        turno_id
+      )
+    `)
     .eq('etapa', 'tanque')
     .in('planning_status', ['BACKLOG', 'SCHEDULED', 'IN_PRODUCTION'])
   if (error) {
     console.error('[demanda] erro ao buscar ordens:', error.message)
     return []
   }
-  return (data as Ordem[]) ?? []
+
+  // Flatten agendamentos data into orden
+  const ordensComAgendamento = (data as any[])?.map(ordem => {
+    const agendamento = ordem.agendamentos_producao?.[0]
+    // Use agendamento data if exists, otherwise use ordem's original data
+    const dataAgendamento = agendamento?.data_agendamento
+      ? (typeof agendamento.data_agendamento === 'string'
+          ? agendamento.data_agendamento
+          : new Date(agendamento.data_agendamento).toISOString().split('T')[0])
+      : ordem.data_prevista
+
+    return {
+      ...ordem,
+      tank_id: agendamento?.tank_id || ordem.tank_id,
+      data_prevista: dataAgendamento,
+    }
+  }) ?? []
+
+  return ordensComAgendamento as Ordem[]
 }
 
 export default async function DemandaPage() {

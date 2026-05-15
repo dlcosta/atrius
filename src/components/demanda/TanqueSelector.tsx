@@ -75,7 +75,16 @@ export function TanqueSelector({
         o.data_prevista?.slice(0, 10) === diaExecucao
     )
 
-    // Agrupar por turno
+    console.log(`[TanqueSelector] Tanque ${tanqueSelecionado} em ${diaExecucao}:`, {
+      ordensFound: ordensNoTanque.length,
+      detalhes: ordensNoTanque.map(o => ({
+        id: o.id,
+        tank_id: o.tank_id,
+        quantidade: o.quantidade,
+        data: o.data_prevista
+      }))
+    })
+
     const litersNoTurno = ordensNoTanque.reduce((acc, o) => acc + (o.quantidade ?? 0), 0)
 
     return (litersNoTurno / tanque.volume_liters) * 100
@@ -195,21 +204,27 @@ export function TanqueSelector({
           <div className="p-6 space-y-6">
           {/* Resumo de disponibilidade */}
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <h3 className="text-sm font-semibold text-slate-900 mb-3">Disponibilidade Hoje</h3>
+            <h3 className="text-sm font-semibold text-slate-900 mb-3">
+              Disponibilidade em {format(parseISO(dataSelecionada), 'dd/MM/yyyy', { locale: ptBR })}
+            </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
               {tanques.map((tanque) => {
-                const ordensNoTanque = (ordensAgendadas || []).filter(
-                  (o) => o.tank_id === tanque.id && o.data_prevista?.slice(0, 10) === dataSelecionada
-                )
+                // Filtrar ordens que estão agendadas para este tanque e data
+                const ordensNoTanque = (ordensAgendadas || []).filter((o) => {
+                  const dataAgend = o.data_prevista?.slice(0, 10)
+                  return o.tank_id === tanque.id && dataAgend === dataSelecionada
+                })
                 const litersUsados = ordensNoTanque.reduce((acc, o) => acc + (o.quantidade ?? 0), 0)
                 const percentualUsado = (litersUsados / tanque.volume_liters) * 100
                 const livres = tanque.volume_liters - litersUsados
+
+                console.log(`Tanque ${tanque.id} (${dataSelecionada}): ${litersUsados}L de ${tanque.volume_liters}L, ordens: ${ordensNoTanque.length}`)
 
                 return (
                   <div key={tanque.id} className="bg-white rounded p-3 text-sm">
                     <div className="font-semibold text-slate-900">{tanque.nome}</div>
                     <div className="text-xs text-slate-600 mt-1">
-                      Livre: <span className="font-bold">{livres.toLocaleString('pt-BR')}L</span>
+                      Livre: <span className="font-bold">{livres.toLocaleString('pt-BR')}L</span> / {litersUsados.toLocaleString('pt-BR')}L usado
                     </div>
                     <div className="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden mt-2">
                       <div
@@ -219,6 +234,7 @@ export function TanqueSelector({
                         style={{ width: `${Math.min(percentualUsado, 100)}%` }}
                       />
                     </div>
+                    <div className="text-xs text-slate-500 mt-1">{percentualUsado.toFixed(0)}% utilizado</div>
                   </div>
                 )
               })}

@@ -53,7 +53,7 @@ export type Ordem = {
   numero_externo: string
   produto_sku: string | null
   maquina_id: string | null
-  quantidade: number
+  quantidade: number  // Stored in liters when etapa='tanque'
   unidade: string
   tanque: string | null
   lote: string | null
@@ -89,6 +89,21 @@ export type Ordem = {
   produto?: Produto
   maquina?: Maquina
   tanque_ref?: Tanque
+}
+
+export type AgendamentoProducao = {
+  id: string
+  ordem_id: string
+  tank_id: string
+  turno_id: string
+  turno_nome: string
+  data_agendamento: string  // YYYY-MM-DD
+  duracao_planejada_min?: number | null
+  data_inicio?: string | null
+  data_pausa?: string | null
+  data_retomada?: string | null
+  data_conclusao?: string | null
+  criado_em: string
 }
 
 export type EventoTimer = {
