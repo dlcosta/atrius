@@ -37,6 +37,11 @@ export default async function OlistAdminPage({
           Falha na autenticação com o Olist. Tente novamente.
         </div>
       )}
+      {error === 'invalid_state' && (
+        <div className="mb-4 p-3 bg-red-100 text-red-800 rounded">
+          Sessão expirou. Tente novamente.
+        </div>
+      )}
 
       {!status.connected ? (
         <div className="p-4 bg-yellow-50 border border-yellow-300 rounded mb-4">
