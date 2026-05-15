@@ -463,6 +463,13 @@ export function TanqueSelector({
                 if (!porData.has(dataKey)) porData.set(dataKey, [])
                 porData.get(dataKey)!.push(item)
               }
+              console.log('[DEBUG] Itens agrupados por data:', {
+                mapa: Array.from(porData.entries()).map(([data, itens]) => ({
+                  data,
+                  count: itens.length,
+                  exemplos: itens.slice(0, 2).map(i => ({ numero: i.numero_pedido, data_item: i.data_prevista }))
+                }))
+              })
               const datasOrdenadas = Array.from(porData.keys()).sort((a, b) => {
                 if (a === '__sem_data__') return 1
                 if (b === '__sem_data__') return -1
