@@ -5,10 +5,12 @@ import { Calendar } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import type { ItemDemanda, Tanque } from '@/types'
-import { CategoriaSelector } from './CategoriaSelector'
+import { TanqueSelector } from './TanqueSelector'
+import type { Ordem } from '@/types'
 
 type Props = {
   itensIniciais: ItemDemanda[]
+  ordensAgendadas: Ordem[]
   tanques: Tanque[]
 }
 
@@ -18,7 +20,7 @@ type DiaAgrupado = {
   categorias: string[]
 }
 
-export function DemandaCalendar({ itensIniciais, tanques }: Props) {
+export function DemandaCalendar({ itensIniciais, ordensAgendadas, tanques }: Props) {
   const [dataSelecionada, setDataSelecionada] = useState<string | null>(null)
   const [categoriaSelecionada, setCategoriaSelecionada] = useState<string | null>(null)
 
@@ -50,10 +52,11 @@ export function DemandaCalendar({ itensIniciais, tanques }: Props) {
 
   if (categoriaSelecionada && dataSelecionada) {
     return (
-      <CategoriaSelector
+      <TanqueSelector
         dataSelecionada={dataSelecionada}
         categoriaSelecionada={categoriaSelecionada}
         itensIniciais={itensIniciais}
+        ordensAgendadas={ordensAgendadas}
         tanques={tanques}
         onBack={() => {
           setCategoriaSelecionada(null)

@@ -2,19 +2,21 @@
 
 import { useState } from 'react'
 import { Calendar, Package } from 'lucide-react'
-import type { ItemDemanda, Tanque } from '@/types'
+import type { ItemDemanda, Ordem, Tanque } from '@/types'
 import { DemandaCalendar } from './DemandaCalendar'
 import { PedidoStatusView } from './PedidoStatusView'
 
 type Props = {
   itensIniciais: ItemDemanda[]
+  ordensIniciais: Ordem[]
   tanques: Tanque[]
 }
 
 type ViewMode = 'calendario' | 'pedidos'
 
-export function DemandaContainer({ itensIniciais, tanques }: Props) {
+export function DemandaContainer({ itensIniciais, ordensIniciais, tanques }: Props) {
   const [view, setView] = useState<ViewMode>('calendario')
+  const [ordens, setOrdens] = useState<Ordem[]>(ordensIniciais)
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -46,7 +48,13 @@ export function DemandaContainer({ itensIniciais, tanques }: Props) {
         </div>
 
         {/* Conteúdo */}
-        {view === 'calendario' && <DemandaCalendar itensIniciais={itensIniciais} tanques={tanques} />}
+        {view === 'calendario' && (
+          <DemandaCalendar
+            itensIniciais={itensIniciais}
+            ordensAgendadas={ordens}
+            tanques={tanques}
+          />
+        )}
         {view === 'pedidos' && <PedidoStatusView itens={itensIniciais} />}
       </div>
     </div>
