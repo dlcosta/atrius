@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useMemo, useEffect } from 'react'
 import { Calendar } from 'lucide-react'
 import type { ItemDemanda, Tanque } from '@/types'
 import { CategoriaAccordion } from './CategoriaAccordion'
@@ -53,6 +53,10 @@ export function DemandaList({ itensIniciais, tanques }: Props) {
       setCarregando(false)
     }
   }, [mostrarAlocados])
+
+  useEffect(() => {
+    recarregar()
+  }, [mostrarAlocados, recarregar])
 
   const itensFiltrados = useMemo(
     () => (mostrarAlocados ? itens : itens.filter((i) => !i.alocado)),
