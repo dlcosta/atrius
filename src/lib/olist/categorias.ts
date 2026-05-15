@@ -71,8 +71,19 @@ export function extrairCategoriasResposta(payload: unknown): CategoriaArvore[] {
 }
 
 export async function fetchCategoriasArvore(): Promise<CategoriaArvore[]> {
-  const res = await olistFetch('/categorias/todas')
-  return extrairCategoriasResposta(await res.json())
+  try {
+    const res = await olistFetch('/categorias/todas')
+    return extrairCategoriasResposta(await res.json())
+  } catch (error) {
+    // Se falhar com /categorias/todas, tentar /categorias
+    try {
+      const res = await olistFetch('/categorias')
+      return extrairCategoriasResposta(await res.json())
+    } catch {
+      // Se ambas falharem, retornar erro original
+      throw error
+    }
+  }
 }
 
 export async function getCategoria(id: number): Promise<Categoria> {
