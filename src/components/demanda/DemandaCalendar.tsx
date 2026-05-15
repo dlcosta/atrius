@@ -74,7 +74,34 @@ export function DemandaCalendar({ itensIniciais, tanques }: Props) {
   }
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
+    <div className="p-6 max-w-6xl mx-auto space-y-6">
+      {/* Dias de entrega */}
+      <div className="bg-white rounded-lg shadow p-4">
+        <h3 className="text-sm font-semibold text-slate-700 mb-3">Dias com Demanda</h3>
+        <div className="flex flex-wrap gap-2">
+          {diasComDemanda.length > 0 ? (
+            diasComDemanda.map((dia) => (
+              <button
+                key={dia.data}
+                onClick={() => setDataSelecionada(dia.data)}
+                className={`px-3 py-2 rounded-lg text-sm font-semibold transition-all ${
+                  dataSelecionada === dia.data
+                    ? 'bg-blue-600 text-white shadow-md'
+                    : 'bg-slate-100 text-slate-700 hover:bg-blue-100 hover:text-blue-700'
+                }`}
+              >
+                <div>{format(parseISO(dia.data), 'dd/MM')}</div>
+                <div className="text-xs font-normal opacity-75 mt-0.5">
+                  {dia.itens.reduce((acc, i) => acc + i.total_litros, 0).toLocaleString('pt-BR')}L
+                </div>
+              </button>
+            ))
+          ) : (
+            <p className="text-sm text-slate-500">Nenhuma demanda nos próximos dias</p>
+          )}
+        </div>
+      </div>
+
       <div className="bg-white rounded-lg shadow">
         {/* Cabeçalho do calendário */}
         <div className="flex items-center justify-between p-4 border-b border-slate-200">
