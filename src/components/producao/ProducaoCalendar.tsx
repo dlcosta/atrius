@@ -45,10 +45,10 @@ export function ProducaoCalendar({ ordens, tanques }: Props) {
   const [ordemSelecionada, setOrdemSelecionada] = useState<Ordem | null>(null)
   const [agendamentos, setAgendamentos] = useState<Map<string, { turnoId: string; tanqueId: string }>>(new Map())
 
-  // Ordens BACKLOG disponíveis
+  // Ordens BACKLOG disponíveis (sem agendamentos)
   const ordensBacklog = useMemo(() => {
-    return ordens.filter((o) => o.planning_status === 'BACKLOG')
-  }, [ordens])
+    return ordens.filter((o) => o.planning_status === 'BACKLOG' && !agendamentos.has(o.id))
+  }, [ordens, agendamentos])
 
   // Gerar 7 dias a partir de hoje
   const dias = useMemo(() => {
@@ -68,9 +68,9 @@ export function ProducaoCalendar({ ordens, tanques }: Props) {
           const ordensDoTanque = ordensBacklog.filter((o) => {
             const agendamento = agendamentos.get(o.id)
             return (
-              agendamento?.turnoId === turno.id &&
-              agendamento?.tanqueId === tanque.id &&
-              o.data_prevista?.slice(0, 10) === data
+              agendamento &&
+              agendamento.turnoId === turno.id &&
+              agendamento.tanqueId === tanque.id
             )
           })
 
