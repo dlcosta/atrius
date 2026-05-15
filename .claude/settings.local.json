@@ -24,7 +24,8 @@
       "Skill(superpowers:finishing-a-development-branch:*)",
       "Bash(netstat -ano)",
       "Bash(findstr :3000)",
-      "Bash(curl -s http://localhost:3000/demanda)"
+      "Bash(curl -s http://localhost:3000/demanda)",
+      "Bash(curl -s http://localhost:3000/admin)"
     ]
   }
 }

@@ -52,31 +52,46 @@ export function ProdutoForm({ maquinas, produto, onSalvo, onCancelar }: Props) {
     setSalvando(true)
     setErro('')
 
-    const body = {
-      sku,
-      nome,
-      volume_base: Number(volumeBase),
-      tempo_limpeza_min: 0,
-      cor,
-      tempos_maquinas: tempos,
+    try {
+      const body = {
+        sku,
+        nome,
+        volume_base: Number(volumeBase),
+        tempo_limpeza_min: 0,
+        cor,
+        tempos_maquinas: tempos,
+      }
+      const method = produto ? 'PATCH' : 'POST'
+      const payload = produto ? { ...body, id: produto.id } : body
+
+      const controller = new AbortController()
+      const timeout = setTimeout(() => controller.abort(), 10000) // 10 segundos
+
+      const res = await fetch('/api/produtos', {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        signal: controller.signal,
+      })
+
+      clearTimeout(timeout)
+
+      if (res.ok) {
+        onSalvo()
+      } else {
+        const data = await res.json()
+        setErro(data.error ?? 'Erro ao salvar produto')
+      }
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        setErro('Timeout ao salvar produto. Tente novamente.')
+      } else {
+        setErro(String(error) || 'Erro ao salvar produto')
+      }
+      console.error('Erro ao salvar produto:', error)
+    } finally {
+      setSalvando(false)
     }
-    const method = produto ? 'PATCH' : 'POST'
-    const payload = produto ? { ...body, id: produto.id } : body
-
-    const res = await fetch('/api/produtos', {
-      method,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    })
-
-    if (res.ok) {
-      onSalvo()
-    } else {
-      const data = await res.json()
-      setErro(data.error ?? 'Erro ao salvar produto')
-    }
-
-    setSalvando(false)
   }
 
   return (

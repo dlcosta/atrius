@@ -44,6 +44,8 @@ export async function PATCH(req: NextRequest) {
   const supabase = await createClient()
   const { id, nome, volume_base, tempos_maquinas, tempo_limpeza_min, cor } = await req.json()
 
+  console.log('[PATCH /api/produtos] Atualizando produto:', { id, nome })
+
   const updates: Record<string, unknown> = {}
   if (nome !== undefined) updates.nome = nome
   if (volume_base !== undefined) updates.volume_base = Number(volume_base)
@@ -51,15 +53,27 @@ export async function PATCH(req: NextRequest) {
   if (tempo_limpeza_min !== undefined) updates.tempo_limpeza_min = Number(tempo_limpeza_min)
   if (cor !== undefined) updates.cor = cor
 
-  const { data, error } = await supabase
-    .from('produtos')
-    .update(updates)
-    .eq('id', id)
-    .select('*')
-    .single()
+  console.log('[PATCH /api/produtos] Updates:', Object.keys(updates))
 
-  if (error) return NextResponse.json({ error: mensagemErroProduto(error.message) }, { status: 400 })
-  return NextResponse.json(data)
+  try {
+    const { data, error } = await supabase
+      .from('produtos')
+      .update(updates)
+      .eq('id', id)
+      .select('*')
+      .single()
+
+    if (error) {
+      console.error('[PATCH /api/produtos] Erro ao atualizar:', error)
+      return NextResponse.json({ error: mensagemErroProduto(error.message) }, { status: 400 })
+    }
+
+    console.log('[PATCH /api/produtos] Sucesso ao atualizar produto:', id)
+    return NextResponse.json(data)
+  } catch (err) {
+    console.error('[PATCH /api/produtos] Erro inesperado:', err)
+    return NextResponse.json({ error: String(err) }, { status: 500 })
+  }
 }
 
 export async function DELETE(req: NextRequest) {
