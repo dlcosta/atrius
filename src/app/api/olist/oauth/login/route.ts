@@ -13,5 +13,9 @@ export async function GET() {
     path: '/',
   })
 
-  return NextResponse.redirect(buildAuthUrl(state))
+  const authUrl = buildAuthUrl(state)
+  console.log('[OAuth Login] Redirecionando para:', authUrl.slice(0, 100) + '...')
+  console.log('[OAuth Login] State salvo:', state.slice(0, 20) + '...')
+
+  return NextResponse.redirect(authUrl)
 }

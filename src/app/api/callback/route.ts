@@ -9,12 +9,26 @@ export async function GET(req: NextRequest) {
   const code = searchParams.get('code')
   const state = searchParams.get('state')
   const error = searchParams.get('error')
+  const errorDesc = searchParams.get('error_description')
+
+  console.log('[OAuth Callback] Parâmetros recebidos:', {
+    code: code ? `${code.slice(0, 20)}...` : null,
+    state: state ? `${state.slice(0, 20)}...` : null,
+    error,
+    errorDesc,
+  })
 
   const cookieStore = await cookies()
   const storedState = cookieStore.get('olist_oauth_state')?.value
 
+  console.log('[OAuth Callback] Estado armazenado:', storedState ? `${storedState.slice(0, 20)}...` : null)
+
   // Verificar estado (CSRF protection)
   if (!storedState || state !== storedState) {
+    console.error('[OAuth] Falha na validação de estado', {
+      hasStoredState: !!storedState,
+      statesMatch: state === storedState,
+    })
     return NextResponse.redirect(`/admin/olist?error=csrf`)
   }
 
@@ -23,7 +37,7 @@ export async function GET(req: NextRequest) {
 
   // Verificar se houve erro do servidor Olist
   if (error) {
-    console.error(`[OAuth] Erro do Tiny ERP: ${error}`)
+    console.error(`[OAuth] Erro do Tiny ERP: ${error} - ${errorDesc}`)
     return NextResponse.redirect(`/admin/olist?error=oauth_failed`)
   }
 
