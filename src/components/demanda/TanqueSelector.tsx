@@ -448,16 +448,34 @@ export function TanqueSelector({
               Selecionar todos
             </label>
           </div>
-          <div className="divide-y divide-slate-100 border border-slate-200 rounded-lg overflow-hidden">
-            {itensDaCategoria.map((item) => (
-              <ItemPedidoRow
-                key={itemKey(item)}
-                item={item}
-                selecionado={selecionados.has(itemKey(item))}
-                bloqueado={litrosSelecionados >= (tanqueObj?.volume_liters ?? 0) && !selecionados.has(itemKey(item))}
-                onChange={handleChange}
-              />
-            ))}
+          <div className="space-y-3">
+            {(() => {
+              const porData = new Map<string, ItemDemanda[]>()
+              for (const item of itensDaCategoria) {
+                const data = item.data_prevista?.slice(0, 10) || '__sem_data__'
+                if (!porData.has(data)) porData.set(data, [])
+                porData.get(data)!.push(item)
+              }
+              const datasOrdenadas = Array.from(porData.keys()).sort()
+              return datasOrdenadas.map((data) => (
+                <div key={data}>
+                  <div className="text-xs font-bold text-blue-600 px-3 py-2">
+                    Entrega: {data === '__sem_data__' ? 'Sem data' : format(parseISO(data), 'dd/MM/yyyy', { locale: ptBR })}
+                  </div>
+                  <div className="divide-y divide-slate-100 border border-slate-200 rounded-lg overflow-hidden">
+                    {porData.get(data)!.map((item) => (
+                      <ItemPedidoRow
+                        key={itemKey(item)}
+                        item={item}
+                        selecionado={selecionados.has(itemKey(item))}
+                        bloqueado={litrosSelecionados >= (tanqueObj?.volume_liters ?? 0) && !selecionados.has(itemKey(item))}
+                        onChange={handleChange}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ))
+            })()}
           </div>
         </div>
 
