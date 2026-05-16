@@ -1572,10 +1572,11 @@ export default function CalendarioPage() {
   }, [recursosAtivos, selectedMachineId])
   const ordensBacklog = useMemo(() => {
     const termo = normalizarBusca(busca)
+    const etapaBacklog = filtroEtapa === 'todas' ? resourceTab : filtroEtapa
+
     return ordensAtivas
       .filter((o) => ordemPlanningStatus(o) === 'BACKLOG')
-      .filter((o) => (resourceTab === 'envase' ? o.etapa === 'envase' : o.etapa === 'tanque'))
-      .filter((o) => filtroEtapa === 'todas' || o.etapa === filtroEtapa)
+      .filter((o) => o.etapa === etapaBacklog)
       .filter((o) => {
         if (!termo) return true
         return [o.produto?.nome, o.produto_sku, o.numero_externo, o.lote, o.tanque]
@@ -1895,7 +1896,10 @@ export default function CalendarioPage() {
                 {(['todas', 'tanque', 'envase'] as const).map((value) => (
                   <button
                     key={value}
-                    onClick={() => setFiltroEtapa(value)}
+                    onClick={() => {
+                      setFiltroEtapa(value)
+                      if (value !== 'todas') setResourceTab(value)
+                    }}
                     className={`h-7 rounded-full text-xs font-medium ${filtroEtapa === value ? 'bg-[#2563EB] text-white' : 'text-[#9CA3AF]'}`}
                   >
                     {value}
@@ -1957,7 +1961,10 @@ export default function CalendarioPage() {
                   {(['tanque', 'envase'] as const).map((tab) => (
                     <button
                       key={tab}
-                      onClick={() => setResourceTab(tab)}
+                      onClick={() => {
+                        setResourceTab(tab)
+                        if (filtroEtapa !== 'todas') setFiltroEtapa(tab)
+                      }}
                       className={`h-7 rounded-[6px] px-3 text-xs font-medium uppercase ${
                         resourceTab === tab ? 'bg-white text-[#2563EB] shadow-[var(--shadow-sm)]' : 'text-[#9CA3AF]'
                       }`}

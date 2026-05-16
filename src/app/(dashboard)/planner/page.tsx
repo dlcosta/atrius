@@ -6,6 +6,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react'
 import type { Maquina, Ordem, Produto } from '@/types'
 import { NovaOrdemForm } from '@/components/planner/NovaOrdemForm'
 import { OperacaoDashboard } from '@/components/planner/OperacaoDashboard'
+import { OperacaoTvPanel } from '@/components/planner/OperacaoTvPanel'
 import {
   DEFAULT_JANELA_PRODUCAO,
   JanelaProducao,
@@ -323,49 +324,26 @@ export default function PlannerPage() {
 
       <main className="flex-1 space-y-4 overflow-y-auto p-4">
         {isExpanded ? (
-          <div className="fixed inset-0 z-[100] overflow-y-auto bg-[#F7F8FA] p-6">
-            <div className="mx-auto max-w-[1600px] space-y-4">
-              <div className="mb-4 flex items-center justify-between rounded-[12px] border border-[#E4E7EC] bg-white p-5">
-                <div>
-                  <h1 className="text-xl font-semibold text-[#111827]">Painel de Producao</h1>
-                  <p className="mt-1 text-sm text-[#9CA3AF]">{format(dia, "dd 'de' MMMM", { locale: ptBR })}</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setDia((d) => subDays(d, 1))}
-                    className="h-9 rounded-[8px] border border-[#CDD2DA] bg-white px-3 text-sm font-medium text-[#4B5563] hover:bg-[#F0F2F5]"
-                  >
-                    Ontem
-                  </button>
-                  <button
-                    onClick={() => setDia(new Date())}
-                    className="h-9 rounded-[8px] border border-[#2563EB] bg-white px-3 text-sm font-medium text-[#2563EB] hover:bg-[#EFF6FF]"
-                  >
-                    Hoje
-                  </button>
-                  <button
-                    onClick={() => setDia((d) => addDays(d, 1))}
-                    className="h-9 rounded-[8px] border border-[#CDD2DA] bg-white px-3 text-sm font-medium text-[#4B5563] hover:bg-[#F0F2F5]"
-                  >
-                    Amanha
-                  </button>
-                  <button
-                    onClick={() => setIsExpanded(false)}
-                    className="ml-2 h-9 rounded-[8px] border border-[#CDD2DA] bg-white px-4 text-sm font-medium text-[#4B5563] hover:bg-[#F0F2F5]"
-                  >
-                    Sair
-                  </button>
-                </div>
-              </div>
-
-              <OperacaoDashboard
-                maquinas={maquinas}
-                ordens={ordens.filter((o) => o.inicio_agendado !== null)}
-                executandoOrdemId={executandoOrdemId}
-                onAcao={executarAcaoOperacao}
-              />
-            </div>
-          </div>
+          <OperacaoTvPanel
+            maquinas={maquinas}
+            ordens={ordens.filter((o) => o.inicio_agendado !== null)}
+            executandoOrdemId={executandoOrdemId}
+            dia={dia}
+            janela={janela}
+            onNavigateDay={(acao) => {
+              if (acao === 'prev') {
+                setDia((d) => subDays(d, 1))
+                return
+              }
+              if (acao === 'next') {
+                setDia((d) => addDays(d, 1))
+                return
+              }
+              setDia(new Date())
+            }}
+            onExit={() => setIsExpanded(false)}
+            onAcao={executarAcaoOperacao}
+          />
         ) : (
           <OperacaoDashboard
             maquinas={maquinas}
