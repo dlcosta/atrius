@@ -261,44 +261,44 @@ export function NovaOrdemForm({ produtos, dataInicial, onSalvo, onFechar }: Prop
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm">
-      <div className="max-h-[95vh] w-full max-w-4xl overflow-y-auto rounded-lg border border-slate-200 bg-white p-6 shadow-xl">
-        <h2 className="text-xl font-semibold text-slate-900">Nova producao manual</h2>
-        <p className="mb-6 text-sm text-slate-500">Fluxo separado para Tanque e Envase com controle de volume operacional.</p>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/35 p-4">
+      <div className="max-h-[95vh] w-full max-w-4xl overflow-y-auto rounded-[12px] border border-[#E4E7EC] bg-white p-6 shadow-[var(--shadow-md)]">
+        <h2 className="text-xl font-semibold text-[#111827]">Nova producao manual</h2>
+        <p className="mb-6 text-sm text-[#9CA3AF]">Fluxo separado para Tanque e Envase com controle de volume operacional.</p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
             <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">Tipo de producao</label>
+              <label className="mb-1 block text-sm font-medium text-[#4B5563]">Tipo de producao</label>
               <select
                 value={etapa}
                 onChange={(e) => setEtapa(e.target.value as 'tanque' | 'envase')}
-                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                className="w-full rounded-[8px] border border-[#E4E7EC] bg-white px-3 py-2 text-sm text-[#111827]"
               >
                 <option value="tanque">Tanque</option>
                 <option value="envase">Envase</option>
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">Data de producao</label>
+              <label className="mb-1 block text-sm font-medium text-[#4B5563]">Data de producao</label>
               <input
                 type="date"
                 required
                 value={dataProducao}
                 onChange={(e) => setDataProducao(e.target.value)}
-                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                className="w-full rounded-[8px] border border-[#E4E7EC] bg-white px-3 py-2 text-sm text-[#111827]"
               />
             </div>
           </div>
 
           {etapa === 'envase' && (
-            <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
-              <label className="mb-1 block text-sm font-medium text-slate-700">Origem (ordem de tanque)</label>
+            <div className="rounded-[8px] border border-[#E4E7EC] bg-[#F7F8FA] p-3">
+              <label className="mb-1 block text-sm font-medium text-[#4B5563]">Origem (ordem de tanque)</label>
               <select
                 value={originTankOrderId}
                 onChange={(e) => setOriginTankOrderId(e.target.value)}
                 required
-                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                className="w-full rounded-[8px] border border-[#E4E7EC] bg-white px-3 py-2 text-sm text-[#111827]"
               >
                 <option value="">Selecione a ordem de tanque...</option>
                 {origensTanque.map((origem) => (
@@ -315,13 +315,13 @@ export function NovaOrdemForm({ produtos, dataInicial, onSalvo, onFechar }: Prop
 
           <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
             <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">Produto</label>
+              <label className="mb-1 block text-sm font-medium text-[#4B5563]">Produto</label>
               <select
                 value={produtoSku}
                 onChange={(e) => setProdutoSku(e.target.value)}
                 required
                 disabled={etapa === 'envase'}
-                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm disabled:bg-slate-100"
+                className="w-full rounded-[8px] border border-[#E4E7EC] bg-white px-3 py-2 text-sm text-[#111827] disabled:bg-[#F0F2F5]"
               >
                 <option value="">Selecione...</option>
                 {produtos.map((p) => (
@@ -332,23 +332,23 @@ export function NovaOrdemForm({ produtos, dataInicial, onSalvo, onFechar }: Prop
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">Lote</label>
+              <label className="mb-1 block text-sm font-medium text-[#4B5563]">Lote</label>
               <input
                 type="text"
                 value={lote}
                 onChange={(e) => setLote(e.target.value)}
                 disabled={etapa === 'envase'}
-                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm disabled:bg-slate-100"
+                className="w-full rounded-[8px] border border-[#E4E7EC] bg-white px-3 py-2 text-sm text-[#111827] disabled:bg-[#F0F2F5]"
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">{etapa === 'tanque' ? 'Tanque' : 'Maquina'}</label>
+              <label className="mb-1 block text-sm font-medium text-[#4B5563]">{etapa === 'tanque' ? 'Tanque' : 'Maquina'}</label>
               {etapa === 'tanque' ? (
                 <select
                   value={tankId}
                   onChange={(e) => setTankId(e.target.value)}
                   required
-                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                  className="w-full rounded-[8px] border border-[#E4E7EC] bg-white px-3 py-2 text-sm text-[#111827]"
                 >
                   <option value="">Selecione...</option>
                   {tanques.map((t) => (
@@ -362,7 +362,7 @@ export function NovaOrdemForm({ produtos, dataInicial, onSalvo, onFechar }: Prop
                   value={machineId}
                   onChange={(e) => setMachineId(e.target.value)}
                   required
-                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                  className="w-full rounded-[8px] border border-[#E4E7EC] bg-white px-3 py-2 text-sm text-[#111827]"
                 >
                   <option value="">Selecione...</option>
                   {maquinas.map((m) => (
@@ -377,7 +377,7 @@ export function NovaOrdemForm({ produtos, dataInicial, onSalvo, onFechar }: Prop
 
           <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
             <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">Litros</label>
+              <label className="mb-1 block text-sm font-medium text-[#4B5563]">Litros</label>
               <input
                 type="number"
                 min={0}
@@ -386,20 +386,20 @@ export function NovaOrdemForm({ produtos, dataInicial, onSalvo, onFechar }: Prop
                 value={liters}
                 onChange={(e) => onChangeLiters(e.target.value)}
                 disabled={etapa === 'envase' && calcMode === 'BOXES_MASTER'}
-                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm disabled:bg-slate-100"
+                className="w-full rounded-[8px] border border-[#E4E7EC] bg-white px-3 py-2 text-sm text-[#111827] disabled:bg-[#F0F2F5]"
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">Setup (min)</label>
-              <input type="number" min={0} required value={setupTimeMinutes} onChange={(e) => setSetupTimeMinutes(e.target.value)} className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm" />
+              <label className="mb-1 block text-sm font-medium text-[#4B5563]">Setup (min)</label>
+              <input type="number" min={0} required value={setupTimeMinutes} onChange={(e) => setSetupTimeMinutes(e.target.value)} className="w-full rounded-[8px] border border-[#E4E7EC] bg-white px-3 py-2 text-sm text-[#111827]" />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">Producao (min)</label>
-              <input type="number" min={1} required value={productionTimeMinutes} onChange={(e) => setProductionTimeMinutes(e.target.value)} className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm" />
+              <label className="mb-1 block text-sm font-medium text-[#4B5563]">Producao (min)</label>
+              <input type="number" min={1} required value={productionTimeMinutes} onChange={(e) => setProductionTimeMinutes(e.target.value)} className="w-full rounded-[8px] border border-[#E4E7EC] bg-white px-3 py-2 text-sm text-[#111827]" />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">Limpeza (min)</label>
-              <input type="number" min={0} required value={cleaningTimeMinutes} onChange={(e) => setCleaningTimeMinutes(e.target.value)} className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm" />
+              <label className="mb-1 block text-sm font-medium text-[#4B5563]">Limpeza (min)</label>
+              <input type="number" min={0} required value={cleaningTimeMinutes} onChange={(e) => setCleaningTimeMinutes(e.target.value)} className="w-full rounded-[8px] border border-[#E4E7EC] bg-white px-3 py-2 text-sm text-[#111827]" />
             </div>
           </div>
 
@@ -407,58 +407,58 @@ export function NovaOrdemForm({ produtos, dataInicial, onSalvo, onFechar }: Prop
             <>
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">Modo de calculo</label>
+                  <label className="mb-1 block text-sm font-medium text-[#4B5563]">Modo de calculo</label>
                   <select
                     value={calcMode}
                     onChange={(e) => setCalcMode(e.target.value as CalcMode)}
-                    className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                    className="w-full rounded-[8px] border border-[#E4E7EC] bg-white px-3 py-2 text-sm text-[#111827]"
                   >
                     <option value="LITERS_MASTER">Litros mestre</option>
                     <option value="BOXES_MASTER">Caixas mestre</option>
                   </select>
                 </div>
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">Quantidade de caixas</label>
+                  <label className="mb-1 block text-sm font-medium text-[#4B5563]">Quantidade de caixas</label>
                   <input
                     type="number"
                     min={0}
                     value={estimatedBoxesInput}
                     onChange={(e) => onChangeBoxes(e.target.value)}
                     disabled={calcMode === 'LITERS_MASTER'}
-                    className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm disabled:bg-slate-100"
+                    className="w-full rounded-[8px] border border-[#E4E7EC] bg-white px-3 py-2 text-sm text-[#111827] disabled:bg-[#F0F2F5]"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">Volume embalagem (L)</label>
+                  <label className="mb-1 block text-sm font-medium text-[#4B5563]">Volume embalagem (L)</label>
                   <input
                     type="number"
                     min={0}
                     step="0.01"
                     value={packageVolumeLiters}
                     onChange={(e) => onChangePackaging(e.target.value, unitsPerBox)}
-                    className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                    className="w-full rounded-[8px] border border-[#E4E7EC] bg-white px-3 py-2 text-sm text-[#111827]"
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">Unidades por caixa</label>
+                  <label className="mb-1 block text-sm font-medium text-[#4B5563]">Unidades por caixa</label>
                   <input
                     type="number"
                     min={1}
                     value={unitsPerBox}
                     onChange={(e) => onChangePackaging(packageVolumeLiters, e.target.value)}
-                    className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                    className="w-full rounded-[8px] border border-[#E4E7EC] bg-white px-3 py-2 text-sm text-[#111827]"
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">Volume por caixa</label>
+                  <label className="mb-1 block text-sm font-medium text-[#4B5563]">Volume por caixa</label>
                   <input
                     type="text"
                     value={`${formatNumber(boxVolumeLiters, 2)} L`}
                     readOnly
-                    className="w-full rounded-md border border-slate-200 bg-slate-100 px-3 py-2 text-sm"
+                    className="w-full rounded-[8px] border border-[#E4E7EC] bg-[#F0F2F5] px-3 py-2 text-sm text-[#4B5563]"
                   />
                 </div>
               </div>
@@ -467,29 +467,29 @@ export function NovaOrdemForm({ produtos, dataInicial, onSalvo, onFechar }: Prop
 
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
             <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">Cor do card</label>
-              <input type="color" value={cor} onChange={(e) => setCor(e.target.value)} className="h-10 w-full rounded-md border border-slate-300 px-2" />
+              <label className="mb-1 block text-sm font-medium text-[#4B5563]">Cor do card</label>
+              <input type="color" value={cor} onChange={(e) => setCor(e.target.value)} className="h-10 w-full rounded-[8px] border border-[#E4E7EC] bg-white px-2" />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">Observacoes</label>
-              <input type="text" value={notes} onChange={(e) => setNotes(e.target.value)} className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm" />
+              <label className="mb-1 block text-sm font-medium text-[#4B5563]">Observacoes</label>
+              <input type="text" value={notes} onChange={(e) => setNotes(e.target.value)} className="w-full rounded-[8px] border border-[#E4E7EC] bg-white px-3 py-2 text-sm text-[#111827]" />
             </div>
           </div>
 
-          <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
-            <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
+          <div className="rounded-[8px] border border-[#E4E7EC] bg-[#F7F8FA] p-3">
+            <label className="flex items-center gap-2 text-sm font-medium text-[#4B5563]">
               <input type="checkbox" checked={usarHoraInicio} onChange={(e) => setUsarHoraInicio(e.target.checked)} />
               Informar hora de inicio no cadastro (se desmarcado, vai para backlog com data)
             </label>
             {usarHoraInicio && (
               <div className="mt-3">
-                <label className="mb-1 block text-sm font-medium text-slate-700">Hora de inicio</label>
-                <input type="time" value={horaInicio} onChange={(e) => setHoraInicio(e.target.value)} className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm md:w-48" />
+                <label className="mb-1 block text-sm font-medium text-[#4B5563]">Hora de inicio</label>
+                <input type="time" value={horaInicio} onChange={(e) => setHoraInicio(e.target.value)} className="w-full rounded-[8px] border border-[#E4E7EC] bg-white px-3 py-2 text-sm text-[#111827] md:w-48" />
               </div>
             )}
           </div>
 
-          <div className="rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
+          <div className="rounded-[8px] border border-[#E4E7EC] bg-[#EFF6FF] p-3 text-sm text-[#1D4ED8]">
             <div>Tempo total: <span className="font-semibold">{totalDurationMinutes} min</span></div>
             {preview.startAt && preview.endAt && (
               <div>
@@ -506,7 +506,7 @@ export function NovaOrdemForm({ produtos, dataInicial, onSalvo, onFechar }: Prop
           </div>
 
           {etapa === 'envase' && balancePreview && (
-            <div className={`rounded-md border p-3 text-sm ${
+            <div className={`rounded-[8px] border p-3 text-sm ${
               balancePreview.status === 'OVER'
                 ? 'border-red-200 bg-red-50 text-red-800'
                 : balancePreview.status === 'UNDER'
@@ -525,13 +525,13 @@ export function NovaOrdemForm({ produtos, dataInicial, onSalvo, onFechar }: Prop
             </div>
           )}
 
-          {erro && <p className="text-sm font-medium text-red-600">{erro}</p>}
+          {erro && <p className="text-sm font-medium text-[#DC2626]">{erro}</p>}
 
           <div className="flex justify-end gap-3 pt-2">
-            <button type="button" onClick={onFechar} className="rounded-md border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+            <button type="button" onClick={onFechar} className="rounded-[8px] border border-[#CDD2DA] bg-white px-4 py-2 text-sm font-medium text-[#4B5563] hover:bg-[#F7F8FA]">
               Cancelar
             </button>
-            <button type="submit" disabled={salvando} className="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50">
+            <button type="submit" disabled={salvando} className="rounded-[8px] bg-[#2563EB] px-4 py-2 text-sm font-medium text-white hover:bg-[#1D4ED8] disabled:opacity-50">
               {salvando ? 'Salvando...' : 'Salvar producao'}
             </button>
           </div>

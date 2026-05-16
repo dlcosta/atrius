@@ -1,7 +1,7 @@
- 'use client'
+'use client'
 
 import { usePathname } from 'next/navigation'
-import { Bell, Wifi } from 'lucide-react'
+import { Bell } from 'lucide-react'
 
 export function Topbar() {
   const pathname = usePathname()
@@ -10,33 +10,26 @@ export function Topbar() {
     if (path.startsWith('/planner')) return 'Dashboard Operacional'
     if (path.startsWith('/calendario')) return 'Planejamento Visual'
     if (path.startsWith('/monitoramento')) return 'Monitoramento Realtime'
-    if (path.startsWith('/admin')) return 'Administração do Sistema'
+    if (path.startsWith('/admin')) return 'Administracao do Sistema'
     return 'Atrius Planner'
   }
 
   return (
-    <header className="h-[56px] border-b border-blue-100 bg-blue-50 px-6 flex items-center justify-between sticky top-0 z-30 shadow-xs">
+    <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-[#E4E7EC] bg-white px-6">
       <div className="flex items-center gap-4">
-        <h2 className="text-sm font-bold text-slate-900 tracking-tight">{getPageTitle(pathname)}</h2>
-        <div className="h-4 w-[1px] bg-slate-200" />
-        <nav className="flex items-center gap-2 text-[11px] font-semibold text-slate-400">
-          <span className="hover:text-slate-600 cursor-default transition-colors">Home</span>
-          <span className="text-slate-300">/</span>
-          <span className="text-blue-600 capitalize">{pathname.replace('/', '')}</span>
+        <h2 className="text-sm font-semibold text-[#111827]">{getPageTitle(pathname)}</h2>
+        <div className="h-4 w-px bg-[#E4E7EC]" />
+        <nav className="flex items-center gap-2 text-[11px] font-medium text-[#9CA3AF]">
+          <span className="cursor-default">Home</span>
+          <span>/</span>
+          <span className="capitalize text-[#4B5563]">{pathname.replace('/', '')}</span>
         </nav>
       </div>
 
-      <div className="flex items-center gap-4">
-        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-100">
-          <Wifi size={12} className="text-emerald-500 animate-pulse" />
-          <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-tight">Connected</span>
-        </div>
-        
-        <button className="p-2 text-slate-400 hover:text-slate-600 transition-colors relative">
-          <Bell size={20} />
-          <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-white" />
-        </button>
-      </div>
+      <button className="relative rounded-[8px] border border-transparent p-2 text-[#9CA3AF] hover:border-[#E4E7EC] hover:bg-[#F7F8FA] hover:text-[#4B5563]">
+        <Bell size={18} />
+        <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-[#DC2626] ring-2 ring-white" />
+      </button>
     </header>
   )
 }

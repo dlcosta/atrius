@@ -249,7 +249,7 @@ function DraggableBacklogCard({ ordem }: { ordem: Ordem }) {
       ref={setNodeRef}
       {...listeners}
       {...attributes}
-      className={`cursor-grab select-none rounded-md border border-slate-200 bg-white px-3 py-2 shadow-sm transition hover:border-blue-300 hover:bg-blue-50 active:cursor-grabbing ${
+      className={`cursor-grab select-none rounded-[8px] border border-[#E4E7EC] bg-white px-3 py-3 transition-colors duration-[120ms] hover:border-[#CDD2DA] active:cursor-grabbing ${
         isDragging ? 'opacity-40' : ''
       }`}
       style={{
@@ -259,27 +259,27 @@ function DraggableBacklogCard({ ordem }: { ordem: Ordem }) {
     >
       <div className="flex items-start gap-2">
         <div className="min-w-0 flex-1">
-          <div className="truncate text-sm font-semibold text-slate-900">{ordemLabel(ordem)}</div>
-          <div className="mt-0.5 text-[11px] text-slate-500">
-            #{ordem.numero_externo} · {ordem.quantidade} {ordem.unidade}
+          <div className="truncate text-[13px] font-semibold text-[#111827]">{ordemLabel(ordem)}</div>
+          <div className="mt-0.5 font-mono text-[11px] text-[#9CA3AF]">
+            #{ordem.numero_externo} - {ordem.quantidade} {ordem.unidade}
           </div>
         </div>
-        <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600">
+        <span className="rounded-full bg-[#F0F2F5] px-2 py-0.5 text-[10px] font-medium uppercase text-[#4B5563]">
           {ordem.etapa}
         </span>
       </div>
-      <div className="mt-1 flex gap-1 overflow-hidden text-[10px] text-slate-500">
-        {ordem.data_prevista && <span className="rounded bg-slate-100 px-1.5 py-0.5">{ordem.data_prevista}</span>}
-        {ordem.lote && <span className="truncate rounded bg-slate-100 px-1.5 py-0.5">{ordem.lote}</span>}
-        {ordem.tank_id && <span className="truncate rounded bg-cyan-50 px-1.5 py-0.5 text-cyan-700">{ordem.tank_id}</span>}
-        {ordem.maquina_id && <span className="truncate rounded bg-violet-50 px-1.5 py-0.5 text-violet-700">{ordem.maquina_id}</span>}
+      <div className="mt-1 flex gap-1 overflow-hidden font-mono text-[11px] text-[#9CA3AF]">
+        {ordem.data_prevista && <span className="rounded-[6px] bg-[#F0F2F5] px-1.5 py-0.5">{ordem.data_prevista}</span>}
+        {ordem.lote && <span className="truncate rounded-[6px] bg-[#F0F2F5] px-1.5 py-0.5">{ordem.lote}</span>}
+        {ordem.tank_id && <span className="truncate rounded-[6px] bg-[#EFF6FF] px-1.5 py-0.5 text-[#2563EB]">{ordem.tank_id}</span>}
+        {ordem.maquina_id && <span className="truncate rounded-[6px] bg-[#EFF6FF] px-1.5 py-0.5 text-[#2563EB]">{ordem.maquina_id}</span>}
       </div>
-      <div className="mt-1 flex flex-wrap gap-1 text-[10px] text-slate-500">
+      <div className="mt-1 flex flex-wrap gap-1 text-[11px] text-[#9CA3AF]">
         {ordem.total_duration_minutes ? (
-          <span className="rounded bg-slate-100 px-1.5 py-0.5">{ordem.total_duration_minutes} min</span>
+          <span className="rounded-[6px] bg-[#F0F2F5] px-1.5 py-0.5">{ordem.total_duration_minutes} min</span>
         ) : null}
         {ordem.estimated_boxes !== null && ordem.estimated_boxes !== undefined ? (
-          <span className="rounded bg-emerald-50 px-1.5 py-0.5 text-emerald-700">{ordem.estimated_boxes} caixas</span>
+          <span className="rounded-[6px] bg-[#F0FDF4] px-1.5 py-0.5 text-[#16A34A]">{ordem.estimated_boxes} caixas</span>
         ) : null}
       </div>
     </div>
@@ -289,7 +289,7 @@ function DraggableBacklogCard({ ordem }: { ordem: Ordem }) {
 function DroppableBacklog({ children }: { children: React.ReactNode }) {
   const { setNodeRef, isOver } = useDroppable({ id: 'backlog-drop' })
   return (
-    <div ref={setNodeRef} className={`min-h-24 space-y-2 p-3 ${isOver ? 'bg-blue-50' : ''}`}>
+    <div ref={setNodeRef} className={`min-h-24 space-y-2 p-3 ${isOver ? 'bg-[#EFF6FF]' : ''}`}>
       {children}
     </div>
   )
@@ -625,15 +625,18 @@ function MachineCalendarBoard({
 
   return (
     <div className="min-w-max">
-      <div className="sticky top-0 z-30 flex border-b border-slate-200 bg-white">
-        <div className="sticky left-0 z-40 w-20 shrink-0 border-r border-slate-200 bg-slate-50 px-3 py-3 text-xs font-bold uppercase text-slate-500">
+      <div className="sticky top-0 z-30 flex border-b border-[#E4E7EC] bg-white">
+        <div className="sticky left-0 z-40 w-20 shrink-0 border-r border-[#E4E7EC] bg-[#F7F8FA] px-3 py-3 text-xs font-medium uppercase tracking-wide text-[#9CA3AF]">
           Hora
         </div>
         <div className="grid" style={{ gridTemplateColumns: `repeat(${dias.length}, ${columnWidth}px)` }}>
           {dias.map((dia) => (
-            <div key={formatYmd(dia)} className="border-r border-slate-200 px-4 py-3">
-              <div className="text-xs font-black uppercase text-slate-900">{format(dia, "EEEE", { locale: ptBR })}</div>
-              <div className="text-[11px] font-semibold text-slate-500">{format(dia, "dd 'de' MMMM", { locale: ptBR })}</div>
+            <div
+              key={formatYmd(dia)}
+              className={`border-r border-[#E4E7EC] px-4 py-3 ${formatYmd(dia) === formatYmd(new Date()) ? 'bg-[#EFF6FF]' : ''}`}
+            >
+              <div className="text-lg font-semibold text-[#111827]">{format(dia, 'dd')}</div>
+              <div className="text-[11px] font-medium uppercase text-[#9CA3AF]">{format(dia, 'EEE', { locale: ptBR })}</div>
             </div>
           ))}
         </div>
@@ -641,13 +644,13 @@ function MachineCalendarBoard({
 
       <div className="flex">
         <div
-          className="relative sticky left-0 z-20 w-20 shrink-0 border-r border-slate-200 bg-slate-50"
+          className="relative sticky left-0 z-20 w-20 shrink-0 border-r border-[#E4E7EC] bg-[#F7F8FA]"
           style={{ height: boardHeight }}
         >
           {hourMarks.map((hour) => (
             <div
               key={hour}
-              className="absolute right-3 -translate-y-2 text-[11px] font-bold text-slate-500"
+              className="absolute right-3 -translate-y-2 font-mono text-[11px] font-medium text-[#9CA3AF]"
               style={{ top: (hour - janela.startHour) * hourHeight }}
             >
               {String(hour).padStart(2, '0')}h
@@ -660,19 +663,19 @@ function MachineCalendarBoard({
             setNodeRef(node)
             boardRef(node)
           }}
-          className={`relative bg-white transition-colors ${isOver ? 'bg-blue-50' : ''}`}
+          className={`relative bg-white transition-colors ${isOver ? 'bg-[#EFF6FF]' : ''}`}
           style={{ width: boardWidth, height: boardHeight }}
         >
           {dias.map((dia, dayIndex) => (
             <div
               key={formatYmd(dia)}
-              className="absolute inset-y-0 border-r border-slate-200"
+              className="absolute inset-y-0 border-r border-[#E4E7EC]"
               style={{ left: dayIndex * columnWidth, width: columnWidth }}
             >
               {hourMarks.map((hour) => (
                 <div
                   key={`${formatYmd(dia)}-${hour}`}
-                  className={`absolute inset-x-0 border-t ${hour === janela.startHour ? 'border-slate-300' : 'border-slate-100'}`}
+                  className={`absolute inset-x-0 border-t ${hour === janela.startHour ? 'border-[#CDD2DA]' : 'border-[#E4E7EC]'}`}
                   style={{ top: (hour - janela.startHour) * hourHeight }}
                 />
               ))}
@@ -696,7 +699,8 @@ function MachineCalendarBoard({
 
           {ordens.length === 0 && (
             <div className="absolute inset-0 grid place-items-center">
-              <div className="rounded-md border border-dashed border-slate-300 bg-white px-8 py-6 text-sm font-semibold text-slate-400">
+              <div className="rounded-[12px] border border-dashed border-[#E4E7EC] bg-white px-8 py-6 text-center text-[13px] text-[#9CA3AF]">
+                <CalendarClock size={16} className="mx-auto mb-2 text-[#9CA3AF]" />
                 Arraste uma ordem do backlog para montar a agenda desta maquina.
               </div>
             </div>
@@ -704,8 +708,8 @@ function MachineCalendarBoard({
         </div>
       </div>
 
-      <div className="sticky bottom-0 z-30 border-t border-slate-200 bg-white px-4 py-2 text-[11px] font-semibold uppercase text-slate-500">
-        Escala {zoomLabel} · linhas de 1 hora · encaixe de {janela.snapMinutes} min
+      <div className="sticky bottom-0 z-30 border-t border-[#E4E7EC] bg-white px-4 py-2 text-[11px] font-medium uppercase text-[#9CA3AF]">
+        Escala {zoomLabel} - linhas de 1 hora - encaixe de {janela.snapMinutes} min
       </div>
     </div>
   )
@@ -839,40 +843,40 @@ function VerticalScheduledEvent({
         }
         if (!editing) onOpen(ordem)
       }}
-      className={`group absolute overflow-hidden rounded-lg border bg-white shadow-sm transition hover:z-30 hover:border-blue-300 hover:shadow-lg ${
-        editing ? 'z-40 cursor-grabbing border-blue-400 ring-2 ring-blue-200' : 'cursor-pointer border-slate-200'
+      className={`group absolute overflow-hidden rounded-[8px] border bg-white shadow-[var(--shadow-sm)] transition-colors duration-[120ms] hover:z-30 hover:border-[#CDD2DA] ${
+        editing ? 'z-40 cursor-grabbing border-[#2563EB] ring-2 ring-[#EFF6FF]' : 'cursor-pointer border-[#E4E7EC]'
       }`}
       style={{ top, left, width, height }}
       title={`${ordemLabel(ordem)}\n${formatarHora(inicio)} - ${formatarHora(fim)}`}
     >
       <div className="absolute inset-y-0 left-0 w-2.5" style={{ backgroundColor: color }} />
       <div
-        className="absolute inset-x-0 top-0 z-10 h-2 cursor-ns-resize bg-blue-500/0 transition group-hover:bg-blue-500/20"
+        className="absolute inset-x-0 top-0 z-10 h-2 cursor-ns-resize bg-[#2563EB]/0 transition group-hover:bg-[#2563EB]/20"
         onPointerDown={(e) => handlePointerDown(e, 'resize-start')}
         title="Ajustar inicio"
       />
       <div
-        className="absolute inset-x-0 bottom-0 z-10 h-2 cursor-ns-resize bg-blue-500/0 transition group-hover:bg-blue-500/20"
+        className="absolute inset-x-0 bottom-0 z-10 h-2 cursor-ns-resize bg-[#2563EB]/0 transition group-hover:bg-[#2563EB]/20"
         onPointerDown={(e) => handlePointerDown(e, 'resize-end')}
         title="Ajustar fim"
       />
 
-      <div className="flex h-full flex-col justify-between gap-2 bg-linear-to-br from-white to-slate-50 py-3 pl-5 pr-3">
+      <div className="flex h-full flex-col justify-between gap-2 bg-white py-3 pl-5 pr-3">
         <div className="flex items-start gap-3">
           <div className="min-w-0 flex-1 pr-1">
-            <div className="line-clamp-2 text-[15px] font-black leading-5 text-slate-950">{ordemLabel(ordem)}</div>
+            <div className="line-clamp-2 text-[14px] font-semibold leading-5 text-[#111827]">{ordemLabel(ordem)}</div>
             <div className="mt-2 flex flex-wrap items-center gap-1.5">
-              <span className="rounded-md bg-blue-50 px-2 py-1 text-[11px] font-black text-blue-800">
+              <span className="rounded-[6px] bg-[#EFF6FF] px-2 py-1 font-mono text-[11px] font-medium text-[#2563EB]">
                 {formatarHora(inicio)} - {formatarHora(fim)}
               </span>
-              <span className="rounded-md bg-slate-100 px-2 py-1 text-[11px] font-black text-slate-700">
+              <span className="rounded-[6px] bg-[#F0F2F5] px-2 py-1 font-mono text-[11px] font-medium text-[#4B5563]">
                 {formatarDuracao(duration)}
               </span>
             </div>
           </div>
           <button
             type="button"
-            className="grid h-8 w-8 shrink-0 place-items-center rounded-md border border-slate-200 bg-white text-slate-400 shadow-sm transition hover:border-red-200 hover:bg-red-50 hover:text-red-600"
+            className="grid h-8 w-8 shrink-0 place-items-center rounded-[8px] border border-[#E4E7EC] bg-white text-[#9CA3AF] transition hover:border-[#DC2626]/30 hover:bg-red-50 hover:text-[#DC2626]"
             onPointerDown={(e) => e.stopPropagation()}
             onClick={(e) => {
               e.stopPropagation()
@@ -884,10 +888,10 @@ function VerticalScheduledEvent({
           </button>
         </div>
 
-        <div className="flex min-h-6 flex-wrap items-center gap-1 overflow-hidden text-[10px] font-bold uppercase tracking-wide">
-          <span className="rounded-md bg-slate-900 px-2 py-1 text-white">#{ordem.numero_externo}</span>
-          <span className="rounded-md bg-slate-100 px-2 py-1 text-slate-600">{ordem.etapa}</span>
-          {ordem.lote && <span className="truncate rounded-md bg-amber-50 px-2 py-1 text-amber-700">{ordem.lote}</span>}
+        <div className="flex min-h-6 flex-wrap items-center gap-1 overflow-hidden text-[10px] font-medium uppercase tracking-wide">
+          <span className="rounded-[6px] bg-[#111827] px-2 py-1 text-white">#{ordem.numero_externo}</span>
+          <span className="rounded-[6px] bg-[#F0F2F5] px-2 py-1 text-[#4B5563]">{ordem.etapa}</span>
+          {ordem.lote && <span className="truncate rounded-[6px] bg-[#F0F2F5] px-2 py-1 text-[#9CA3AF]">{ordem.lote}</span>}
         </div>
       </div>
     </div>
@@ -942,21 +946,21 @@ function OrderConfigModal({
   }
 
   return (
-    <div className="fixed inset-0 z-[130] flex items-center justify-center bg-slate-950/45 p-4">
-      <div className="flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-lg bg-white shadow-2xl">
-        <div className="border-b border-slate-200 px-6 py-5">
+    <div className="fixed inset-0 z-[130] flex items-center justify-center bg-slate-950/35 p-4">
+      <div className="flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-[12px] border border-[#E4E7EC] bg-white shadow-[var(--shadow-md)]">
+        <div className="border-b border-[#E4E7EC] px-6 py-5">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
-              <div className="text-xs font-black uppercase text-blue-700">Configurar pedido agendado</div>
-              <h2 className="mt-1 truncate text-2xl font-black text-slate-900">{ordemLabel(ordem)}</h2>
-              <p className="mt-1 text-sm text-slate-500">
-                #{ordem.numero_externo} · {maquina?.nome ?? 'Sem maquina'} · {ordem.quantidade} {ordem.unidade}
+              <div className="text-xs font-medium uppercase tracking-wide text-[#2563EB]">Configurar pedido agendado</div>
+              <h2 className="mt-1 truncate text-2xl font-semibold text-[#111827]">{ordemLabel(ordem)}</h2>
+              <p className="mt-1 text-sm text-[#9CA3AF]">
+                #{ordem.numero_externo} - {maquina?.nome ?? 'Sem maquina'} - {ordem.quantidade} {ordem.unidade}
               </p>
             </div>
             <button
               type="button"
               onClick={onClose}
-              className="grid h-9 w-9 place-items-center rounded-md border border-slate-200 text-slate-500 hover:bg-slate-50"
+              className="grid h-9 w-9 place-items-center rounded-[8px] border border-[#E4E7EC] text-[#9CA3AF] hover:bg-[#F7F8FA]"
               title="Fechar"
             >
               <X size={18} />
@@ -966,63 +970,63 @@ function OrderConfigModal({
 
         <div className="min-h-0 overflow-y-auto p-6">
           <div className="grid gap-4 md:grid-cols-3">
-            <div className="rounded-md border border-slate-200 bg-slate-50 p-4">
-              <div className="text-xs font-bold uppercase text-slate-500">Horario atual</div>
-              <div className="mt-2 text-lg font-black text-slate-900">
+            <div className="rounded-[8px] border border-[#E4E7EC] bg-[#F7F8FA] p-4">
+              <div className="text-xs font-medium uppercase tracking-wide text-[#9CA3AF]">Horario atual</div>
+              <div className="mt-2 font-mono text-lg font-semibold text-[#111827]">
                 {inicio && fim ? `${formatarHora(inicio)} - ${formatarHora(fim)}` : 'Sem horario'}
               </div>
-              <div className="mt-1 text-sm font-semibold text-slate-500">{duracaoAtual ? formatarDuracao(duracaoAtual) : 'Nao calculado'}</div>
+              <div className="mt-1 text-sm text-[#9CA3AF]">{duracaoAtual ? formatarDuracao(duracaoAtual) : 'Nao calculado'}</div>
             </div>
-            <div className="rounded-md border border-slate-200 bg-slate-50 p-4">
-              <div className="text-xs font-bold uppercase text-slate-500">Produto</div>
-              <div className="mt-2 truncate text-lg font-black text-slate-900">{produto?.sku ?? ordem.produto_sku ?? '--'}</div>
-              <div className="mt-1 text-sm font-semibold text-slate-500">Volume base {produto?.volume_base ?? 3800} L</div>
+            <div className="rounded-[8px] border border-[#E4E7EC] bg-[#F7F8FA] p-4">
+              <div className="text-xs font-medium uppercase tracking-wide text-[#9CA3AF]">Produto</div>
+              <div className="mt-2 truncate font-mono text-lg font-semibold text-[#111827]">{produto?.sku ?? ordem.produto_sku ?? '--'}</div>
+              <div className="mt-1 text-sm text-[#9CA3AF]">Volume base {produto?.volume_base ?? 3800} L</div>
             </div>
-            <div className="rounded-md border border-slate-200 bg-slate-50 p-4">
-              <div className="text-xs font-bold uppercase text-slate-500">Pedido</div>
-              <div className="mt-2 text-lg font-black text-slate-900">{ordem.etapa}</div>
-              <div className="mt-1 truncate text-sm font-semibold text-slate-500">{ordem.lote ? `Lote ${ordem.lote}` : 'Sem lote informado'}</div>
+            <div className="rounded-[8px] border border-[#E4E7EC] bg-[#F7F8FA] p-4">
+              <div className="text-xs font-medium uppercase tracking-wide text-[#9CA3AF]">Pedido</div>
+              <div className="mt-2 text-lg font-semibold text-[#111827]">{ordem.etapa}</div>
+              <div className="mt-1 truncate text-sm text-[#9CA3AF]">{ordem.lote ? `Lote ${ordem.lote}` : 'Sem lote informado'}</div>
             </div>
           </div>
 
           <div className="mt-5 grid gap-4 md:grid-cols-3">
-            <label className="block rounded-md border border-slate-200 p-4">
-              <span className="text-xs font-black uppercase text-slate-500">Setup</span>
+            <label className="block rounded-[8px] border border-[#E4E7EC] p-4">
+              <span className="text-xs font-medium uppercase tracking-wide text-[#9CA3AF]">Setup</span>
               <input
                 type="number"
                 min="0"
                 value={setupMin}
                 onChange={(e) => setSetupMin(e.target.value)}
-                className="mt-2 h-11 w-full rounded-md border border-slate-300 px-3 text-lg font-bold outline-none focus:border-blue-500"
+                className="mt-2 h-11 w-full rounded-[8px] border border-[#E4E7EC] px-3 font-mono text-lg font-semibold text-[#111827] outline-none focus:border-[#2563EB]"
               />
-              <span className="mt-1 block text-xs font-semibold text-slate-400">minutos antes da producao</span>
+              <span className="mt-1 block text-xs text-[#9CA3AF]">minutos antes da producao</span>
             </label>
-            <label className="block rounded-md border border-slate-200 p-4">
-              <span className="text-xs font-black uppercase text-slate-500">Tempo de producao</span>
+            <label className="block rounded-[8px] border border-[#E4E7EC] p-4">
+              <span className="text-xs font-medium uppercase tracking-wide text-[#9CA3AF]">Tempo de producao</span>
               <input
                 type="number"
                 min="1"
                 value={producaoMin}
                 onChange={(e) => setProducaoMin(e.target.value)}
-                className="mt-2 h-11 w-full rounded-md border border-slate-300 px-3 text-lg font-bold outline-none focus:border-blue-500"
+                className="mt-2 h-11 w-full rounded-[8px] border border-[#E4E7EC] px-3 font-mono text-lg font-semibold text-[#111827] outline-none focus:border-[#2563EB]"
               />
-              <span className="mt-1 block text-xs font-semibold text-slate-400">minutos totais desta ordem</span>
+              <span className="mt-1 block text-xs text-[#9CA3AF]">minutos totais desta ordem</span>
             </label>
-            <label className="block rounded-md border border-slate-200 p-4">
-              <span className="text-xs font-black uppercase text-slate-500">Tempo de limpeza</span>
+            <label className="block rounded-[8px] border border-[#E4E7EC] p-4">
+              <span className="text-xs font-medium uppercase tracking-wide text-[#9CA3AF]">Tempo de limpeza</span>
               <input
                 type="number"
                 min="0"
                 value={limpezaMin}
                 onChange={(e) => setLimpezaMin(e.target.value)}
-                className="mt-2 h-11 w-full rounded-md border border-slate-300 px-3 text-lg font-bold outline-none focus:border-blue-500"
+                className="mt-2 h-11 w-full rounded-[8px] border border-[#E4E7EC] px-3 font-mono text-lg font-semibold text-[#111827] outline-none focus:border-[#2563EB]"
               />
-              <span className="mt-1 block text-xs font-semibold text-slate-400">minutos apos producao</span>
+              <span className="mt-1 block text-xs text-[#9CA3AF]">minutos apos producao</span>
             </label>
           </div>
 
-          <div className="mt-5 rounded-md border border-slate-200 bg-white p-4">
-            <div className="text-xs font-black uppercase text-slate-500">Informacoes do pedido</div>
+          <div className="mt-5 rounded-[8px] border border-[#E4E7EC] bg-white p-4">
+            <div className="text-xs font-medium uppercase tracking-wide text-[#9CA3AF]">Informacoes do pedido</div>
             <div className="mt-3 grid gap-2 text-sm md:grid-cols-2">
               <div><span className="font-bold text-slate-500">SKU:</span> {ordem.produto_sku ?? '--'}</div>
               <div><span className="font-bold text-slate-500">Status:</span> {ordem.status}</div>
@@ -1031,18 +1035,18 @@ function OrderConfigModal({
             </div>
           </div>
 
-          {erro && <div className="mt-4 rounded-md bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{erro}</div>}
+          {erro && <div className="mt-4 rounded-[8px] bg-red-50 px-4 py-3 text-sm text-[#DC2626]">{erro}</div>}
         </div>
 
-        <div className="flex justify-end gap-2 border-t border-slate-200 px-6 py-4">
-          <button type="button" onClick={onClose} className="h-10 rounded-md border border-slate-300 px-4 text-sm font-bold text-slate-700">
+        <div className="flex justify-end gap-2 border-t border-[#E4E7EC] px-6 py-4">
+          <button type="button" onClick={onClose} className="h-10 rounded-[8px] border border-[#CDD2DA] bg-white px-4 text-sm font-medium text-[#4B5563]">
             Cancelar
           </button>
           <button
             type="button"
             onClick={salvar}
             disabled={saving}
-            className="h-10 rounded-md bg-blue-600 px-5 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-50"
+            className="h-10 rounded-[8px] bg-[#2563EB] px-5 text-sm font-medium text-white hover:bg-[#1D4ED8] disabled:opacity-50"
           >
             {saving ? 'Salvando...' : 'Salvar e recalcular agenda'}
           </button>
@@ -1098,14 +1102,14 @@ function ConflictModal({
   }
 
   return (
-    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/40 p-4">
-      <div className="w-full max-w-2xl rounded-lg bg-white shadow-2xl">
-        <div className="border-b border-slate-200 px-5 py-4">
-          <h2 className="text-lg font-bold text-slate-900">Resolver conflito de agenda</h2>
-          <p className="mt-1 text-sm text-slate-500">
+    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/35 p-4">
+      <div className="w-full max-w-2xl rounded-[12px] border border-[#E4E7EC] bg-white shadow-[var(--shadow-md)]">
+        <div className="border-b border-[#E4E7EC] px-5 py-4">
+          <h2 className="text-lg font-semibold text-[#111827]">Resolver conflito de agenda</h2>
+          <p className="mt-1 text-sm text-[#9CA3AF]">
             Ajuste os horarios antes de salvar. A agenda so aceita a mudanca quando nao houver sobreposicao.
           </p>
-          {pending.error && <p className="mt-2 rounded bg-red-50 px-3 py-2 text-sm text-red-700">{pending.error}</p>}
+          {pending.error && <p className="mt-2 rounded-[8px] bg-red-50 px-3 py-2 text-sm text-[#DC2626]">{pending.error}</p>}
         </div>
 
         <div className="grid gap-4 p-5 md:grid-cols-2">
@@ -1134,14 +1138,14 @@ function ConflictModal({
           />
         </div>
 
-        <div className="flex justify-end gap-2 border-t border-slate-200 px-5 py-4">
-          <button onClick={onClose} className="rounded-md border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700">
+        <div className="flex justify-end gap-2 border-t border-[#E4E7EC] px-5 py-4">
+          <button onClick={onClose} className="rounded-[8px] border border-[#CDD2DA] bg-white px-4 py-2 text-sm font-medium text-[#4B5563]">
             Cancelar
           </button>
           <button
             onClick={salvar}
             disabled={saving}
-            className="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+            className="rounded-[8px] bg-[#2563EB] px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
           >
             {saving ? 'Salvando...' : 'Salvar reprogramacao'}
           </button>
@@ -1175,15 +1179,15 @@ function ScheduleEditor({
   onTime: (value: string) => void
 }) {
   return (
-    <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-      <div className="text-xs font-bold uppercase text-slate-500">{title}</div>
-      <div className="mt-1 truncate text-sm font-semibold text-slate-900">{label}</div>
+    <div className="rounded-[8px] border border-[#E4E7EC] bg-[#F7F8FA] p-4">
+      <div className="text-xs font-medium uppercase tracking-wide text-[#9CA3AF]">{title}</div>
+      <div className="mt-1 truncate text-sm font-semibold text-[#111827]">{label}</div>
       <div className="mt-3 space-y-2">
         <select
           value={machine}
           disabled={disabled}
           onChange={(e) => onMachine(e.target.value)}
-          className="h-9 w-full rounded-md border border-slate-300 bg-white px-3 text-sm disabled:opacity-50"
+          className="h-9 w-full rounded-[8px] border border-[#E4E7EC] bg-white px-3 text-sm text-[#111827] disabled:opacity-50"
         >
           {maquinas.filter((m) => m.ativa).map((maquina) => (
             <option key={maquina.id} value={maquina.id}>
@@ -1197,14 +1201,14 @@ function ScheduleEditor({
             value={date}
             disabled={disabled}
             onChange={(e) => onDate(e.target.value)}
-            className="h-9 rounded-md border border-slate-300 px-3 text-sm disabled:opacity-50"
+            className="h-9 rounded-[8px] border border-[#E4E7EC] bg-white px-3 text-sm text-[#111827] disabled:opacity-50"
           />
           <input
             type="time"
             value={time}
             disabled={disabled}
             onChange={(e) => onTime(e.target.value)}
-            className="h-9 rounded-md border border-slate-300 px-3 text-sm disabled:opacity-50"
+            className="h-9 rounded-[8px] border border-[#E4E7EC] bg-white px-3 text-sm text-[#111827] disabled:opacity-50"
           />
         </div>
       </div>
@@ -1755,45 +1759,45 @@ export default function CalendarioPage() {
 
   return (
     <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-      <div className="flex h-full flex-col overflow-hidden bg-slate-100">
-        <header className="border-b border-slate-200 bg-white px-4 py-3 shadow-sm">
+      <div className="flex h-full flex-col overflow-hidden bg-[#F7F8FA]">
+        <header className="border-b border-[#E4E7EC] bg-white px-4 py-3">
           <div className="flex flex-wrap items-center gap-3">
             <div>
-              <h1 className="text-lg font-black uppercase tracking-tight text-slate-900">Calendario de Producao</h1>
-              <p className="text-xs font-medium text-slate-500">Separacao operacional por Tanques e Envase</p>
+              <h1 className="text-[22px] font-semibold text-[#111827]">Calendario de Producao</h1>
+              <p className="text-[13px] text-[#9CA3AF]">Separacao operacional por Tanques e Envase</p>
             </div>
 
             <div className="ml-auto flex flex-wrap items-center gap-2">
               <button
                 onClick={() => setDiaBase((d) => (viewMode === 'dia' ? subDays(d, 1) : subDays(d, 7)))}
-                className="grid h-9 w-9 place-items-center rounded-md border border-slate-300 text-slate-700 hover:bg-slate-50"
+                className="grid h-9 w-9 place-items-center rounded-[8px] border border-[#E4E7EC] text-[#4B5563] hover:bg-[#F7F8FA]"
                 title="Periodo anterior"
               >
                 <ChevronLeft size={18} />
               </button>
               <button
                 onClick={() => setDiaBase(new Date())}
-                className="h-9 rounded-md border border-slate-300 px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                className="h-9 rounded-[8px] border border-[#2563EB] bg-white px-3 text-sm font-medium text-[#2563EB] hover:bg-[#EFF6FF]"
               >
                 Hoje
               </button>
               <button
                 onClick={() => setDiaBase((d) => (viewMode === 'dia' ? addDays(d, 1) : addDays(d, 7)))}
-                className="grid h-9 w-9 place-items-center rounded-md border border-slate-300 text-slate-700 hover:bg-slate-50"
+                className="grid h-9 w-9 place-items-center rounded-[8px] border border-[#E4E7EC] text-[#4B5563] hover:bg-[#F7F8FA]"
                 title="Proximo periodo"
               >
                 <ChevronRight size={18} />
               </button>
 
-              <div className="min-w-56 text-center text-sm font-bold text-slate-800">{periodoLabel}</div>
+              <div className="min-w-56 text-center text-sm font-medium text-[#111827]">{periodoLabel}</div>
 
-              <div className="flex rounded-md border border-slate-300 bg-slate-50 p-1">
+              <div className="flex rounded-[8px] border border-[#E4E7EC] bg-[#F0F2F5] p-1">
                 {(['semana', 'dia'] as ViewMode[]).map((mode) => (
                   <button
                     key={mode}
                     onClick={() => setViewMode(mode)}
-                    className={`h-7 rounded px-3 text-xs font-bold uppercase ${
-                      viewMode === mode ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500'
+                    className={`h-7 rounded-[6px] px-3 text-xs font-medium uppercase ${
+                      viewMode === mode ? 'bg-white text-[#2563EB] shadow-[var(--shadow-sm)]' : 'text-[#9CA3AF]'
                     }`}
                   >
                     {mode}
@@ -1803,16 +1807,16 @@ export default function CalendarioPage() {
             </div>
           </div>
 
-          <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3">
-            <label className="text-xs font-semibold uppercase text-slate-500">Inicio</label>
+          <div className="mt-3 flex flex-wrap items-center gap-2 rounded-[8px] bg-[#F0F2F5] p-3">
+            <label className="text-xs font-semibold uppercase text-[#4B5563]">Inicio</label>
             <input
               type="time"
               step={3600}
               value={horaParaInput(janela.startHour)}
               onChange={(e) => setJanela((j) => sanitizarJanelaProducao({ ...j, startHour: inputParaHora(e.target.value, j.startHour) }))}
-              className="h-8 rounded-md border border-slate-300 px-2 text-sm"
+              className="h-8 rounded-[6px] border-0 bg-white px-2 text-sm text-[#111827]"
             />
-            <label className="text-xs font-semibold uppercase text-slate-500">Fim</label>
+            <label className="text-xs font-semibold uppercase text-[#4B5563]">Fim</label>
             <input
               type="time"
               step={3600}
@@ -1821,13 +1825,13 @@ export default function CalendarioPage() {
                 const hora = inputParaHora(e.target.value, janela.endHour)
                 setJanela((j) => sanitizarJanelaProducao({ ...j, endHour: hora === 0 ? 24 : hora }))
               }}
-              className="h-8 rounded-md border border-slate-300 px-2 text-sm"
+              className="h-8 rounded-[6px] border-0 bg-white px-2 text-sm text-[#111827]"
             />
-            <label className="text-xs font-semibold uppercase text-slate-500">Snap</label>
+            <label className="text-xs font-semibold uppercase text-[#4B5563]">Snap</label>
             <select
               value={janela.snapMinutes}
               onChange={(e) => setJanela((j) => sanitizarJanelaProducao({ ...j, snapMinutes: Number(e.target.value) }))}
-              className="h-8 rounded-md border border-slate-300 bg-white px-2 text-sm"
+              className="h-8 rounded-[6px] border-0 bg-white px-2 text-sm text-[#111827]"
             >
               {SNAP_OPTIONS.map((snap) => (
                 <option key={snap} value={snap}>
@@ -1836,18 +1840,18 @@ export default function CalendarioPage() {
               ))}
             </select>
 
-            <div className="ml-auto flex items-center gap-1 rounded-md border border-slate-300 bg-white p-1">
+            <div className="ml-auto flex items-center gap-1 rounded-[8px] border border-[#E4E7EC] bg-white p-1">
               <button
                 onClick={() => setZoomIndex((i) => Math.max(0, i - 1))}
-                className="grid h-7 w-7 place-items-center rounded text-slate-600 hover:bg-slate-100"
+                className="grid h-7 w-7 place-items-center rounded-[6px] text-[#4B5563] hover:bg-[#F0F2F5]"
                 title="Reduzir zoom"
               >
                 <ZoomOut size={15} />
               </button>
-              <span className="w-20 text-center text-xs font-semibold text-slate-600">{zoom.label}</span>
+              <span className="w-20 text-center text-xs font-medium text-[#4B5563]">{zoom.label}</span>
               <button
                 onClick={() => setZoomIndex((i) => Math.min(ZOOM_OPTIONS.length - 1, i + 1))}
-                className="grid h-7 w-7 place-items-center rounded text-slate-600 hover:bg-slate-100"
+                className="grid h-7 w-7 place-items-center rounded-[6px] text-[#4B5563] hover:bg-[#F0F2F5]"
                 title="Aumentar zoom"
               >
                 <ZoomIn size={15} />
@@ -1859,38 +1863,40 @@ export default function CalendarioPage() {
         {mensagem && <div className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800">{mensagem}</div>}
 
         <main className="flex min-h-0 flex-1 gap-3 p-3">
-          <aside className="flex w-72 shrink-0 flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
-            <div className="border-b border-slate-200 p-3">
+          <aside className="flex w-72 shrink-0 flex-col overflow-hidden rounded-[12px] border border-[#E4E7EC] bg-white">
+            <div className="border-b border-[#E4E7EC] p-3">
               <div className="flex items-center justify-between gap-2">
-                <div>
-                  <h2 className="text-sm font-bold text-slate-900">Backlog</h2>
-                  <p className="text-xs text-slate-500">{ordensBacklog.length} ordens na janela</p>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-sm font-semibold text-[#111827]">Backlog</h2>
+                  <span className="grid h-4 min-w-4 place-items-center rounded-full bg-[#2563EB] px-1 text-[10px] font-medium text-white">
+                    {ordensBacklog.length}
+                  </span>
                 </div>
                 <button
                   onClick={() => setNovaOrdemAberta(true)}
-                  className="grid h-8 w-8 place-items-center rounded-md bg-blue-600 text-white hover:bg-blue-700"
+                  className="grid h-7 w-7 place-items-center rounded-full bg-[#2563EB] text-white hover:bg-[#1D4ED8]"
                   title="Nova ordem"
                 >
                   <Plus size={16} />
                 </button>
               </div>
 
-              <div className="mt-3 flex items-center gap-2 rounded-md border border-slate-300 px-2">
-                <Search size={15} className="text-slate-400" />
+              <div className="mt-3 flex h-9 items-center gap-2 rounded-[8px] border border-[#E4E7EC] px-2 focus-within:border-[#2563EB]">
+                <Search size={15} className="text-[#9CA3AF]" />
                 <input
                   value={busca}
                   onChange={(e) => setBusca(e.target.value)}
                   placeholder="Buscar produto, SKU, lote..."
-                  className="h-9 min-w-0 flex-1 text-sm outline-none"
+                  className="h-9 min-w-0 flex-1 text-sm text-[#111827] outline-none"
                 />
               </div>
 
-              <div className="mt-2 grid grid-cols-3 gap-1 rounded-md bg-slate-100 p-1">
+              <div className="mt-2 grid grid-cols-3 gap-1 rounded-full bg-[#F0F2F5] p-1">
                 {(['todas', 'tanque', 'envase'] as const).map((value) => (
                   <button
                     key={value}
                     onClick={() => setFiltroEtapa(value)}
-                    className={`h-7 rounded text-xs font-semibold ${filtroEtapa === value ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500'}`}
+                    className={`h-7 rounded-full text-xs font-medium ${filtroEtapa === value ? 'bg-[#2563EB] text-white' : 'text-[#9CA3AF]'}`}
                   >
                     {value}
                   </button>
@@ -1901,7 +1907,7 @@ export default function CalendarioPage() {
             <div className="min-h-0 flex-1 overflow-y-auto">
               <DroppableBacklog>
                 {ordensBacklog.length === 0 ? (
-                  <div className="rounded-md border border-dashed border-slate-300 p-6 text-center text-xs text-slate-400">
+                  <div className="rounded-[12px] border border-dashed border-[#E4E7EC] p-6 text-center text-[13px] text-[#9CA3AF]">
                     Nenhuma ordem pendente nesta janela.
                   </div>
                 ) : (
@@ -1911,40 +1917,49 @@ export default function CalendarioPage() {
             </div>
           </aside>
 
-          <section className="min-w-0 flex-1 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+          <section className="min-w-0 flex-1 overflow-hidden rounded-[12px] border border-[#E4E7EC] bg-white">
             <div className="flex h-full min-h-0 flex-col">
-              <div className="border-b border-slate-200 bg-white p-3">
+              <div className="border-b border-[#E4E7EC] bg-white p-3">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
-                    <h2 className="text-base font-black text-slate-900">
+                    <h2 className="text-base font-semibold text-[#111827]">
                       {resourceTab === 'envase' ? 'Calendario de Envase (Maquinas)' : 'Calendario de Tanques'}
                     </h2>
-                    <p className="text-xs text-slate-500">
+                    <p className="text-xs text-[#9CA3AF]">
                       {selectedMachine ? `${selectedMachine.nome} com ${selectedMachineOrdens.length} ordens agendadas` : 'Selecione um recurso ativo'}
                     </p>
                   </div>
                   {selectedMachine && (
-                    <div className="flex items-center gap-2 text-xs font-bold uppercase text-slate-500">
-                      <span className="rounded bg-slate-100 px-2 py-1">
-                        {calcularOcupacaoMaquina(selectedMachineOrdens, janela, range.dias).toFixed(0)}% ocupado
+                    <div className="flex items-center divide-x divide-[#E4E7EC] rounded-[8px] border border-[#E4E7EC] bg-white text-right">
+                      <span className="px-3 py-1.5">
+                        <span className="block text-[10px] uppercase tracking-wide text-[#9CA3AF]">% ocupado</span>
+                        <span className="font-mono text-[13px] font-semibold text-[#111827]">
+                          {calcularOcupacaoMaquina(selectedMachineOrdens, janela, range.dias).toFixed(0)}
+                        </span>
                       </span>
-                      <span className="rounded bg-cyan-50 px-2 py-1 text-cyan-700">
-                        {selectedMachineOrdens.filter((ordem) => ordem.etapa === 'tanque').length} tanque
+                      <span className="px-3 py-1.5">
+                        <span className="block text-[10px] uppercase tracking-wide text-[#9CA3AF]">tanque</span>
+                        <span className="font-mono text-[13px] font-semibold text-[#111827]">
+                          {selectedMachineOrdens.filter((ordem) => ordem.etapa === 'tanque').length}
+                        </span>
                       </span>
-                      <span className="rounded bg-violet-50 px-2 py-1 text-violet-700">
-                        {selectedMachineOrdens.filter((ordem) => ordem.etapa === 'envase').length} envase
+                      <span className="px-3 py-1.5">
+                        <span className="block text-[10px] uppercase tracking-wide text-[#9CA3AF]">envase</span>
+                        <span className="font-mono text-[13px] font-semibold text-[#111827]">
+                          {selectedMachineOrdens.filter((ordem) => ordem.etapa === 'envase').length}
+                        </span>
                       </span>
                     </div>
                   )}
                 </div>
 
-                <div className="mt-3 flex w-fit rounded-md border border-slate-300 bg-slate-50 p-1">
+                <div className="mt-3 flex w-fit rounded-[8px] border border-[#E4E7EC] bg-[#F0F2F5] p-1">
                   {(['tanque', 'envase'] as const).map((tab) => (
                     <button
                       key={tab}
                       onClick={() => setResourceTab(tab)}
-                      className={`h-7 rounded px-3 text-xs font-bold uppercase ${
-                        resourceTab === tab ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500'
+                      className={`h-7 rounded-[6px] px-3 text-xs font-medium uppercase ${
+                        resourceTab === tab ? 'bg-white text-[#2563EB] shadow-[var(--shadow-sm)]' : 'text-[#9CA3AF]'
                       }`}
                     >
                       {tab === 'tanque' ? 'Tanques' : 'Envase'}
@@ -1963,19 +1978,22 @@ export default function CalendarioPage() {
                         key={resource.id}
                         type="button"
                         onClick={() => setSelectedMachineId(resource.id)}
-                        className={`min-w-48 rounded-md border px-3 py-2 text-left transition ${
-                          active ? 'border-blue-300 bg-blue-50 text-blue-900' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                        className={`min-w-48 border-b-2 px-3 py-2 text-left transition ${
+                          active ? 'border-[#2563EB] text-[#2563EB]' : 'border-transparent text-[#4B5563] hover:text-[#111827]'
                         }`}
                       >
-                        <div className="truncate text-sm font-bold">{resource.nome}</div>
-                        <div className="mt-1 text-[11px] font-semibold text-slate-500">{agendaRecurso.length} ordens no periodo</div>
+                        <div className="flex items-center gap-2">
+                          <div className="truncate text-sm font-semibold">{resource.nome}</div>
+                          <span className="rounded-full bg-[#F0F2F5] px-1.5 py-0.5 text-[10px] text-[#9CA3AF]">{agendaRecurso.length}</span>
+                        </div>
+                        <div className="mt-1 text-[11px] text-[#9CA3AF]">ordens no periodo</div>
                       </button>
                     )
                   })}
                 </div>
               </div>
 
-              <div className="min-h-0 flex-1 overflow-auto bg-slate-50">
+              <div className="min-h-0 flex-1 overflow-auto bg-[#F7F8FA]">
                 {selectedMachine ? (
                   <MachineCalendarBoard
                     key={selectedMachine.id}
@@ -1995,12 +2013,12 @@ export default function CalendarioPage() {
                     onEdit={salvarAgendaComFim}
                   />
                 ) : (
-                  <div className="p-10 text-center text-sm text-slate-400">Nenhum recurso ativo cadastrado.</div>
+                  <div className="p-10 text-center text-sm text-[#9CA3AF]">Nenhum recurso ativo cadastrado.</div>
                 )}
               </div>
 
               {selectedMachine && resourceTab === 'envase' && (
-                <div className="border-t border-slate-200 bg-white p-3">
+                <div className="border-t border-[#E4E7EC] bg-white p-3">
                   <MachineInspector
                     maquina={{ id: selectedMachine.id, nome: selectedMachine.nome, ativa: true, criado_em: '' }}
                     ordens={selectedMachineOrdens}

@@ -1,7 +1,8 @@
-﻿ 'use client'
+'use client'
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { format, addDays, subDays } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import type { Maquina, Ordem, Produto } from '@/types'
 import { NovaOrdemForm } from '@/components/planner/NovaOrdemForm'
 import { OperacaoDashboard } from '@/components/planner/OperacaoDashboard'
@@ -100,11 +101,6 @@ export default function PlannerPage() {
     localStorage.setItem(JANELA_STORAGE_KEY, JSON.stringify(janela))
   }, [janela])
 
-  const ordensAtivas = useMemo(
-    () => ordens.filter((o) => o.status !== 'concluida' && o.status !== 'cancelada'),
-    [ordens]
-  )
-
   const resumo = useMemo(() => {
     const total = ordens.length
     const tanque = ordens.filter((o) => o.etapa === 'tanque').length
@@ -177,65 +173,67 @@ export default function PlannerPage() {
   }
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
-      <div className="border-b border-slate-200 bg-white p-4 space-y-4 shadow-sm relative z-10">
-        <div className="flex items-center gap-3 mb-2">
-          <img src="/logoAtrius.webp" alt="Atrius Logo" className="h-12 w-auto" />
+    <div className="flex h-full flex-col overflow-hidden">
+      <div className="relative z-10 space-y-4 border-b border-[#E4E7EC] bg-white p-4">
+        <div className="flex items-start gap-4">
           <div>
-            <h1 className="text-2xl font-black text-slate-900 tracking-tighter uppercase">Painel de Controle Atrius</h1>
-            <p className="text-xs font-bold text-slate-500">Monitoramento e Gestão de Produção em Tempo Real</p>
+            <h1 className="text-[22px] font-semibold leading-tight text-[#111827]">Painel de Controle Atrius</h1>
+            <p className="mt-1 text-[13px] text-[#9CA3AF]">Monitoramento e Gestao de Producao em Tempo Real</p>
           </div>
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-1 py-1">
-            <button
-              onClick={() => setDia((d) => subDays(d, 1))}
-              className="px-2 py-1 rounded-md text-sm text-slate-600 hover:bg-white"
-            >
-              {'<'}
-            </button>
-            <span className="text-sm font-medium text-slate-700 w-52 text-center">
-              {format(dia, "EEEE, dd 'de' MMMM", { locale: ptBR })}
-            </span>
-            <button
-              onClick={() => setDia((d) => addDays(d, 1))}
-              className="px-2 py-1 rounded-md text-sm text-slate-600 hover:bg-white"
-            >
-              {'>'}
-            </button>
-          </div>
-
-          <button
-            onClick={() => setDia(new Date())}
-            className="px-3 py-2 rounded-lg border border-slate-300 text-sm text-slate-700 hover:bg-slate-50"
-          >
-            Hoje
-          </button>
 
           <div className="ml-auto flex items-center gap-2">
             <button
               onClick={() => setIsExpanded(true)}
-              className="px-4 py-2 bg-slate-900 text-white rounded-md text-sm font-black uppercase tracking-widest hover:bg-black transition-all shadow-md active:scale-95"
+              className="h-9 rounded-[8px] border border-[#CDD2DA] bg-white px-4 text-sm font-medium text-[#4B5563] hover:border-[#2563EB] hover:text-[#2563EB]"
             >
-              Expandir Painel Operacional
+              Expandir Painel
             </button>
             <button
               onClick={sincronizar}
               disabled={sincronizando}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors shadow-sm"
+              className="h-9 rounded-[8px] bg-[#2563EB] px-4 text-sm font-medium text-white hover:bg-[#1D4ED8] disabled:opacity-50"
             >
               {sincronizando ? 'Sincronizando...' : 'Sincronizar API'}
             </button>
           </div>
         </div>
 
-        <div className="flex flex-wrap items-end gap-2">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center rounded-[8px] border border-[#E4E7EC] bg-white p-1">
+            <button
+              onClick={() => setDia((d) => subDays(d, 1))}
+              className="grid h-8 w-8 place-items-center rounded-[6px] text-[#4B5563] hover:bg-[#F0F2F5]"
+              title="Dia anterior"
+            >
+              <ChevronLeft size={16} />
+            </button>
+            <span className="w-56 px-2 text-center text-sm font-medium text-[#111827]">
+              {format(dia, "EEEE, dd 'de' MMMM", { locale: ptBR })}
+            </span>
+            <button
+              onClick={() => setDia((d) => addDays(d, 1))}
+              className="grid h-8 w-8 place-items-center rounded-[6px] text-[#4B5563] hover:bg-[#F0F2F5]"
+              title="Proximo dia"
+            >
+              <ChevronRight size={16} />
+            </button>
+          </div>
+
+          <button
+            onClick={() => setDia(new Date())}
+            className="h-8 rounded-[8px] border border-[#2563EB] bg-white px-3 text-sm font-medium text-[#2563EB] hover:bg-[#EFF6FF]"
+          >
+            Hoje
+          </button>
+        </div>
+
+        <div className="flex flex-wrap items-end gap-3 rounded-[8px] bg-[#F0F2F5] p-3">
           <div className="flex flex-col gap-1">
-            <label className="text-[11px] font-semibold text-slate-600 uppercase tracking-wide">Turno</label>
+            <label className="text-[11px] font-semibold uppercase tracking-wide text-[#4B5563]">Turno</label>
             <select
               value={turnoSelecionado}
               onChange={(e) => aplicarPresetTurno(e.target.value)}
-              className="h-9 px-3 rounded-lg border border-slate-300 bg-white text-sm text-slate-700"
+              className="h-9 min-w-52 rounded-[8px] border-0 bg-white px-3 text-sm text-[#111827]"
             >
               {TURNOS_PRESET.map((turno) => (
                 <option key={turno.id} value={turno.id}>
@@ -247,7 +245,7 @@ export default function PlannerPage() {
           </div>
 
           <div className="flex flex-col gap-1">
-            <label className="text-[11px] font-semibold text-slate-600 uppercase tracking-wide">Inicio</label>
+            <label className="text-[11px] font-semibold uppercase tracking-wide text-[#4B5563]">Inicio</label>
             <input
               type="time"
               step={3600}
@@ -258,12 +256,12 @@ export default function PlannerPage() {
                 setJanela(normalizada)
                 setTurnoSelecionado(detectarPreset(normalizada))
               }}
-              className="h-9 px-3 rounded-lg border border-slate-300 bg-white text-sm text-slate-700"
+              className="h-9 rounded-[8px] border-0 bg-white px-3 text-sm text-[#111827]"
             />
           </div>
 
           <div className="flex flex-col gap-1">
-            <label className="text-[11px] font-semibold text-slate-600 uppercase tracking-wide">Fim</label>
+            <label className="text-[11px] font-semibold uppercase tracking-wide text-[#4B5563]">Fim</label>
             <input
               type="time"
               step={3600}
@@ -274,41 +272,41 @@ export default function PlannerPage() {
                 setJanela(normalizada)
                 setTurnoSelecionado(detectarPreset(normalizada))
               }}
-              className="h-9 px-3 rounded-lg border border-slate-300 bg-white text-sm text-slate-700"
+              className="h-9 rounded-[8px] border-0 bg-white px-3 text-sm text-[#111827]"
             />
           </div>
 
-          <span className="h-9 inline-flex items-center px-3 rounded-lg bg-slate-200 text-slate-700 text-xs font-medium">
+          <span className="inline-flex h-9 items-center rounded-[12px] bg-[#EFF6FF] px-3 text-xs font-medium text-[#2563EB]">
             Janela ativa: {horaParaInput(janela.startHour)} - {horaParaInput(janela.endHour % 24 === 0 ? 0 : janela.endHour)}
           </span>
         </div>
 
-        <div className="flex flex-wrap gap-4 pt-4 border-t border-slate-100">
-          <div className="px-5 py-2 rounded-xl bg-slate-100 border border-slate-200 shadow-sm">
-            <span className="text-[10px] font-black text-slate-500 uppercase block leading-none mb-1">Total</span>
-            <span className="text-2xl font-black text-slate-900 leading-none">{resumo.total}</span>
+        <div className="flex flex-wrap gap-3 border-t border-[#E4E7EC] pt-4">
+          <div className="min-w-32 rounded-[8px] border border-[#E4E7EC] bg-white p-4">
+            <span className="block text-[10px] uppercase tracking-[0.08em] text-[#9CA3AF]">TOTAL</span>
+            <span className="mt-2 block font-mono text-4xl font-semibold leading-none text-[#111827]">{resumo.total}</span>
           </div>
-          <div className="px-5 py-2 rounded-xl bg-blue-50 border border-blue-200 shadow-sm">
-            <span className="text-[10px] font-black text-blue-500 uppercase block leading-none mb-1">Tanque</span>
-            <span className="text-2xl font-black text-blue-700 leading-none">{resumo.tanque}</span>
+          <div className="min-w-32 rounded-[8px] border border-[#E4E7EC] bg-white p-4">
+            <span className="block text-[10px] uppercase tracking-[0.08em] text-[#9CA3AF]">TANQUE</span>
+            <span className="mt-2 block font-mono text-4xl font-semibold leading-none text-[#2563EB]">{resumo.tanque}</span>
           </div>
-          <div className="px-5 py-2 rounded-xl bg-purple-50 border border-purple-200 shadow-sm">
-            <span className="text-[10px] font-black text-purple-500 uppercase block leading-none mb-1">Envase</span>
-            <span className="text-2xl font-black text-purple-700 leading-none">{resumo.envase}</span>
+          <div className="min-w-32 rounded-[8px] border border-[#E4E7EC] bg-white p-4">
+            <span className="block text-[10px] uppercase tracking-[0.08em] text-[#9CA3AF]">ENVASE</span>
+            <span className="mt-2 block font-mono text-4xl font-semibold leading-none text-[#2563EB]">{resumo.envase}</span>
           </div>
-          <div className="px-5 py-2 rounded-xl bg-green-50 border border-green-200 shadow-sm">
-            <span className="text-[10px] font-black text-green-500 uppercase block leading-none mb-1">Agendadas</span>
-            <span className="text-2xl font-black text-green-700 leading-none">{resumo.agendadas}</span>
+          <div className="min-w-32 rounded-[8px] border border-[#E4E7EC] bg-white p-4">
+            <span className="block text-[10px] uppercase tracking-[0.08em] text-[#9CA3AF]">AGENDADAS</span>
+            <span className="mt-2 block font-mono text-4xl font-semibold leading-none text-[#16A34A]">{resumo.agendadas}</span>
           </div>
-          <div className="px-5 py-2 rounded-xl bg-slate-100 border border-slate-300 shadow-sm">
-            <span className="text-[10px] font-black text-slate-500 uppercase block leading-none mb-1">Concluídas</span>
-            <span className="text-2xl font-black text-slate-700 leading-none">{resumo.concluidas}</span>
+          <div className="min-w-32 rounded-[8px] border border-[#E4E7EC] bg-white p-4">
+            <span className="block text-[10px] uppercase tracking-[0.08em] text-[#9CA3AF]">CONCLUIDAS</span>
+            <span className="mt-2 block font-mono text-4xl font-semibold leading-none text-[#16A34A]">{resumo.concluidas}</span>
           </div>
         </div>
       </div>
 
       {mensagem && (
-        <div className="bg-amber-50 border-b border-amber-200 px-6 py-2 text-sm text-amber-800">{mensagem}</div>
+        <div className="border-b border-amber-200 bg-amber-50 px-6 py-2 text-sm text-amber-800">{mensagem}</div>
       )}
 
       {novaOrdemAberta && (
@@ -323,58 +321,43 @@ export default function PlannerPage() {
         />
       )}
 
-      <main className="flex-1 overflow-y-auto p-4 space-y-4">
+      <main className="flex-1 space-y-4 overflow-y-auto p-4">
         {isExpanded ? (
-          <div className="fixed inset-0 z-[100] bg-slate-50 overflow-y-auto p-6 animate-in fade-in zoom-in-95 duration-300">
-            <div className="max-w-[1600px] mx-auto space-y-6">
-              <div className="flex items-center justify-between bg-white p-6 rounded-xl border-2 border-slate-200 shadow-xl mb-6">
-                <div className="flex items-center gap-4">
-                  <img src="/logoAtrius.webp" alt="Atrius Logo" className="h-16 w-auto" />
-                  <div>
-                    <h1 className="text-4xl font-black text-slate-900 tracking-tighter uppercase leading-none">Painel de Produção</h1>
-                  </div>
+          <div className="fixed inset-0 z-[100] overflow-y-auto bg-[#F7F8FA] p-6">
+            <div className="mx-auto max-w-[1600px] space-y-4">
+              <div className="mb-4 flex items-center justify-between rounded-[12px] border border-[#E4E7EC] bg-white p-5">
+                <div>
+                  <h1 className="text-xl font-semibold text-[#111827]">Painel de Producao</h1>
+                  <p className="mt-1 text-sm text-[#9CA3AF]">{format(dia, "dd 'de' MMMM", { locale: ptBR })}</p>
                 </div>
-
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-2 rounded-2xl border-2 border-slate-200 bg-slate-50 p-2 shadow-inner">
-                    <button
-                      onClick={() => setDia((d) => subDays(d, 1))}
-                      className="px-6 py-3 rounded-xl text-xl font-black text-slate-600 hover:bg-white hover:text-blue-600 transition-all shadow-sm active:scale-95"
-                    >
-                      Ontem
-                    </button>
-                    <div className="h-10 w-[2px] bg-slate-200 mx-2" />
-                    <button
-                      onClick={() => setDia(new Date())}
-                      className="px-8 py-3 rounded-xl text-xl font-black text-blue-700 bg-white shadow-md border-2 border-blue-100 hover:bg-blue-50 transition-all active:scale-95"
-                    >
-                      HOJE
-                    </button>
-                    <div className="h-10 w-[2px] bg-slate-200 mx-2" />
-                    <button
-                      onClick={() => setDia((d) => addDays(d, 1))}
-                      className="px-6 py-3 rounded-xl text-xl font-black text-slate-600 hover:bg-white hover:text-blue-600 transition-all shadow-sm active:scale-95"
-                    >
-                      Amanhã
-                    </button>
-                  </div>
-
-                  <div className="bg-slate-900 text-white px-6 py-3 rounded-xl border-b-4 border-slate-950 flex flex-col items-center">
-                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Data Visualizada</span>
-                    <span className="text-2xl font-black uppercase tracking-tighter">
-                      {format(dia, "dd 'de' MMMM", { locale: ptBR })}
-                    </span>
-                  </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setDia((d) => subDays(d, 1))}
+                    className="h-9 rounded-[8px] border border-[#CDD2DA] bg-white px-3 text-sm font-medium text-[#4B5563] hover:bg-[#F0F2F5]"
+                  >
+                    Ontem
+                  </button>
+                  <button
+                    onClick={() => setDia(new Date())}
+                    className="h-9 rounded-[8px] border border-[#2563EB] bg-white px-3 text-sm font-medium text-[#2563EB] hover:bg-[#EFF6FF]"
+                  >
+                    Hoje
+                  </button>
+                  <button
+                    onClick={() => setDia((d) => addDays(d, 1))}
+                    className="h-9 rounded-[8px] border border-[#CDD2DA] bg-white px-3 text-sm font-medium text-[#4B5563] hover:bg-[#F0F2F5]"
+                  >
+                    Amanha
+                  </button>
+                  <button
+                    onClick={() => setIsExpanded(false)}
+                    className="ml-2 h-9 rounded-[8px] border border-[#CDD2DA] bg-white px-4 text-sm font-medium text-[#4B5563] hover:bg-[#F0F2F5]"
+                  >
+                    Sair
+                  </button>
                 </div>
-
-                <button
-                  onClick={() => setIsExpanded(false)}
-                  className="px-8 py-4 bg-red-600 text-white rounded-xl text-xl font-black uppercase tracking-tighter hover:bg-red-700 shadow-2xl transition-all active:scale-95 border-b-4 border-red-800 ml-4"
-                >
-                  Sair
-                </button>
               </div>
-              
+
               <OperacaoDashboard
                 maquinas={maquinas}
                 ordens={ordens.filter((o) => o.inicio_agendado !== null)}
