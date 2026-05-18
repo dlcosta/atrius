@@ -4,10 +4,10 @@ import { createClient } from '@/lib/supabase/server'
 export async function GET() {
   const supabase = await createClient()
   const { data, error } = await supabase
-    .from('tanques')
+    .from('turnos')
     .select('*')
     .eq('ativo', true)
-    .order('nome')
+    .order('hora_inicio')
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json(data)
@@ -16,17 +16,18 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   const supabase = await createClient()
   const body = await req.json()
-  const { nome, volume_liters } = body
+  const { nome, hora_inicio, hora_fim } = body
 
   if (!nome || typeof nome !== 'string' || !nome.trim())
     return NextResponse.json({ error: 'Nome é obrigatório' }, { status: 422 })
-  if (!volume_liters || typeof volume_liters !== 'number' || volume_liters <= 0)
-    return NextResponse.json({ error: 'Capacidade deve ser maior que zero' }, { status: 422 })
+  if (hora_inicio === undefined || hora_inicio === null || typeof hora_inicio !== 'number' || hora_inicio < 0 || hora_inicio > 1439)
+    return NextResponse.json({ error: 'Hora de início inválida' }, { status: 422 })
+  if (hora_fim === undefined || hora_fim === null || typeof hora_fim !== 'number' || hora_fim < 0 || hora_fim > 1439)
+    return NextResponse.json({ error: 'Hora de fim inválida' }, { status: 422 })
 
-  const id = crypto.randomUUID()
   const { data, error } = await supabase
-    .from('tanques')
-    .insert({ id, nome: nome.trim(), volume_liters })
+    .from('turnos')
+    .insert({ nome: nome.trim(), hora_inicio, hora_fim })
     .select()
     .single()
 
@@ -37,7 +38,7 @@ export async function POST(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   const supabase = await createClient()
   const body = await req.json()
-  const { id, nome, volume_liters, ativo } = body
+  const { id, nome, hora_inicio, hora_fim, ativo } = body
 
   if (!id) return NextResponse.json({ error: 'ID é obrigatório' }, { status: 422 })
 
@@ -47,10 +48,15 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: 'Nome inválido' }, { status: 422 })
     updates.nome = nome.trim()
   }
-  if (volume_liters !== undefined) {
-    if (typeof volume_liters !== 'number' || volume_liters <= 0)
-      return NextResponse.json({ error: 'Capacidade deve ser maior que zero' }, { status: 422 })
-    updates.volume_liters = volume_liters
+  if (hora_inicio !== undefined) {
+    if (typeof hora_inicio !== 'number' || hora_inicio < 0 || hora_inicio > 1439)
+      return NextResponse.json({ error: 'Hora de início inválida' }, { status: 422 })
+    updates.hora_inicio = hora_inicio
+  }
+  if (hora_fim !== undefined) {
+    if (typeof hora_fim !== 'number' || hora_fim < 0 || hora_fim > 1439)
+      return NextResponse.json({ error: 'Hora de fim inválida' }, { status: 422 })
+    updates.hora_fim = hora_fim
   }
   if (ativo !== undefined) updates.ativo = ativo
 
@@ -58,7 +64,7 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: 'Nenhum campo para atualizar' }, { status: 422 })
 
   const { data, error } = await supabase
-    .from('tanques')
+    .from('turnos')
     .update(updates)
     .eq('id', id)
     .select()
@@ -76,7 +82,7 @@ export async function DELETE(req: NextRequest) {
   if (!id) return NextResponse.json({ error: 'ID é obrigatório' }, { status: 422 })
 
   const { error } = await supabase
-    .from('tanques')
+    .from('turnos')
     .update({ ativo: false })
     .eq('id', id)
 

@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { ProducaoCalendar } from '@/components/producao/ProducaoCalendar'
-import type { Ordem, Tanque } from '@/types'
+import type { Ordem, Tanque, Turno } from '@/types'
 
 async function buscarOrdens(): Promise<Ordem[]> {
   const supabase = await createClient()
@@ -27,12 +27,23 @@ async function buscarTanques(): Promise<Tanque[]> {
   return (data as Tanque[]) ?? []
 }
 
+async function buscarTurnos(): Promise<Turno[]> {
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from('turnos')
+    .select('*')
+    .eq('ativo', true)
+    .order('hora_inicio', { ascending: true })
+  if (error) return []
+  return (data as Turno[]) ?? []
+}
+
 export default async function ProducaoPage() {
-  const [ordens, tanques] = await Promise.all([buscarOrdens(), buscarTanques()])
+  const [ordens, tanques, turnos] = await Promise.all([buscarOrdens(), buscarTanques(), buscarTurnos()])
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
-      <ProducaoCalendar ordens={ordens} tanques={tanques} />
+      <ProducaoCalendar ordens={ordens} tanques={tanques} turnos={turnos} />
     </div>
   )
 }

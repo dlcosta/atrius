@@ -4,16 +4,9 @@ import { useState, useMemo } from 'react'
 import { ChevronLeft, Plus } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import type { ItemDemanda, Ordem, Tanque } from '@/types'
+import type { ItemDemanda, Ordem, Tanque, Turno } from '@/types'
 import { TanqueProgressBar } from './TanqueProgressBar'
 import { ItemPedidoRow } from './ItemPedidoRow'
-
-type Turno = {
-  id: string
-  nome: string
-  horaInicio: number
-  horaFim: number
-}
 
 type Props = {
   dataSelecionada: string
@@ -21,15 +14,10 @@ type Props = {
   itensIniciais: ItemDemanda[]
   ordensAgendadas: Ordem[]
   tanques: Tanque[]
+  turnos: Turno[]
   onBack: () => void
   onOrdemCriada: () => void
 }
-
-const TURNOS_PADRAO: Turno[] = [
-  { id: 'manha', nome: 'Manhã', horaInicio: 6, horaFim: 14 },
-  { id: 'tarde', nome: 'Tarde', horaInicio: 14, horaFim: 22 },
-  { id: 'noite', nome: 'Noite', horaInicio: 22, horaFim: 6 },
-]
 
 const SEM_DATA_KEY = '__sem_data__'
 
@@ -50,17 +38,13 @@ function itemKey(item: ItemDemanda) {
   return `${item.numero_pedido}::${item.produto_descricao}::${item.data_prevista?.slice(0, 10) ?? ''}`
 }
 
-function turnoLabel(turnoId: string) {
-  const turno = TURNOS_PADRAO.find((item) => item.id === turnoId)
-  return turno ? `${turno.nome} (${turno.horaInicio}h - ${turno.horaFim}h)` : turnoId
-}
-
 export function TanqueSelector({
   dataSelecionada,
   categoriaSelecionada,
   itensIniciais,
   ordensAgendadas,
   tanques,
+  turnos,
   onBack,
   onOrdemCriada,
 }: Props) {
@@ -68,9 +52,22 @@ export function TanqueSelector({
   const [selecionados, setSelecionados] = useState<Set<string>>(new Set())
   const [nomeOrdem, setNomeOrdem] = useState<string>('')
   const [diaExecucao, setDiaExecucao] = useState<string>(getHojeYmd())
-  const [turnoId, setTurnoId] = useState<string>('manha')
+  const [turnoId, setTurnoId] = useState<string>(turnos[0]?.id ?? '')
+  const [tempoProducaoMin, setTempoProducaoMin] = useState<number | null>(null)
+  const [tempoLimpezaMin, setTempoLimpezaMin] = useState<number>(0)
   const [criando, setCriando] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
+
+  function minutesToTime(minutes: number) {
+    const h = Math.floor(minutes / 60)
+    const m = minutes % 60
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+  }
+
+  function turnoLabel(id: string) {
+    const turno = turnos.find((t) => t.id === id)
+    return turno ? `${turno.nome} (${minutesToTime(turno.hora_inicio)} – ${minutesToTime(turno.hora_fim)})` : id
+  }
 
   // Itens da categoria selecionada
   const itensDaCategoria = useMemo(() => {
@@ -95,44 +92,54 @@ export function TanqueSelector({
     .filter((item) => selecionados.has(itemKey(item)))
     .reduce((acc, item) => acc + item.total_litros, 0)
 
-  // Calcular utilização do tanque no dia/turno selecionado
+  // Duração do turno selecionado em minutos
+  const duracaoTurnoMin = useMemo(() => {
+    const turno = turnos.find((t) => t.id === turnoId)
+    if (!turno) return 0
+    return Math.max(0, turno.hora_fim - turno.hora_inicio)
+  }, [turnos, turnoId])
+
+  // Calcular utilização do tanque no dia/turno selecionado (volume + tempo)
   const utilizacaoTanque = useMemo(() => {
-    if (!tanqueSelecionado || !ordensAgendadas) return { litros: 0, percentual: 0 }
+    if (!tanqueSelecionado || !ordensAgendadas) return { litros: 0, percentual: 0, minutos: 0, percentualTempo: 0 }
     const tanque = tanques.find((t) => t.id === tanqueSelecionado)
-    if (!tanque) return { litros: 0, percentual: 0 }
+    if (!tanque) return { litros: 0, percentual: 0, minutos: 0, percentualTempo: 0 }
 
     const ordensNoTanque = ordensAgendadas.filter(
       (o) =>
         o.tank_id === tanqueSelecionado &&
         o.data_prevista?.slice(0, 10) === diaExecucao &&
-        (o.turno_id ?? 'manha') === turnoId
+        (o.turno_id ?? turnos[0]?.id) === turnoId
     )
 
-    console.log(`[TanqueSelector] Tanque ${tanqueSelecionado} em ${diaExecucao}:`, {
-      ordensFound: ordensNoTanque.length,
-      detalhes: ordensNoTanque.map(o => ({
-        id: o.id,
-        tank_id: o.tank_id,
-        quantidade: o.quantidade,
-        data: o.data_prevista
-      }))
-    })
-
     const litersUsados = ordensNoTanque.reduce((acc, o) => acc + (o.quantidade ?? 0), 0)
-    const percentualUsado = (litersUsados / tanque.volume_liters) * 100
+    const minutosUsados = ordensNoTanque.reduce((acc, o) => acc + (o.total_duration_minutes ?? 0), 0)
+    const percentualVolume = (litersUsados / tanque.volume_liters) * 100
+    const percentualTempo = duracaoTurnoMin > 0 ? (minutosUsados / duracaoTurnoMin) * 100 : 0
 
-    return { litros: litersUsados, percentual: percentualUsado }
-  }, [tanqueSelecionado, diaExecucao, turnoId, tanques, ordensAgendadas])
+    return { litros: litersUsados, percentual: percentualVolume, minutos: minutosUsados, percentualTempo }
+  }, [tanqueSelecionado, diaExecucao, turnoId, tanques, ordensAgendadas, turnos, duracaoTurnoMin])
 
   const tanqueObj = tanques.find((t) => t.id === tanqueSelecionado)
   const capacidadeDisponivel = tanqueObj
     ? Math.max(0, tanqueObj.volume_liters - utilizacaoTanque.litros)
     : 0
-  const podeAgendar = litrosSelecionados > 0 && litrosSelecionados <= capacidadeDisponivel
-  const itensSelecionaveis = itensDaCategoria.filter((item) => item.total_litros <= capacidadeDisponivel)
+
+  const totalDuracaoNovaOrdem = (tempoProducaoMin ?? 0) + tempoLimpezaMin
+  const minutosDisponiveis = Math.max(0, duracaoTurnoMin - utilizacaoTanque.minutos)
+  const tempoInsuficiente = tempoProducaoMin !== null && tempoProducaoMin > 0 && totalDuracaoNovaOrdem > minutosDisponiveis && minutosDisponiveis > 0
+
+  const volumeExcede = litrosSelecionados > capacidadeDisponivel
+  const podeAgendar =
+    litrosSelecionados > 0 &&
+    !volumeExcede &&
+    tempoProducaoMin !== null &&
+    tempoProducaoMin > 0 &&
+    !tempoInsuficiente
+  // Todos os itens são selecionáveis — a máquina processa 1 ordem por vez, o gate é tempo não volume
   const todosSelecionados =
-    itensSelecionaveis.length > 0 &&
-    itensSelecionaveis.every((item) => selecionados.has(itemKey(item)))
+    itensDaCategoria.length > 0 &&
+    itensDaCategoria.every((item) => selecionados.has(itemKey(item)))
 
   function handleChange(item: ItemDemanda, checked: boolean) {
     setSelecionados((prev) => {
@@ -148,19 +155,7 @@ export function TanqueSelector({
       setSelecionados(new Set())
       return
     }
-
-    const next = new Set<string>()
-    let litrosAcumulados = 0
-
-    for (const item of itensDaCategoria) {
-      const proximoTotal = litrosAcumulados + item.total_litros
-      if (proximoTotal <= capacidadeDisponivel) {
-        next.add(itemKey(item))
-        litrosAcumulados = proximoTotal
-      }
-    }
-
-    setSelecionados(next)
+    setSelecionados(new Set(itensDaCategoria.map(itemKey)))
   }
 
   async function handleCriarOrdem() {
@@ -173,17 +168,10 @@ export function TanqueSelector({
       .filter(Boolean)
       .sort()[0] ?? diaExecucao
 
-    const turno = TURNOS_PADRAO.find((t) => t.id === turnoId)
-    if (!turno) {
-      setErro('Turno inválido')
-      return
-    }
-
     setCriando(true)
     setErro(null)
 
     try {
-      // 1. Criar ordem
       const resOrdem = await fetch('/api/demanda/ordens', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -193,6 +181,8 @@ export function TanqueSelector({
           data_prevista: dataPrevista,
           tank_id: tanqueSelecionado,
           total_litros: litrosSelecionados,
+          production_time_minutes: tempoProducaoMin,
+          cleaning_time_minutes: tempoLimpezaMin,
           itens: itensSelecionados.map((item) => ({
             numero_pedido: item.numero_pedido,
             produto_descricao: item.produto_descricao,
@@ -208,31 +198,12 @@ export function TanqueSelector({
         return
       }
 
-      const ordem = await resOrdem.json()
-
-      // 2. Agendar produção
-      const resAgendamento = await fetch('/api/producao/agendamentos', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ordem_id: ordem.id,
-          tank_id: tanqueSelecionado,
-          turno_id: turnoId,
-          turno_nome: turno.nome,
-          data_agendamento: diaExecucao,
-        }),
-      })
-
-      if (!resAgendamento.ok) {
-        const json = await resAgendamento.json()
-        setErro(`Ordem criada mas erro ao agendar: ${json.error}`)
-        return
-      }
-
       setSelecionados(new Set())
       setNomeOrdem('')
+      setTempoProducaoMin(null)
+      setTempoLimpezaMin(0)
       setDiaExecucao(getHojeYmd())
-      setTurnoId('manha')
+      setTurnoId(turnos[0]?.id ?? '')
       onOrdemCriada()
     } catch {
       setErro('Erro de rede ao criar ordem')
@@ -281,20 +252,24 @@ export function TanqueSelector({
 
             <div>
               <label className="text-xs font-semibold text-slate-600 block mb-1">Turno de producao</label>
-              <select
-                value={turnoId}
-                onChange={(e) => {
-                  setTurnoId(e.target.value)
-                  setSelecionados(new Set())
-                }}
-                className="w-full text-sm border border-slate-300 rounded-md px-3 py-2 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                {TURNOS_PADRAO.map((turno) => (
-                  <option key={turno.id} value={turno.id}>
-                    {turno.nome} ({turno.horaInicio}h - {turno.horaFim}h)
-                  </option>
-                ))}
-              </select>
+              {turnos.length === 0 ? (
+                <p className="text-sm text-amber-600 py-2">Nenhum turno cadastrado. Cadastre turnos na aba Cadastros.</p>
+              ) : (
+                <select
+                  value={turnoId}
+                  onChange={(e) => {
+                    setTurnoId(e.target.value)
+                    setSelecionados(new Set())
+                  }}
+                  className="w-full text-sm border border-slate-300 rounded-md px-3 py-2 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  {turnos.map((turno) => (
+                    <option key={turno.id} value={turno.id}>
+                      {turno.nome} ({minutesToTime(turno.hora_inicio)} – {minutesToTime(turno.hora_fim)})
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
           </div>
 
@@ -303,61 +278,98 @@ export function TanqueSelector({
             <h3 className="text-sm font-semibold text-slate-900 mb-3">
               Disponibilidade em {format(parseISO(diaExecucao), 'dd/MM/yyyy', { locale: ptBR })} - {turnoLabel(turnoId)}
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-              {tanques.map((tanque) => {
-                // Filtrar ordens que estão agendadas para este tanque e data
-                const ordensNoTanque = (ordensAgendadas || []).filter((o) => {
-                  const dataAgend = o.data_prevista?.slice(0, 10)
+            {tanques.length === 0 ? (
+              <p className="text-sm text-amber-600">Nenhum tanque cadastrado. Cadastre tanques na aba Cadastros.</p>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                {tanques.map((tanque) => {
+                  const ordensNoTanque = (ordensAgendadas || []).filter((o) => {
+                    const dataAgend = o.data_prevista?.slice(0, 10)
+                    return (
+                      o.tank_id === tanque.id &&
+                      dataAgend === diaExecucao &&
+                      (o.turno_id ?? turnos[0]?.id) === turnoId
+                    )
+                  })
+                  const litersUsados = ordensNoTanque.reduce((acc, o) => acc + (o.quantidade ?? 0), 0)
+                  const minutosUsados = ordensNoTanque.reduce((acc, o) => acc + (o.total_duration_minutes ?? 0), 0)
+                  const percentualVolume = (litersUsados / tanque.volume_liters) * 100
+                  const percentualTempo = duracaoTurnoMin > 0 ? (minutosUsados / duracaoTurnoMin) * 100 : 0
+                  const livres = tanque.volume_liters - litersUsados
+                  const minDisp = Math.max(0, duracaoTurnoMin - minutosUsados)
+
+                  function fmtMin(m: number) {
+                    const h = Math.floor(m / 60)
+                    const min = m % 60
+                    return h > 0 ? `${h}h${min > 0 ? String(min).padStart(2, '0') : ''}` : `${min}min`
+                  }
+
                   return (
-                    o.tank_id === tanque.id &&
-                    dataAgend === diaExecucao &&
-                    (o.turno_id ?? 'manha') === turnoId
+                    <div key={tanque.id} className="bg-white rounded p-3 text-sm">
+                      <div className="font-semibold text-slate-900">{tanque.nome}</div>
+                      {duracaoTurnoMin > 0 ? (
+                        <>
+                          <div className="text-xs mt-1">
+                            <span className={`font-bold ${minDisp === 0 ? 'text-red-600' : 'text-slate-800'}`}>{fmtMin(minDisp)}</span>
+                            <span className="text-slate-500"> livres de {fmtMin(duracaoTurnoMin)}</span>
+                          </div>
+                          <div className="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden mt-1.5">
+                            <div
+                              className={`h-full transition-all ${
+                                percentualTempo > 90 ? 'bg-red-400' : percentualTempo > 70 ? 'bg-orange-400' : 'bg-blue-400'
+                              }`}
+                              style={{ width: `${Math.min(percentualTempo, 100)}%` }}
+                            />
+                          </div>
+                          <div className="text-xs text-slate-500 mt-0.5">{percentualTempo.toFixed(0)}% do turno usado</div>
+                          <div className="text-xs text-slate-400 mt-1.5 border-t border-slate-100 pt-1">
+                            Vol: {livres.toLocaleString('pt-BR')}L livres
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div className="text-xs text-slate-600 mt-1">
+                            Livre: <span className="font-bold">{livres.toLocaleString('pt-BR')}L</span> / {litersUsados.toLocaleString('pt-BR')}L usado
+                          </div>
+                          <div className="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden mt-2">
+                            <div
+                              className={`h-full transition-all ${
+                                percentualVolume > 90 ? 'bg-red-500' : percentualVolume > 70 ? 'bg-orange-500' : 'bg-green-500'
+                              }`}
+                              style={{ width: `${Math.min(percentualVolume, 100)}%` }}
+                            />
+                          </div>
+                          <div className="text-xs text-slate-500 mt-1">{percentualVolume.toFixed(0)}% volume</div>
+                        </>
+                      )}
+                    </div>
                   )
-                })
-                const litersUsados = ordensNoTanque.reduce((acc, o) => acc + (o.quantidade ?? 0), 0)
-                const percentualUsado = (litersUsados / tanque.volume_liters) * 100
-                const livres = tanque.volume_liters - litersUsados
-
-                console.log(`Tanque ${tanque.id} (${diaExecucao}): ${litersUsados}L de ${tanque.volume_liters}L, ordens: ${ordensNoTanque.length}`)
-
-                return (
-                  <div key={tanque.id} className="bg-white rounded p-3 text-sm">
-                    <div className="font-semibold text-slate-900">{tanque.nome}</div>
-                    <div className="text-xs text-slate-600 mt-1">
-                      Livre: <span className="font-bold">{livres.toLocaleString('pt-BR')}L</span> / {litersUsados.toLocaleString('pt-BR')}L usado
-                    </div>
-                    <div className="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden mt-2">
-                      <div
-                        className={`h-full transition-all ${
-                          percentualUsado > 90 ? 'bg-red-500' : percentualUsado > 70 ? 'bg-orange-500' : 'bg-green-500'
-                        }`}
-                        style={{ width: `${Math.min(percentualUsado, 100)}%` }}
-                      />
-                    </div>
-                    <div className="text-xs text-slate-500 mt-1">{percentualUsado.toFixed(0)}% utilizado</div>
-                  </div>
-                )
-              })}
-            </div>
+                })}
+              </div>
+            )}
           </div>
 
           {/* Seletor de tanque */}
           <div>
             <h3 className="text-sm font-semibold text-slate-900 mb-3">Escolher tanque para esta producao</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-              {tanques.map((tanque) => (
-                <button
-                  key={tanque.id}
-                  onClick={() => setTanqueSelecionado(tanque.id)}
-                  className="p-4 rounded-lg border-2 border-slate-200 bg-white hover:border-blue-400 hover:shadow-md transition-all text-left"
-                >
-                  <div className="font-semibold text-slate-900">{tanque.nome}</div>
-                  <div className="text-sm text-slate-600 mt-2">
-                    {tanque.volume_liters.toLocaleString('pt-BR')}L
-                  </div>
-                </button>
-              ))}
-            </div>
+            {tanques.length === 0 ? (
+              <p className="text-sm text-amber-600">Nenhum tanque cadastrado. Cadastre tanques na aba Cadastros.</p>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                {tanques.map((tanque) => (
+                  <button
+                    key={tanque.id}
+                    onClick={() => setTanqueSelecionado(tanque.id)}
+                    className="p-4 rounded-lg border-2 border-slate-200 bg-white hover:border-blue-400 hover:shadow-md transition-all text-left"
+                  >
+                    <div className="font-semibold text-slate-900">{tanque.nome}</div>
+                    <div className="text-sm text-slate-600 mt-2">
+                      {tanque.volume_liters.toLocaleString('pt-BR')}L
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
         </div>
@@ -407,37 +419,91 @@ export function TanqueSelector({
 
             <div>
               <label className="text-xs font-semibold text-slate-600 block mb-1">Turno</label>
-              <select
-                value={turnoId}
-                onChange={(e) => setTurnoId(e.target.value)}
-                className="w-full text-sm border border-slate-300 rounded-md px-3 py-2 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                {TURNOS_PADRAO.map((turno) => (
-                  <option key={turno.id} value={turno.id}>
-                    {turno.nome} ({turno.horaInicio}h - {turno.horaFim}h)
-                  </option>
-                ))}
-              </select>
+              {turnos.length === 0 ? (
+                <p className="text-sm text-amber-600 py-2">Nenhum turno cadastrado.</p>
+              ) : (
+                <select
+                  value={turnoId}
+                  onChange={(e) => setTurnoId(e.target.value)}
+                  className="w-full text-sm border border-slate-300 rounded-md px-3 py-2 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  {turnos.map((turno) => (
+                    <option key={turno.id} value={turno.id}>
+                      {turno.nome} ({minutesToTime(turno.hora_inicio)} – {minutesToTime(turno.hora_fim)})
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
           </div>
 
-          {/* Disponibilidade */}
-          <div className="bg-white rounded-lg p-3 border border-slate-200">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-semibold text-slate-900">Disponibilidade</span>
-              <span className="text-sm font-bold text-slate-600">
-                {((utilizacaoTanque.litros + litrosSelecionados) / (tanqueObj?.volume_liters ?? 1) * 100).toFixed(0)}%
-                {' '} / {(capacidadeDisponivel - litrosSelecionados).toLocaleString('pt-BR')}L livres
-              </span>
-            </div>
-            <TanqueProgressBar
-              litrosSelecionados={utilizacaoTanque.litros + litrosSelecionados}
-              capacidadeTanque={tanqueObj?.volume_liters ?? 0}
-            />
-            <div className="mt-2 flex items-center justify-between text-xs text-slate-600">
-              <span>Ja agendado: {utilizacaoTanque.litros.toLocaleString('pt-BR')}L</span>
-              <span>Selecionado agora: {litrosSelecionados.toLocaleString('pt-BR')}L</span>
-            </div>
+          {/* Disponibilidade — tempo é o fator primário */}
+          <div className="bg-white rounded-lg p-3 border border-slate-200 space-y-2">
+            {duracaoTurnoMin > 0 ? (
+              <>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-semibold text-slate-900">Tempo disponível no turno</span>
+                  <span className={`text-sm font-bold ${tempoInsuficiente ? 'text-red-600' : minutosDisponiveis === 0 ? 'text-red-600' : 'text-slate-700'}`}>
+                    {(() => {
+                      const h = Math.floor(minutosDisponiveis / 60)
+                      const m = minutosDisponiveis % 60
+                      return h > 0 ? `${h}h${m > 0 ? String(m).padStart(2, '0') : ''}` : `${m}min`
+                    })()} livres de {(() => {
+                      const h = Math.floor(duracaoTurnoMin / 60)
+                      const m = duracaoTurnoMin % 60
+                      return h > 0 ? `${h}h${m > 0 ? String(m).padStart(2, '0') : ''}` : `${m}min`
+                    })()}
+                  </span>
+                </div>
+                <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden">
+                  <div
+                    className={`h-full transition-all ${
+                      utilizacaoTanque.percentualTempo > 90 ? 'bg-red-400' : utilizacaoTanque.percentualTempo > 70 ? 'bg-orange-400' : 'bg-blue-400'
+                    }`}
+                    style={{ width: `${Math.min(utilizacaoTanque.percentualTempo, 100)}%` }}
+                  />
+                </div>
+                <div className="flex items-center justify-between text-xs text-slate-500">
+                  <span>Já usado: {utilizacaoTanque.minutos}min</span>
+                  {tempoProducaoMin !== null && tempoProducaoMin > 0 && (
+                    <span className={tempoInsuficiente ? 'text-red-600 font-semibold' : 'text-slate-500'}>
+                      Esta ordem: {totalDuracaoNovaOrdem}min
+                    </span>
+                  )}
+                </div>
+                {tempoInsuficiente && (
+                  <div className="text-xs text-red-600 font-semibold bg-red-50 rounded px-2 py-1">
+                    Tempo insuficiente: {totalDuracaoNovaOrdem}min necessários, apenas {minutosDisponiveis}min disponíveis
+                  </div>
+                )}
+                <div className="pt-1 border-t border-slate-100">
+                  <div className="flex items-center justify-between text-xs text-slate-500 mb-1">
+                    <span>Volume selecionado</span>
+                    <span className={volumeExcede ? 'text-red-600 font-semibold' : ''}>
+                      {litrosSelecionados.toLocaleString('pt-BR')}L / {(tanqueObj?.volume_liters ?? 0).toLocaleString('pt-BR')}L
+                      {volumeExcede && ' — excede capacidade'}
+                    </span>
+                  </div>
+                  <TanqueProgressBar
+                    litrosSelecionados={utilizacaoTanque.litros + litrosSelecionados}
+                    capacidadeTanque={tanqueObj?.volume_liters ?? 0}
+                  />
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-semibold text-slate-900">Volume disponível</span>
+                  <span className="text-sm font-bold text-slate-600">
+                    {(capacidadeDisponivel - litrosSelecionados).toLocaleString('pt-BR')}L livres
+                  </span>
+                </div>
+                <TanqueProgressBar
+                  litrosSelecionados={utilizacaoTanque.litros + litrosSelecionados}
+                  capacidadeTanque={tanqueObj?.volume_liters ?? 0}
+                />
+              </>
+            )}
           </div>
         </div>
 
@@ -449,7 +515,7 @@ export function TanqueSelector({
               <input
                 type="checkbox"
                 checked={todosSelecionados}
-                disabled={itensDaCategoria.length === 0 || capacidadeDisponivel <= 0}
+                disabled={itensDaCategoria.length === 0}
                 onChange={(event) => handleSelecionarTodos(event.target.checked)}
                 className="accent-blue-600"
               />
@@ -480,7 +546,7 @@ export function TanqueSelector({
                         key={itemKey(item)}
                         item={item}
                         selecionado={selecionados.has(itemKey(item))}
-                        bloqueado={litrosSelecionados >= (tanqueObj?.volume_liters ?? 0) && !selecionados.has(itemKey(item))}
+                        bloqueado={false}
                         onChange={handleChange}
                       />
                     ))}
@@ -498,7 +564,7 @@ export function TanqueSelector({
           </div>
         )}
 
-        {/* Nome + Botão */}
+        {/* Nome + Tempo + Botão */}
         {selecionados.size > 0 && (
           <div className="border-t border-slate-200 bg-slate-50 px-6 py-4 space-y-3">
             <input
@@ -508,6 +574,45 @@ export function TanqueSelector({
               onChange={(e) => setNomeOrdem(e.target.value)}
               className="w-full text-sm border border-slate-300 rounded-md px-3 py-2 bg-white text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-semibold text-slate-600 block mb-1">
+                  Tempo de produção (min) <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  placeholder="ex: 120"
+                  value={tempoProducaoMin ?? ''}
+                  onChange={(e) => setTempoProducaoMin(e.target.value === '' ? null : Number(e.target.value))}
+                  className="w-full text-sm border border-slate-300 rounded-md px-3 py-2 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-slate-600 block mb-1">
+                  Tempo de limpeza (min)
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  placeholder="ex: 30"
+                  value={tempoLimpezaMin}
+                  onChange={(e) => setTempoLimpezaMin(e.target.value === '' ? 0 : Number(e.target.value))}
+                  className="w-full text-sm border border-slate-300 rounded-md px-3 py-2 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+            {tempoProducaoMin !== null && tempoProducaoMin > 0 && (
+              <div className="text-xs text-slate-600">
+                Total de uso do turno:{' '}
+                <span className={`font-semibold ${tempoInsuficiente ? 'text-red-600' : 'text-slate-800'}`}>
+                  {totalDuracaoNovaOrdem}min
+                </span>
+                {duracaoTurnoMin > 0 && (
+                  <span className="text-slate-500"> de {duracaoTurnoMin}min do turno</span>
+                )}
+              </div>
+            )}
             <button
               onClick={handleCriarOrdem}
               disabled={criando || !podeAgendar || !nomeOrdem.trim()}
@@ -516,9 +621,11 @@ export function TanqueSelector({
               <Plus size={16} />
               {criando
                 ? 'Criando...'
-                : !podeAgendar
-                  ? `Sem capacidade (precisa ${(litrosSelecionados - capacidadeDisponivel).toLocaleString('pt-BR')}L)`
-                  : `Criar Ordem — ${litrosSelecionados.toLocaleString('pt-BR')}L`}
+                : tempoInsuficiente
+                  ? `Tempo insuficiente (${totalDuracaoNovaOrdem}min > ${minutosDisponiveis}min disponíveis)`
+                  : volumeExcede
+                    ? `Volume excede o tanque (${litrosSelecionados.toLocaleString('pt-BR')}L > ${(tanqueObj?.volume_liters ?? 0).toLocaleString('pt-BR')}L)`
+                    : `Criar no Backlog — ${litrosSelecionados.toLocaleString('pt-BR')}L · ${totalDuracaoNovaOrdem > 0 ? totalDuracaoNovaOrdem + 'min' : 'informe o tempo'}`}
             </button>
           </div>
         )}

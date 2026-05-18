@@ -4,34 +4,28 @@ import { useState, useMemo } from 'react'
 import { ChevronLeft, Plus } from 'lucide-react'
 import { format, parseISO, addDays } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import type { ItemDemanda, Tanque } from '@/types'
+import type { ItemDemanda, Tanque, Turno } from '@/types'
 import { TanqueProgressBar } from './TanqueProgressBar'
 import { ItemPedidoRow } from './ItemPedidoRow'
-
-type Turno = {
-  id: string
-  nome: string
-  horaInicio: number
-  horaFim: number
-}
 
 type Props = {
   dataSelecionada: string
   categoriaSelecionada: string
   itensIniciais: ItemDemanda[]
   tanques: Tanque[]
+  turnos: Turno[]
   onBack: () => void
   onOrdemCriada: () => void
 }
 
-const TURNOS_PADRAO: Turno[] = [
-  { id: 'manha', nome: 'Manhã', horaInicio: 6, horaFim: 14 },
-  { id: 'tarde', nome: 'Tarde', horaInicio: 14, horaFim: 22 },
-  { id: 'noite', nome: 'Noite', horaInicio: 22, horaFim: 6 },
-]
-
 type ItemComProxDias = ItemDemanda & {
   diasAfrente: number
+}
+
+function minutesToTime(minutes: number) {
+  const h = Math.floor(minutes / 60)
+  const m = minutes % 60
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
 }
 
 export function CategoriaSelector({
@@ -39,6 +33,7 @@ export function CategoriaSelector({
   categoriaSelecionada,
   itensIniciais,
   tanques,
+  turnos,
   onBack,
   onOrdemCriada,
 }: Props) {
@@ -46,12 +41,27 @@ export function CategoriaSelector({
   const [selecionados, setSelecionados] = useState<Set<string>>(new Set())
   const [nomeOrdem, setNomeOrdem] = useState<string>('')
   const [diaExecucao, setDiaExecucao] = useState<string>(dataSelecionada)
-  const [turnoId, setTurnoId] = useState<string>('manha')
+  const [turnoId, setTurnoId] = useState<string>(turnos[0]?.id ?? '')
+  const [tempoProducaoMin, setTempoProducaoMin] = useState<number | null>(null)
+  const [tempoLimpezaMin, setTempoLimpezaMin] = useState<number>(0)
   const [criando, setCriando] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
 
   const tanqueSelecionado = tanques.find((t) => t.id === tanqueId)
   const capacidade = tanqueSelecionado?.volume_liters ?? 0
+
+  const duracaoTurnoMin = useMemo(() => {
+    const turno = turnos.find((t) => t.id === turnoId)
+    if (!turno) return 0
+    return Math.max(0, turno.hora_fim - turno.hora_inicio)
+  }, [turnos, turnoId])
+
+  const totalDuracaoNovaOrdem = (tempoProducaoMin ?? 0) + tempoLimpezaMin
+  const tempoInsuficiente = tempoProducaoMin !== null && tempoProducaoMin > 0 && duracaoTurnoMin > 0 && totalDuracaoNovaOrdem > duracaoTurnoMin
+
+  function itemKey(item: ItemDemanda) {
+    return `${item.numero_pedido}::${item.produto_descricao}::${item.data_prevista?.slice(0, 10) ?? ''}`
+  }
 
   const litrosSelecionados = itensIniciais
     .filter(
@@ -62,10 +72,6 @@ export function CategoriaSelector({
     .reduce((acc, item) => acc + item.total_litros, 0)
 
   const cheio = capacidade > 0 && litrosSelecionados >= capacidade
-
-  function itemKey(item: ItemDemanda) {
-    return `${item.numero_pedido}::${item.produto_descricao}::${item.data_prevista?.slice(0, 10) ?? ''}`
-  }
 
   function handleChange(item: ItemDemanda, checked: boolean) {
     setSelecionados((prev) => {
@@ -100,6 +106,14 @@ export function CategoriaSelector({
 
   async function handleCriarOrdem() {
     if (selecionados.size === 0 || !tanqueId || !nomeOrdem.trim() || !diaExecucao) return
+    if (tempoProducaoMin === null || tempoProducaoMin <= 0) {
+      setErro('Informe o tempo de produção')
+      return
+    }
+    if (tempoInsuficiente) {
+      setErro(`Tempo insuficiente: ${totalDuracaoNovaOrdem}min necessários, ${duracaoTurnoMin}min no turno`)
+      return
+    }
 
     const itensSelecionados = itensIniciais.filter(
       (item) =>
@@ -112,17 +126,10 @@ export function CategoriaSelector({
       .filter(Boolean)
       .sort()[0] ?? ''
 
-    const turno = TURNOS_PADRAO.find((t) => t.id === turnoId)
-    if (!turno) {
-      setErro('Turno inválido')
-      return
-    }
-
     setCriando(true)
     setErro(null)
 
     try {
-      // 1. Criar ordem
       const resOrdem = await fetch('/api/demanda/ordens', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -132,6 +139,8 @@ export function CategoriaSelector({
           data_prevista: dataPrevista,
           tank_id: tanqueId,
           total_litros: litrosSelecionados,
+          production_time_minutes: tempoProducaoMin,
+          cleaning_time_minutes: tempoLimpezaMin,
           itens: itensSelecionados.map((item) => ({
             numero_pedido: item.numero_pedido,
             produto_descricao: item.produto_descricao,
@@ -147,31 +156,12 @@ export function CategoriaSelector({
         return
       }
 
-      const ordem = await resOrdem.json()
-
-      // 2. Agendar produção
-      const resAgendamento = await fetch('/api/producao/agendamentos', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ordem_id: ordem.id,
-          tank_id: tanqueId,
-          turno_id: turnoId,
-          turno_nome: turno.nome,
-          data_agendamento: diaExecucao,
-        }),
-      })
-
-      if (!resAgendamento.ok) {
-        const json = await resAgendamento.json()
-        setErro(`Ordem criada mas erro ao agendar: ${json.error}`)
-        return
-      }
-
       setSelecionados(new Set())
       setNomeOrdem('')
+      setTempoProducaoMin(null)
+      setTempoLimpezaMin(0)
       setDiaExecucao(dataSelecionada)
-      setTurnoId('manha')
+      setTurnoId(turnos[0]?.id ?? '')
       onOrdemCriada()
     } catch {
       setErro('Erro de rede ao criar ordem')
@@ -316,25 +306,66 @@ export function CategoriaSelector({
                   onChange={(e) => setTurnoId(e.target.value)}
                   className="w-full text-sm border border-slate-300 rounded-md px-3 py-2 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
-                  {TURNOS_PADRAO.map((turno) => (
+                  {turnos.map((turno) => (
                     <option key={turno.id} value={turno.id}>
-                      {turno.nome} ({turno.horaInicio}h - {turno.horaFim}h)
+                      {turno.nome} ({minutesToTime(turno.hora_inicio)} – {minutesToTime(turno.hora_fim)})
                     </option>
                   ))}
                 </select>
               </div>
             </div>
 
+            {/* Tempo de produção e limpeza */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-semibold text-slate-600 block mb-1">
+                  Tempo de produção (min) <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  placeholder="ex: 120"
+                  value={tempoProducaoMin ?? ''}
+                  onChange={(e) => setTempoProducaoMin(e.target.value === '' ? null : Number(e.target.value))}
+                  className="w-full text-sm border border-slate-300 rounded-md px-3 py-2 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-slate-600 block mb-1">
+                  Tempo de limpeza (min)
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  placeholder="ex: 30"
+                  value={tempoLimpezaMin}
+                  onChange={(e) => setTempoLimpezaMin(e.target.value === '' ? 0 : Number(e.target.value))}
+                  className="w-full text-sm border border-slate-300 rounded-md px-3 py-2 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+            {tempoProducaoMin !== null && tempoProducaoMin > 0 && (
+              <div className={`text-xs ${tempoInsuficiente ? 'text-red-600 font-semibold' : 'text-slate-600'}`}>
+                Total de uso do turno: {totalDuracaoNovaOrdem}min
+                {duracaoTurnoMin > 0 && (
+                  <span className="text-slate-500"> de {duracaoTurnoMin}min disponíveis</span>
+                )}
+                {tempoInsuficiente && ' — tempo insuficiente'}
+              </div>
+            )}
+
             {/* Botão */}
             <button
               onClick={handleCriarOrdem}
-              disabled={criando || !nomeOrdem.trim() || !diaExecucao}
+              disabled={criando || !nomeOrdem.trim() || !diaExecucao || tempoProducaoMin === null || tempoProducaoMin <= 0 || tempoInsuficiente}
               className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-lg transition-colors"
             >
               <Plus size={16} />
               {criando
                 ? 'Criando...'
-                : `Criar Ordem — ${litrosSelecionados.toLocaleString('pt-BR')}L`}
+                : tempoInsuficiente
+                  ? `Tempo insuficiente (${totalDuracaoNovaOrdem}min > ${duracaoTurnoMin}min)`
+                  : `Criar no Backlog — ${litrosSelecionados.toLocaleString('pt-BR')}L`}
             </button>
           </div>
         )}

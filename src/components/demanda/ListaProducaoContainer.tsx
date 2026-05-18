@@ -1,0 +1,282 @@
+'use client'
+
+import { useEffect, useState, useMemo, useCallback } from 'react'
+import {
+  Search, Clock, Calendar, Zap, CheckCircle2, XCircle,
+  RefreshCw, SlidersHorizontal, ArrowUpDown, Filter, EyeOff,
+} from 'lucide-react'
+import type { OrdemHistorico, PlanningStatus } from '@/types'
+import { OrdemListaCard } from './OrdemListaCard'
+
+type Ordenacao = 'recente' | 'antigo' | 'status' | 'nome'
+
+const METRICAS = [
+  { status: 'BACKLOG' as PlanningStatus,       label: 'Backlog',      cor: 'bg-slate-50  border-slate-200  text-slate-600',  icone: Clock },
+  { status: 'SCHEDULED' as PlanningStatus,     label: 'Agendadas',    cor: 'bg-blue-50   border-blue-200   text-blue-700',   icone: Calendar },
+  { status: 'IN_PRODUCTION' as PlanningStatus, label: 'Em Produção',  cor: 'bg-amber-50  border-amber-200  text-amber-700',  icone: Zap },
+  { status: 'COMPLETED' as PlanningStatus,     label: 'Concluídas',   cor: 'bg-emerald-50 border-emerald-200 text-emerald-700', icone: CheckCircle2 },
+  { status: 'CANCELED' as PlanningStatus,      label: 'Canceladas',   cor: 'bg-red-50    border-red-200    text-red-600',    icone: XCircle },
+]
+
+const STATUS_LABELS: Record<PlanningStatus, string> = {
+  BACKLOG: 'Backlog', SCHEDULED: 'Agendadas', IN_PRODUCTION: 'Em Produção',
+  COMPLETED: 'Concluídas', CANCELED: 'Canceladas',
+}
+
+const STATUS_ATIVOS: PlanningStatus[] = ['BACKLOG', 'SCHEDULED', 'IN_PRODUCTION']
+
+export function ListaProducaoContainer() {
+  const [ordens, setOrdens] = useState<OrdemHistorico[]>([])
+  const [carregando, setCarregando] = useState(true)
+  const [busca, setBusca] = useState('')
+  const [filtroStatus, setFiltroStatus] = useState<PlanningStatus[]>([])
+  const [ordenacao, setOrdenacao] = useState<Ordenacao>('status')
+  const [mostrarInativos, setMostrarInativos] = useState(false)
+
+  const carregarOrdens = useCallback(async () => {
+    setCarregando(true)
+    try {
+      const res = await fetch('/api/historico/producoes')
+      if (res.ok) {
+        const data = await res.json()
+        setOrdens(Array.isArray(data) ? data : [])
+      }
+    } catch {
+      // silencioso
+    } finally {
+      setCarregando(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    carregarOrdens()
+  }, [carregarOrdens])
+
+  const contagens = useMemo(() => {
+    const map: Record<string, number> = {}
+    for (const o of ordens) {
+      const s = o.planning_status ?? 'BACKLOG'
+      map[s] = (map[s] ?? 0) + 1
+    }
+    return map
+  }, [ordens])
+
+  const toggleFiltroStatus = (status: PlanningStatus) => {
+    setFiltroStatus((prev) =>
+      prev.includes(status) ? prev.filter((s) => s !== status) : [...prev, status]
+    )
+  }
+
+  const ordensFiltradas = useMemo(() => {
+    let lista = [...ordens]
+
+    // Esconder concluídas e canceladas por padrão
+    if (!mostrarInativos && filtroStatus.length === 0) {
+      lista = lista.filter((o) => STATUS_ATIVOS.includes((o.planning_status ?? 'BACKLOG') as PlanningStatus))
+    } else if (filtroStatus.length > 0) {
+      lista = lista.filter((o) => filtroStatus.includes((o.planning_status ?? 'BACKLOG') as PlanningStatus))
+    }
+
+    if (busca.trim()) {
+      const s = busca.toLowerCase()
+      lista = lista.filter((o) => {
+        const nome = (o.numero_externo ?? '').toLowerCase()
+        const cat = (o.tanque ?? '').toLowerCase()
+        const pedidos = (o.pedidos_vinculados ?? []).some(
+          (p) =>
+            (p.numero_pedido ?? '').toLowerCase().includes(s) ||
+            (p.produto_descricao ?? '').toLowerCase().includes(s)
+        )
+        return nome.includes(s) || cat.includes(s) || pedidos
+      })
+    }
+
+    lista.sort((a, b) => {
+      switch (ordenacao) {
+        case 'recente': return (b.sincronizado_em ?? '').localeCompare(a.sincronizado_em ?? '')
+        case 'antigo':  return (a.sincronizado_em ?? '').localeCompare(b.sincronizado_em ?? '')
+        case 'nome':    return (a.numero_externo ?? '').localeCompare(b.numero_externo ?? '')
+        case 'status': {
+          const ordem: Record<string, number> = { IN_PRODUCTION: 0, SCHEDULED: 1, BACKLOG: 2, COMPLETED: 3, CANCELED: 4 }
+          return (ordem[a.planning_status ?? 'BACKLOG'] ?? 5) - (ordem[b.planning_status ?? 'BACKLOG'] ?? 5)
+        }
+        default: return 0
+      }
+    })
+
+    return lista
+  }, [ordens, filtroStatus, busca, ordenacao, mostrarInativos])
+
+  function handleAtualizado(ordemAtualizada: Partial<OrdemHistorico> & { id: string }) {
+    setOrdens((prev) =>
+      prev.map((o) => (o.id === ordemAtualizada.id ? { ...o, ...ordemAtualizada } : o))
+    )
+  }
+
+  function handleCancelado(id: string) {
+    setOrdens((prev) =>
+      prev.map((o) => (o.id === id ? { ...o, planning_status: 'CANCELED' } : o))
+    )
+  }
+
+  return (
+    <div className="space-y-5">
+      {/* Cabeçalho */}
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h2 className="text-xl font-bold text-slate-900">Lista de Produção</h2>
+          <p className="text-sm text-slate-500 mt-0.5">Gerencie e edite as ordens do pipeline</p>
+        </div>
+        <button
+          onClick={carregarOrdens}
+          disabled={carregando}
+          className="flex items-center gap-2 text-sm text-slate-600 hover:text-slate-800 border border-slate-200 bg-white px-3 py-1.5 rounded-lg hover:bg-slate-50 transition-colors"
+        >
+          <RefreshCw size={14} className={carregando ? 'animate-spin' : ''} />
+          Atualizar
+        </button>
+      </div>
+
+      {/* Cards de métricas */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+        {METRICAS.map(({ status, label, cor, icone: Icone }) => {
+          const count = contagens[status] ?? 0
+          const ativo = filtroStatus.includes(status)
+          return (
+            <button
+              key={status}
+              onClick={() => toggleFiltroStatus(status)}
+              className={`rounded-xl border p-3 text-left transition-all ${cor} ${
+                ativo ? 'ring-2 ring-offset-1 ring-blue-400 shadow-md' : 'hover:shadow-sm'
+              }`}
+            >
+              <Icone size={18} className="mb-1 opacity-70" />
+              <div className="text-2xl font-bold">{count}</div>
+              <div className="text-xs font-medium mt-0.5">{label}</div>
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Controles */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        {/* Busca */}
+        <div className="relative flex-1">
+          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input
+            type="text"
+            placeholder="Buscar por nome, categoria ou pedido..."
+            value={busca}
+            onChange={(e) => setBusca(e.target.value)}
+            className="w-full pl-9 pr-4 py-2 text-sm border border-slate-200 rounded-lg bg-white text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+
+        {/* Chips de filtro */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <Filter size={14} className="text-slate-400 shrink-0" />
+          {filtroStatus.length > 0 && (
+            <div className="flex gap-1 flex-wrap">
+              {filtroStatus.map((s) => (
+                <button
+                  key={s}
+                  onClick={() => toggleFiltroStatus(s)}
+                  className="text-xs bg-blue-600 text-white px-2 py-0.5 rounded-full flex items-center gap-1 hover:bg-blue-700"
+                >
+                  {STATUS_LABELS[s]}
+                  <XCircle size={10} />
+                </button>
+              ))}
+            </div>
+          )}
+          {filtroStatus.length === 0 && (
+            <span className="text-xs text-slate-400">Clique nas métricas para filtrar</span>
+          )}
+        </div>
+
+        {/* Ordenação */}
+        <div className="flex items-center gap-1">
+          <ArrowUpDown size={14} className="text-slate-400 shrink-0" />
+          <select
+            value={ordenacao}
+            onChange={(e) => setOrdenacao(e.target.value as Ordenacao)}
+            className="text-sm border border-slate-200 rounded-lg px-2 py-2 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="status">Por status</option>
+            <option value="recente">Mais recentes</option>
+            <option value="antigo">Mais antigas</option>
+            <option value="nome">Por nome</option>
+          </select>
+        </div>
+      </div>
+
+      {/* Contagem + toggle inativos */}
+      <div className="flex items-center justify-between gap-2 text-sm text-slate-500">
+        <div className="flex items-center gap-2">
+          <SlidersHorizontal size={14} />
+          {carregando
+            ? 'Carregando...'
+            : `${ordensFiltradas.length} ordem${ordensFiltradas.length !== 1 ? 's' : ''}`}
+          {(busca || filtroStatus.length > 0) && (
+            <button
+              onClick={() => { setBusca(''); setFiltroStatus([]) }}
+              className="text-xs text-blue-600 hover:text-blue-700 underline"
+            >
+              Limpar filtros
+            </button>
+          )}
+        </div>
+
+        {filtroStatus.length === 0 && (
+          <button
+            onClick={() => setMostrarInativos(!mostrarInativos)}
+            className={`flex items-center gap-1.5 text-xs transition-colors ${
+              mostrarInativos ? 'text-blue-600 font-semibold' : 'text-slate-400 hover:text-slate-600'
+            }`}
+          >
+            <EyeOff size={13} />
+            {mostrarInativos ? 'Ocultar concluídas/canceladas' : 'Mostrar todas'}
+          </button>
+        )}
+      </div>
+
+      {/* Lista */}
+      {carregando ? (
+        <div className="space-y-3">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="bg-white rounded-xl border border-slate-200 p-4 animate-pulse">
+              <div className="flex gap-3">
+                <div className="w-2.5 h-2.5 rounded-full bg-slate-200 mt-1" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-4 bg-slate-200 rounded w-1/3" />
+                  <div className="h-3 bg-slate-100 rounded w-2/3" />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : ordensFiltradas.length === 0 ? (
+        <div className="bg-white rounded-xl border border-slate-200 p-10 text-center">
+          <CheckCircle2 size={40} className="mx-auto text-slate-200 mb-3" />
+          <p className="font-semibold text-slate-500">Nenhuma ordem encontrada</p>
+          <p className="text-sm text-slate-400 mt-1">
+            {busca || filtroStatus.length > 0
+              ? 'Tente ajustar os filtros'
+              : 'Crie uma demanda para começar'}
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {ordensFiltradas.map((ordem) => (
+            <OrdemListaCard
+              key={ordem.id}
+              ordem={ordem}
+              onAtualizado={handleAtualizado}
+              onCancelado={handleCancelado}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}

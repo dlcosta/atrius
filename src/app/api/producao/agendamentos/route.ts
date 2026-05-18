@@ -92,6 +92,16 @@ export async function POST(req: NextRequest) {
     )
   }
 
+  // Registrar log de agendamento
+  await supabase.from('ordens_audit_log').insert({
+    ordem_id,
+    agendamento_id: agendamento.id,
+    operacao: 'AGENDADO',
+    descricao: `Agendado para ${turno_nome} em ${data_agendamento} — Tanque ${tank_id}`,
+    dados_antes: { planning_status: 'BACKLOG' },
+    dados_depois: { planning_status: 'SCHEDULED', tank_id, turno_id, turno_nome, data_agendamento },
+  })
+
   return NextResponse.json(agendamento, { status: 201 })
 }
 
@@ -149,6 +159,15 @@ export async function DELETE(req: NextRequest) {
       { status: 500 }
     )
   }
+
+  // Registrar log de cancelamento
+  await supabase.from('ordens_audit_log').insert({
+    ordem_id: agendamento.ordem_id,
+    operacao: 'CANCELADO',
+    descricao: 'Agendamento removido — ordem retornou ao backlog',
+    dados_antes: { planning_status: agendamento.status, agendamento_id: agendamentoId },
+    dados_depois: { planning_status: 'BACKLOG' },
+  })
 
   return NextResponse.json({ success: true })
 }

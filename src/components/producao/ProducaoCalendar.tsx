@@ -4,18 +4,12 @@ import { useState, useMemo } from 'react'
 import { format, addDays, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { ChevronLeft, ChevronRight, Calendar, Clock } from 'lucide-react'
-import type { Ordem, Tanque } from '@/types'
+import type { Ordem, Tanque, Turno } from '@/types'
 
 type Props = {
   ordens: Ordem[]
   tanques: Tanque[]
-}
-
-type Turno = {
-  id: string
-  nome: string
-  horaInicio: number
-  horaFim: number
+  turnos?: Turno[]
 }
 
 type DiaProducao = {
@@ -32,6 +26,9 @@ type TanqueProducao = {
   tanque: Tanque
   ordens: Ordem[]
   utilizacao: number
+  utilizacaoTempo: number
+  duracaoTurnoMin: number
+  minutosUsados: number
 }
 
 type Agendamento = {
@@ -39,14 +36,14 @@ type Agendamento = {
   tanqueId: string
 }
 
-const TURNOS_PADRAO: Turno[] = [
-  { id: 'manha', nome: 'Manhã', horaInicio: 6, horaFim: 14 },
-  { id: 'tarde', nome: 'Tarde', horaInicio: 14, horaFim: 22 },
-]
+function minutesToTime(minutes: number) {
+  const h = Math.floor(minutes / 60)
+  const m = minutes % 60
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+}
 
-export function ProducaoCalendar({ ordens, tanques }: Props) {
+export function ProducaoCalendar({ ordens, tanques, turnos = [] }: Props) {
   const [diaBase, setDiaBase] = useState(new Date())
-  const [turnos, setTurnos] = useState<Turno[]>(TURNOS_PADRAO)
   const [ordemSelecionada, setOrdemSelecionada] = useState<Ordem | null>(null)
   const [agendamentos, setAgendamentos] = useState<Record<string, Agendamento>>({})
 
@@ -64,31 +61,39 @@ export function ProducaoCalendar({ ordens, tanques }: Props) {
   }, [diaBase])
 
   // Construir calendário com agendamentos
-  const calendario = useMemo(() => {
+  const calendario = useMemo((): DiaProducao[] => {
     return dias.map((data) => ({
       data,
-      turnos: turnos.map((turno) => ({
-        turno,
-        tanques: tanques.map((tanque) => {
-          const ordensDoTanque = ordens.filter((o) => {
-            const agendamento = agendamentos[o.id]
-            return (
-              agendamento &&
-              agendamento.turnoId === turno.id &&
-              agendamento.tanqueId === tanque.id
-            )
-          })
+      turnos: turnos.map((turno) => {
+        const duracaoTurnoMin = Math.max(0, turno.hora_fim - turno.hora_inicio)
+        return {
+          turno,
+          tanques: tanques.map((tanque) => {
+            const ordensDoTanque = ordens.filter((o) => {
+              const agendamento = agendamentos[o.id]
+              return (
+                agendamento &&
+                agendamento.turnoId === turno.id &&
+                agendamento.tanqueId === tanque.id
+              )
+            })
 
-          const utilizacao = ordensDoTanque.reduce((acc, o) => acc + (o.quantidade ?? 0), 0)
-          const percentual = tanque.volume_liters > 0 ? (utilizacao / tanque.volume_liters) * 100 : 0
+            const litersUsados = ordensDoTanque.reduce((acc, o) => acc + (o.quantidade ?? 0), 0)
+            const minutosUsados = ordensDoTanque.reduce((acc, o) => acc + (o.total_duration_minutes ?? 0), 0)
+            const percentualVolume = tanque.volume_liters > 0 ? (litersUsados / tanque.volume_liters) * 100 : 0
+            const percentualTempo = duracaoTurnoMin > 0 ? (minutosUsados / duracaoTurnoMin) * 100 : 0
 
-          return {
-            tanque,
-            ordens: ordensDoTanque,
-            utilizacao: percentual,
-          }
-        }),
-      })),
+            return {
+              tanque,
+              ordens: ordensDoTanque,
+              utilizacao: percentualVolume,
+              utilizacaoTempo: percentualTempo,
+              duracaoTurnoMin,
+              minutosUsados,
+            }
+          }),
+        }
+      }),
     }))
   }, [dias, turnos, tanques, ordens, agendamentos])
 
@@ -157,22 +162,32 @@ export function ProducaoCalendar({ ordens, tanques }: Props) {
   function handleTanqueClick(data: string, turnoId: string, tanqueId: string) {
     if (!ordemSelecionada) return
 
-    // Encontrar tanque para validar capacidade
     const tanque = tanques.find((t) => t.id === tanqueId)
     if (!tanque) return
 
-    // Calcular utilização atual do tanque neste turno
+    const turno = turnos.find((t) => t.id === turnoId)
+    const duracaoTurnoMin = turno ? Math.max(0, turno.hora_fim - turno.hora_inicio) : 0
+
     const ordensDoTanque = ordens.filter((o) => {
       const agendamento = agendamentos[o.id]
       return agendamento && agendamento.turnoId === turnoId && agendamento.tanqueId === tanqueId
     })
 
-    const utilizacaoAtual = ordensDoTanque.reduce((acc, o) => acc + (o.quantidade ?? 0), 0)
-    const novaUtilizacao = utilizacaoAtual + (ordemSelecionada.quantidade ?? 0)
+    const litersAtual = ordensDoTanque.reduce((acc, o) => acc + (o.quantidade ?? 0), 0)
+    const minutosAtual = ordensDoTanque.reduce((acc, o) => acc + (o.total_duration_minutes ?? 0), 0)
+    const novoLitros = litersAtual + (ordemSelecionada.quantidade ?? 0)
+    const novosMinutos = minutosAtual + (ordemSelecionada.total_duration_minutes ?? 0)
 
-    if (novaUtilizacao > tanque.volume_liters) {
+    if (novoLitros > tanque.volume_liters) {
       alert(
-        `❌ Capacidade insuficiente!\n\n${tanque.nome}: ${tanque.volume_liters.toLocaleString('pt-BR')}L\n\nAtual: ${utilizacaoAtual.toLocaleString('pt-BR')}L\nNova ordem: ${(ordemSelecionada.quantidade ?? 0).toLocaleString('pt-BR')}L\nTotal: ${novaUtilizacao.toLocaleString('pt-BR')}L`
+        `❌ Volume insuficiente!\n\n${tanque.nome}: ${tanque.volume_liters.toLocaleString('pt-BR')}L\nAtual: ${litersAtual.toLocaleString('pt-BR')}L\nNova ordem: ${(ordemSelecionada.quantidade ?? 0).toLocaleString('pt-BR')}L`
+      )
+      return
+    }
+
+    if (duracaoTurnoMin > 0 && novosMinutos > duracaoTurnoMin) {
+      alert(
+        `❌ Tempo insuficiente no turno!\n\nTurno: ${duracaoTurnoMin}min disponíveis\nJá usado: ${minutosAtual}min\nNova ordem: ${(ordemSelecionada.total_duration_minutes ?? 0)}min\nTotal: ${novosMinutos}min`
       )
       return
     }
@@ -206,6 +221,12 @@ export function ProducaoCalendar({ ordens, tanques }: Props) {
           </button>
         </div>
       </div>
+
+      {turnos.length === 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-700">
+          Nenhum turno cadastrado. Vá até a aba <strong>Cadastros</strong> para criar os turnos de produção.
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         {/* Coluna esquerda: Ordens BACKLOG */}
@@ -258,25 +279,31 @@ export function ProducaoCalendar({ ordens, tanques }: Props) {
                       <Clock size={16} className="text-slate-600" />
                       <span className="font-semibold text-slate-900">{turnoProducao.turno.nome}</span>
                       <span className="text-xs text-slate-600">
-                        {turnoProducao.turno.horaInicio}h - {turnoProducao.turno.horaFim}h
+                        {minutesToTime(turnoProducao.turno.hora_inicio)} – {minutesToTime(turnoProducao.turno.hora_fim)}
                       </span>
                     </div>
 
                     {/* Tanques do turno */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {turnoProducao.tanques.map((tanqueProducao) => (
+                      {turnoProducao.tanques.map((tanqueProducao) => {
+                          const volumeExcede = Boolean(
+                            ordemSelecionada &&
+                              tanqueProducao.utilizacao + ((ordemSelecionada.quantidade ?? 0) / tanqueProducao.tanque.volume_liters) * 100 > 100
+                          )
+                          const tempoExcede = Boolean(
+                            ordemSelecionada &&
+                              tanqueProducao.duracaoTurnoMin > 0 &&
+                              tanqueProducao.minutosUsados + (ordemSelecionada.total_duration_minutes ?? 0) > tanqueProducao.duracaoTurnoMin
+                          )
+                          const bloqueado = volumeExcede || tempoExcede
+                          return (
                         <button
                           key={tanqueProducao.tanque.id}
                           onClick={() => handleTanqueClick(dia.data, turnoProducao.turno.id, tanqueProducao.tanque.id)}
-                          disabled={Boolean(
-                            ordemSelecionada &&
-                              tanqueProducao.utilizacao +
-                                ((ordemSelecionada.quantidade ?? 0) / tanqueProducao.tanque.volume_liters) * 100 >
-                                100
-                          )}
+                          disabled={Boolean(ordemSelecionada && bloqueado)}
                           className={`p-3 rounded-lg border-2 transition-all text-left ${
                             ordemSelecionada
-                              ? tanqueProducao.utilizacao + ((ordemSelecionada.quantidade ?? 0) / tanqueProducao.tanque.volume_liters) * 100 > 100
+                              ? bloqueado
                                 ? 'border-red-300 bg-red-50 cursor-not-allowed opacity-50'
                                 : 'border-dashed border-blue-400 bg-blue-25 cursor-pointer hover:bg-blue-50'
                               : 'border-slate-200 bg-slate-50 cursor-default'
@@ -286,13 +313,20 @@ export function ProducaoCalendar({ ordens, tanques }: Props) {
                             <span className="font-semibold text-sm text-slate-900">
                               {tanqueProducao.tanque.nome}
                             </span>
-                            <span className="text-xs font-semibold text-slate-600">
-                              {tanqueProducao.utilizacao.toFixed(0)}%
-                            </span>
+                            <div className="text-right">
+                              <span className="text-xs font-semibold text-slate-600">
+                                Vol: {tanqueProducao.utilizacao.toFixed(0)}%
+                              </span>
+                              {tanqueProducao.duracaoTurnoMin > 0 && (
+                                <span className={`text-xs font-semibold ml-2 ${tanqueProducao.utilizacaoTempo > 90 ? 'text-red-600' : 'text-blue-600'}`}>
+                                  Tempo: {tanqueProducao.utilizacaoTempo.toFixed(0)}%
+                                </span>
+                              )}
+                            </div>
                           </div>
 
-                          {/* Barra de progresso */}
-                          <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden mb-2">
+                          {/* Barra de progresso - volume */}
+                          <div className="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden mb-1">
                             <div
                               className={`h-full transition-all ${
                                 tanqueProducao.utilizacao > 90
@@ -304,6 +338,22 @@ export function ProducaoCalendar({ ordens, tanques }: Props) {
                               style={{ width: `${Math.min(tanqueProducao.utilizacao, 100)}%` }}
                             />
                           </div>
+
+                          {/* Barra de progresso - tempo */}
+                          {tanqueProducao.duracaoTurnoMin > 0 && (
+                            <div className="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden mb-2">
+                              <div
+                                className={`h-full transition-all ${
+                                  tanqueProducao.utilizacaoTempo > 90
+                                    ? 'bg-red-400'
+                                    : tanqueProducao.utilizacaoTempo > 70
+                                      ? 'bg-orange-400'
+                                      : 'bg-blue-400'
+                                }`}
+                                style={{ width: `${Math.min(tanqueProducao.utilizacaoTempo, 100)}%` }}
+                              />
+                            </div>
+                          )}
 
                           {/* Ordens do tanque */}
                           {tanqueProducao.ordens.length > 0 && (
@@ -329,16 +379,19 @@ export function ProducaoCalendar({ ordens, tanques }: Props) {
                           )}
 
                           {/* Espaço disponível */}
-                          <div className="text-xs text-slate-600 mt-2">
-                            {tanqueProducao.tanque.volume_liters.toLocaleString('pt-BR')}L • Livre:{' '}
-                            {Math.max(
-                              0,
-                              tanqueProducao.tanque.volume_liters - (tanqueProducao.utilizacao / 100) * tanqueProducao.tanque.volume_liters
-                            ).toLocaleString('pt-BR')}
-                            L
+                          <div className="text-xs text-slate-600 mt-2 space-y-0.5">
+                            <div>
+                              Vol: {Math.max(0, tanqueProducao.tanque.volume_liters - (tanqueProducao.utilizacao / 100) * tanqueProducao.tanque.volume_liters).toLocaleString('pt-BR')}L livres
+                            </div>
+                            {tanqueProducao.duracaoTurnoMin > 0 && (
+                              <div>
+                                Tempo: {Math.max(0, tanqueProducao.duracaoTurnoMin - tanqueProducao.minutosUsados)}min livres de {tanqueProducao.duracaoTurnoMin}min
+                              </div>
+                            )}
                           </div>
                         </button>
-                      ))}
+                          )
+                        })}
                     </div>
                   </div>
                 ))}

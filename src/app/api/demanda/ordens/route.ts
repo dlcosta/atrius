@@ -16,6 +16,8 @@ type PostBody = {
   tank_id: string
   total_litros: number
   itens: ItemBody[]
+  production_time_minutes?: number
+  cleaning_time_minutes?: number
 }
 
 function validar(body: Partial<PostBody>): string | null {
@@ -25,6 +27,8 @@ function validar(body: Partial<PostBody>): string | null {
   if (!body.tank_id?.trim()) return 'tank_id obrigatório'
   if (!body.total_litros || body.total_litros <= 0) return 'total_litros deve ser maior que zero'
   if (!Array.isArray(body.itens) || body.itens.length === 0) return 'itens não pode ser vazio'
+  if (body.production_time_minutes !== undefined && body.production_time_minutes !== null && body.production_time_minutes <= 0)
+    return 'production_time_minutes deve ser maior que zero'
   return null
 }
 
@@ -76,7 +80,10 @@ export async function POST(req: NextRequest) {
   const erroValidacao = validar(body)
   if (erroValidacao) return NextResponse.json({ error: erroValidacao }, { status: 422 })
 
-  const { categoria_produto, nome_ordem, data_prevista, tank_id, total_litros, itens } = body as PostBody
+  const { categoria_produto, nome_ordem, data_prevista, tank_id, total_litros, itens, production_time_minutes, cleaning_time_minutes } = body as PostBody
+  const prodMin = production_time_minutes ?? null
+  const cleanMin = cleaning_time_minutes ?? null
+  const totalMin = prodMin !== null && cleanMin !== null ? prodMin + cleanMin : prodMin !== null ? prodMin : null
 
   const { data: tanque, error: tanqueError } = await supabase
     .from('tanques')
@@ -110,6 +117,9 @@ export async function POST(req: NextRequest) {
       tank_volume_liters: tanque.volume_liters,
       data_prevista,
       tanque: categoria_produto,
+      production_time_minutes: prodMin,
+      cleaning_time_minutes: cleanMin,
+      total_duration_minutes: totalMin,
     })
     .select('*')
     .single()
@@ -132,6 +142,22 @@ export async function POST(req: NextRequest) {
     await supabase.from('ordens').delete().eq('id', ordem.id)
     return NextResponse.json({ error: `Erro ao vincular pedidos: ${vinculosError.message}` }, { status: 500 })
   }
+
+  // Registrar log de criação
+  await supabase.from('ordens_audit_log').insert({
+    ordem_id: ordem.id,
+    operacao: 'CRIADO',
+    descricao: `Ordem "${nome_ordem}" criada com ${total_litros.toLocaleString('pt-BR')}L — ${categoria_produto}`,
+    dados_depois: {
+      planning_status: 'BACKLOG',
+      tank_id,
+      total_litros,
+      production_time_minutes: prodMin,
+      cleaning_time_minutes: cleanMin,
+      total_duration_minutes: totalMin,
+      itens_count: itens.length,
+    },
+  })
 
   return NextResponse.json(ordem, { status: 201 })
 }

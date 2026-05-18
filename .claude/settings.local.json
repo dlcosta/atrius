@@ -59,7 +59,10 @@
       "Bash(npx prisma *)",
       "PowerShell(Get-Process -Name \"node\" -ErrorAction SilentlyContinue)",
       "PowerShell(\"Todos os processos Node parados\")",
-      "Bash(git reset *)"
+      "Bash(git reset *)",
+      "PowerShell(cd \"c:\\\\Users\\\\lucaw\\\\Documents\\\\VS Code Páginas\\\\atrius-apresentação\"; npx tsc --noEmit 2>&1 | Where-Object { $_ -notmatch \"tests/\" })",
+      "Skill(supabase)",
+      "Skill(supabase:*)"
     ],
     "additionalDirectories": [
       "\\tmp"

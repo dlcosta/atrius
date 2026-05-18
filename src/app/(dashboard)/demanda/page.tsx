@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { DemandaProducaoContainer } from '@/components/demanda/DemandaProducaoContainer'
 import { buscarItensDemanda } from '@/lib/demanda/itens'
-import type { ItemDemanda, Ordem, Tanque } from '@/types'
+import type { ItemDemanda, Ordem, Tanque, Turno } from '@/types'
 
 async function buscarItens(): Promise<ItemDemanda[]> {
   const supabase = await createClient()
@@ -19,9 +19,20 @@ async function buscarTanques(): Promise<Tanque[]> {
     .from('tanques')
     .select('*')
     .eq('ativo', true)
-    .order('volume_liters', { ascending: true })
+    .order('nome', { ascending: true })
   if (error) return []
   return (data as Tanque[]) ?? []
+}
+
+async function buscarTurnos(): Promise<Turno[]> {
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from('turnos')
+    .select('*')
+    .eq('ativo', true)
+    .order('hora_inicio', { ascending: true })
+  if (error) return []
+  return (data as Turno[]) ?? []
 }
 
 async function buscarOrdens(): Promise<Ordem[]> {
@@ -69,9 +80,10 @@ async function buscarOrdens(): Promise<Ordem[]> {
 }
 
 export default async function DemandaPage() {
-  const [itens, tanques, ordens] = await Promise.all([
+  const [itens, tanques, turnos, ordens] = await Promise.all([
     buscarItens(),
     buscarTanques(),
+    buscarTurnos(),
     buscarOrdens(),
   ])
 
@@ -80,6 +92,7 @@ export default async function DemandaPage() {
       itensIniciais={itens}
       ordensIniciais={ordens}
       tanques={tanques}
+      turnosIniciais={turnos}
     />
   )
 }

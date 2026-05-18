@@ -13,6 +13,15 @@ export type Tanque = {
   criado_em: string
 }
 
+export type Turno = {
+  id: string
+  nome: string
+  hora_inicio: number
+  hora_fim: number
+  ativo: boolean
+  criado_em: string
+}
+
 export type TempoMaquina = {
   setup: number
   producao: number
@@ -154,4 +163,46 @@ export type OrdemPedidoErp = {
   quantidade: number
   total_litros: number
   criado_em: string
+}
+
+export type AuditOperacao =
+  | 'CRIADO'
+  | 'AGENDADO'
+  | 'REAGENDADO'
+  | 'CANCELADO'
+  | 'STATUS_ALTERADO'
+  | 'EDITADO'
+  | 'INICIADO'
+  | 'PAUSADO'
+  | 'RETOMADO'
+  | 'CONCLUIDO'
+
+export type AuditLog = {
+  id: string
+  ordem_id: string
+  agendamento_id: string | null
+  operacao: AuditOperacao
+  descricao: string
+  dados_antes: Record<string, unknown> | null
+  dados_depois: Record<string, unknown> | null
+  responsavel: string | null
+  motivo: string | null
+  criado_em: string
+}
+
+export type AgendamentoProducaoDetalhado = AgendamentoProducao & {
+  tank_nome?: string
+}
+
+export type ItemConferencia = ItemDemanda & {
+  nome_ordem?: string | null
+  data_agendamento?: string | null
+  turno_nome?: string | null
+  tank_nome?: string | null
+}
+
+export type OrdemHistorico = Ordem & {
+  agendamentos: AgendamentoProducaoDetalhado[]
+  pedidos_vinculados: OrdemPedidoErp[]
+  audit_count: number
 }
