@@ -79,9 +79,11 @@ async function carregarAlocacoes(supabase: SupabaseServerClient) {
   const alocacoesPorItem = new Map<string, { ordem_id: string; ordem_status: string | null }>()
 
   ;(alocacoes as OrdemPedido[] | null)?.forEach((alocacao) => {
+    const ordemStatus = statusPorOrdem.get(alocacao.ordem_id) ?? null
+    if (ordemStatus === 'CANCELED') return
     alocacoesPorItem.set(`${alocacao.numero_pedido}::${alocacao.produto_descricao}`, {
       ordem_id: alocacao.ordem_id,
-      ordem_status: statusPorOrdem.get(alocacao.ordem_id) ?? null,
+      ordem_status: ordemStatus,
     })
   })
 

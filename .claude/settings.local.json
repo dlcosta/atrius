@@ -62,7 +62,27 @@
       "Bash(git reset *)",
       "PowerShell(cd \"c:\\\\Users\\\\lucaw\\\\Documents\\\\VS Code Páginas\\\\atrius-apresentação\"; npx tsc --noEmit 2>&1 | Where-Object { $_ -notmatch \"tests/\" })",
       "Skill(supabase)",
-      "Skill(supabase:*)"
+      "Skill(supabase:*)",
+      "PowerShell(npx skills add plugins/frontend-mobile-development/skills/tailwind-design-system skills/copywriting skill-creator agent-skills/web-design/landing-page 2>&1)",
+      "PowerShell(npx skills add tailwind-design-system 2>&1)",
+      "PowerShell(npx skills search 2>&1)",
+      "PowerShell(npx skills find tailwind-design-system 2>&1)",
+      "PowerShell(npx skills find copywriting 2>&1)",
+      "PowerShell(npx skills find skill-creator 2>&1)",
+      "PowerShell(npx skills find landing-page 2>&1)",
+      "PowerShell(npx skills find \"frontend mobile\" 2>&1)",
+      "PowerShell(npx skills find \"web design landing\" 2>&1)",
+      "PowerShell(npx skills find \"wshobson\" 2>&1)",
+      "PowerShell(npx skills add wshobson/agents@tailwind-design-system --yes 2>&1)",
+      "PowerShell(npx skills add coreyhaines31/marketingskills@copywriting --yes 2>&1)",
+      "PowerShell(npx skills add anthropics/skills@skill-creator --yes 2>&1)",
+      "PowerShell(npx skills add inference-sh-skills/skills@landing-page-design --yes 2>&1)",
+      "mcp__supabase__execute_sql",
+      "mcp__supabase__apply_migration",
+      "PowerShell(cd \"c:\\\\Users\\\\lucaw\\\\Documents\\\\VS Code Páginas\\\\atrius-apresentação\"; npx tsc --noEmit 2>&1 | Where-Object { $_ -notmatch \"tests/\" } | Select-Object -First 20)",
+      "PowerShell(cd \"c:\\\\Users\\\\lucaw\\\\Documents\\\\VS Code Páginas\\\\atrius-apresentação\"; npx tsc --noEmit 2>&1 | Where-Object { $_ -notmatch \"production.test.ts\" })",
+      "PowerShell(git add -A)",
+      "PowerShell(git commit -m \"feat: modulo de envase e atualizacoes do planejamento\")"
     ],
     "additionalDirectories": [
       "\\tmp"

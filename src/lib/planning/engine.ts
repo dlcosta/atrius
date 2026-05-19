@@ -117,6 +117,7 @@ export function ordemParaBlocos(ordem: Ordem): BlocoGantt[] {
     fim: new Date(ordem.fim_calculado),
     duracao_min: duracaoProducao,
     tanque: ordem.tanque,
+    planning_status: ordem.planning_status ?? null,
   })
 
   const blocoLimpeza = gerarBlocoLimpeza(ordem, ordem.produto)

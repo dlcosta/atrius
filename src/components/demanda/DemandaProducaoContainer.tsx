@@ -65,7 +65,7 @@ export function DemandaProducaoContainer({ itensIniciais, ordensIniciais, tanque
             }`}
           >
             <ClipboardList size={18} />
-            Criar Demanda
+            Planejamento do Tanque
           </button>
           <button
             onClick={() => setView('conferencia')}

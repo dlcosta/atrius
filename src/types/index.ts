@@ -50,6 +50,8 @@ export type StatusOrdem =
 
 export type PlanningStatus =
   | 'BACKLOG'
+  | 'WAITING_TANK'
+  | 'READY_TO_SCHEDULE'
   | 'SCHEDULED'
   | 'IN_PRODUCTION'
   | 'COMPLETED'
@@ -136,6 +138,7 @@ export type BlocoGantt = {
   fim: Date
   duracao_min: number
   tanque?: string | null
+  planning_status?: PlanningStatus | null
 }
 
 export type ItemDemanda = {
@@ -153,6 +156,24 @@ export type ItemDemanda = {
   alocado?: boolean
   ordem_id?: string | null
   ordem_status?: string | null
+}
+
+export type ItemDemandaEnvase = {
+  data_prevista: string | null
+  produto_descricao: string
+  produto_base: string
+  embalagem_label: string
+  embalagem_volume_ml: number
+  litros_por_unidade: number
+  unidades_por_cx: number
+  numero_pedido: string
+  cliente_nome: string
+  quantidade: number
+  total_litros: number
+  confianca_embalagem: 'alta' | 'media' | 'manual'
+  alocado: boolean
+  ordem_id: string | null
+  ordem_status: string | null
 }
 
 export type OrdemPedidoErp = {

@@ -29,7 +29,11 @@ import {
   ZoomIn,
   ZoomOut,
 } from 'lucide-react'
-import type { Maquina, Ordem, Produto, Tanque } from '@/types'
+import type { Maquina, Ordem, Produto, Tanque, Turno } from '@/types'
+import type { OrdemBacklogItem } from '@/app/api/backlog/route'
+import type { OrdemBacklogEnvaseItem } from '@/app/api/backlog/envase/route'
+import { BacklogTanques } from '@/components/calendario/BacklogTanques'
+import { BacklogEnvase } from '@/components/calendario/BacklogEnvase'
 import { NovaOrdemForm } from '@/components/planner/NovaOrdemForm'
 import { calcularDuracao, calcularFim, detectarConflito } from '@/lib/planning/engine'
 import {
@@ -66,6 +70,13 @@ const ZOOM_OPTIONS = [
   { id: 'medio', label: 'Medio', pxPerMinuteDay: 3, pxPerMinuteWeek: 0.6 },
   { id: 'amplo', label: 'Amplo', pxPerMinuteDay: 4.2, pxPerMinuteWeek: 0.84 },
 ]
+
+const TURNO_COLORS = [
+  { bg: '#EFF6FF', label: '#2563EB' },
+  { bg: '#F0FDF4', label: '#16A34A' },
+  { bg: '#FEF9C3', label: '#D97706' },
+  { bg: '#FDF4FF', label: '#9333EA' },
+] as const
 
 function formatYmd(date: Date): string {
   return format(date, 'yyyy-MM-dd')
@@ -597,6 +608,7 @@ function MachineCalendarBoard({
   onRemove,
   onEdit,
   onOpenOrder,
+  turnos,
 }: {
   maquina: Maquina
   ordens: Ordem[]
@@ -610,78 +622,200 @@ function MachineCalendarBoard({
   onRemove: (ordemId: string) => void
   onEdit: (ordemId: string, maquinaId: string, inicio: Date, fim: Date) => Promise<void>
   onOpenOrder: (ordem: Ordem) => void
+  turnos: Turno[]
 }) {
+  const outerRef = useRef<HTMLDivElement>(null)
+  const [outerWidth, setOuterWidth] = useState(0)
   const { setNodeRef, isOver } = useDroppable({ id: `board:${maquina.id}` })
-  const { columnWidth, pxPerMinute } = getCalendarMetrics(viewMode, zoomIndex)
+  const { pxPerMinute } = getCalendarMetrics(viewMode, zoomIndex)
+  const HORA_COL = 64
   const hourHeight = 60 * pxPerMinute
   const totalMinutes = Math.max(60, (janela.endHour - janela.startHour) * 60)
   const boardHeight = totalMinutes * pxPerMinute
-  const boardWidth = columnWidth * dias.length
+  const fallbackColWidth = viewMode === 'dia' ? 760 : 220
+  const dynamicColumnWidth =
+    outerWidth > HORA_COL + 80
+      ? Math.max(100, (outerWidth - HORA_COL) / dias.length)
+      : fallbackColWidth
+  const boardWidth = dynamicColumnWidth * dias.length
+
+  useEffect(() => {
+    const el = outerRef.current
+    if (!el) return
+    const obs = new ResizeObserver(([e]) => setOuterWidth(e.contentRect.width))
+    obs.observe(el)
+    return () => obs.disconnect()
+  }, [])
+
   const hourMarks = useMemo(() => {
     const marks: number[] = []
     for (let h = janela.startHour; h <= janela.endHour; h++) marks.push(h)
     return marks
   }, [janela])
 
+  const now = new Date()
+  const todayIdx = dias.findIndex((d) => formatYmd(d) === formatYmd(now))
+  const currentTimeMin = now.getHours() * 60 + now.getMinutes() - janela.startHour * 60
+  const showNow = todayIdx >= 0 && currentTimeMin >= 0 && currentTimeMin <= totalMinutes
+  const turnosAtivos = turnos.filter((t) => t.ativo)
+
   return (
-    <div className="min-w-max">
-      <div className="sticky top-0 z-30 flex border-b border-[#E4E7EC] bg-white">
-        <div className="sticky left-0 z-40 w-20 shrink-0 border-r border-[#E4E7EC] bg-[#F7F8FA] px-3 py-3 text-xs font-medium uppercase tracking-wide text-[#9CA3AF]">
-          Hora
+    <div ref={outerRef} className="flex min-w-0 flex-col overflow-x-auto">
+      {/* Sticky header: dias + legenda de turnos */}
+      <div className="sticky top-0 z-30 border-b-2 border-[#E4E7EC] bg-white shadow-sm">
+        {/* Linha dos dias */}
+        <div className="flex">
+          <div className="w-16 shrink-0 border-r border-[#E4E7EC] bg-[#F7F8FA]" />
+          {dias.map((dia) => {
+            const isHoje = formatYmd(dia) === formatYmd(now)
+            return (
+              <div
+                key={formatYmd(dia)}
+                className={`shrink-0 border-r border-[#E4E7EC] px-3 py-2 ${isHoje ? 'bg-[#EFF6FF]' : ''}`}
+                style={{ width: dynamicColumnWidth }}
+              >
+                <div
+                  className={`text-[10px] font-semibold uppercase tracking-widest ${isHoje ? 'text-[#2563EB]' : 'text-[#9CA3AF]'}`}
+                >
+                  {format(dia, 'EEE', { locale: ptBR })}
+                </div>
+                <div
+                  className={`mt-0.5 flex h-8 w-8 items-center justify-center rounded-full text-base font-bold ${
+                    isHoje ? 'bg-[#2563EB] text-white' : 'text-[#111827]'
+                  }`}
+                >
+                  {format(dia, 'dd')}
+                </div>
+              </div>
+            )
+          })}
         </div>
-        <div className="grid" style={{ gridTemplateColumns: `repeat(${dias.length}, ${columnWidth}px)` }}>
-          {dias.map((dia) => (
-            <div
-              key={formatYmd(dia)}
-              className={`border-r border-[#E4E7EC] px-4 py-3 ${formatYmd(dia) === formatYmd(new Date()) ? 'bg-[#EFF6FF]' : ''}`}
-            >
-              <div className="text-lg font-semibold text-[#111827]">{format(dia, 'dd')}</div>
-              <div className="text-[11px] font-medium uppercase text-[#9CA3AF]">{format(dia, 'EEE', { locale: ptBR })}</div>
+
+        {/* Legenda de turnos */}
+        {turnosAtivos.length > 0 && (
+          <div className="flex items-center border-t border-[#E4E7EC] bg-[#F7F8FA]">
+            <div className="w-16 shrink-0 border-r border-[#E4E7EC] px-2 py-1 text-[9px] font-bold uppercase tracking-wide text-[#9CA3AF]">
+              Turnos
             </div>
-          ))}
-        </div>
+            <div className="flex flex-wrap gap-1.5 px-3 py-1.5">
+              {turnosAtivos.map((turno, i) => {
+                const cor = TURNO_COLORS[i % TURNO_COLORS.length]
+                const iH = Math.floor(turno.hora_inicio / 60)
+                const iM = turno.hora_inicio % 60
+                const fH = Math.floor(turno.hora_fim / 60)
+                const fM = turno.hora_fim % 60
+                return (
+                  <div
+                    key={turno.id}
+                    className="flex items-center gap-1.5 whitespace-nowrap rounded-[6px] px-2 py-1"
+                    style={{ backgroundColor: cor.bg }}
+                  >
+                    <div className="h-2 w-2 rounded-full" style={{ backgroundColor: cor.label }} />
+                    <span className="text-[11px] font-semibold" style={{ color: cor.label }}>
+                      {turno.nome}
+                    </span>
+                    <span className="font-mono text-[10px] text-[#6B7280]">
+                      {`${String(iH).padStart(2, '0')}:${String(iM).padStart(2, '0')} – ${String(fH).padStart(2, '0')}:${String(fM).padStart(2, '0')}`}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
       </div>
 
+      {/* Grid body */}
       <div className="flex">
+        {/* Coluna de horas */}
         <div
-          className="relative sticky left-0 z-20 w-20 shrink-0 border-r border-[#E4E7EC] bg-[#F7F8FA]"
+          className="relative sticky left-0 z-20 w-16 shrink-0 border-r border-[#E4E7EC] bg-white"
           style={{ height: boardHeight }}
         >
           {hourMarks.map((hour) => (
             <div
               key={hour}
-              className="absolute right-3 -translate-y-2 font-mono text-[11px] font-medium text-[#9CA3AF]"
+              className="absolute right-0 -translate-y-2.5 pr-2"
               style={{ top: (hour - janela.startHour) * hourHeight }}
             >
-              {String(hour).padStart(2, '0')}h
+              <span className="font-mono text-[11px] text-[#9CA3AF]">
+                {String(hour).padStart(2, '0')}h
+              </span>
             </div>
           ))}
         </div>
 
+        {/* Área do board */}
         <div
           ref={(node) => {
             setNodeRef(node)
             boardRef(node)
           }}
-          className={`relative bg-white transition-colors ${isOver ? 'bg-[#EFF6FF]' : ''}`}
+          className={`relative transition-colors ${isOver ? 'bg-[#EFF6FF]/30' : ''}`}
           style={{ width: boardWidth, height: boardHeight }}
         >
-          {dias.map((dia, dayIndex) => (
-            <div
-              key={formatYmd(dia)}
-              className="absolute inset-y-0 border-r border-[#E4E7EC]"
-              style={{ left: dayIndex * columnWidth, width: columnWidth }}
-            >
-              {hourMarks.map((hour) => (
-                <div
-                  key={`${formatYmd(dia)}-${hour}`}
-                  className={`absolute inset-x-0 border-t ${hour === janela.startHour ? 'border-[#CDD2DA]' : 'border-[#E4E7EC]'}`}
-                  style={{ top: (hour - janela.startHour) * hourHeight }}
-                />
-              ))}
-            </div>
-          ))}
+          {/* Colunas de dia — fundo + bandas de turno + linhas de hora */}
+          {dias.map((dia, dayIndex) => {
+            const isHoje = formatYmd(dia) === formatYmd(now)
+            return (
+              <div
+                key={formatYmd(dia)}
+                className="absolute inset-y-0 border-r border-[#E4E7EC]"
+                style={{
+                  left: dayIndex * dynamicColumnWidth,
+                  width: dynamicColumnWidth,
+                  backgroundColor: isHoje ? '#FAFCFF' : '#FFFFFF',
+                }}
+              >
+                {/* Linhas de hora */}
+                {hourMarks.map((hour) => (
+                  <div
+                    key={hour}
+                    className={`absolute inset-x-0 border-t ${
+                      hour === janela.startHour ? 'border-[#CDD2DA]' : 'border-[#F0F2F5]'
+                    }`}
+                    style={{ top: (hour - janela.startHour) * hourHeight }}
+                  />
+                ))}
 
+                {/* Bandas de turno */}
+                {turnosAtivos.map((turno, i) => {
+                  const cor = TURNO_COLORS[i % TURNO_COLORS.length]
+                  const startMin = turno.hora_inicio - janela.startHour * 60
+                  const endMin = turno.hora_fim - janela.startHour * 60
+                  const top = Math.max(0, startMin) * pxPerMinute
+                  const bot = Math.min(totalMinutes, endMin) * pxPerMinute
+                  if (top >= bot) return null
+                  return (
+                    <div
+                      key={turno.id}
+                      className="pointer-events-none absolute inset-x-0"
+                      style={{ top, height: bot - top, backgroundColor: cor.bg, opacity: 0.55 }}
+                    />
+                  )
+                })}
+              </div>
+            )
+          })}
+
+          {/* Indicador de hora atual */}
+          {showNow && (
+            <div
+              className="pointer-events-none absolute z-20"
+              style={{
+                top: currentTimeMin * pxPerMinute,
+                left: todayIdx * dynamicColumnWidth,
+                width: dynamicColumnWidth,
+              }}
+            >
+              <div className="relative flex items-center">
+                <div className="absolute -left-1.5 h-3 w-3 rounded-full bg-[#EF4444]" />
+                <div className="w-full border-t-2 border-[#EF4444]" />
+              </div>
+            </div>
+          )}
+
+          {/* Ordens agendadas */}
           {ordens.map((ordem) => (
             <VerticalScheduledEvent
               key={ordem.id}
@@ -689,7 +823,7 @@ function MachineCalendarBoard({
               rangeStart={rangeStart}
               dias={dias}
               janela={janela}
-              columnWidth={columnWidth}
+              columnWidth={dynamicColumnWidth}
               pxPerMinute={pxPerMinute}
               onRemove={onRemove}
               onOpen={onOpenOrder}
@@ -697,19 +831,21 @@ function MachineCalendarBoard({
             />
           ))}
 
+          {/* Estado vazio */}
           {ordens.length === 0 && (
-            <div className="absolute inset-0 grid place-items-center">
-              <div className="rounded-[12px] border border-dashed border-[#E4E7EC] bg-white px-8 py-6 text-center text-[13px] text-[#9CA3AF]">
-                <CalendarClock size={16} className="mx-auto mb-2 text-[#9CA3AF]" />
-                Arraste uma ordem do backlog para montar a agenda desta maquina.
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="rounded-[12px] border border-dashed border-[#E4E7EC] bg-white/90 px-8 py-6 text-center shadow-sm">
+                <CalendarClock size={20} className="mx-auto mb-2 text-[#CDD2DA]" />
+                <div className="text-[13px] font-medium text-[#9CA3AF]">Arraste uma ordem do backlog</div>
+                <div className="text-[11px] text-[#CDD2DA]">para montar a agenda deste recurso</div>
               </div>
             </div>
           )}
         </div>
       </div>
 
-      <div className="sticky bottom-0 z-30 border-t border-[#E4E7EC] bg-white px-4 py-2 text-[11px] font-medium uppercase text-[#9CA3AF]">
-        Escala {zoomLabel} - linhas de 1 hora - encaixe de {janela.snapMinutes} min
+      <div className="sticky bottom-0 z-30 border-t border-[#E4E7EC] bg-[#F7F8FA] px-4 py-1.5 text-[11px] text-[#9CA3AF]">
+        Zoom {zoomLabel} · encaixe de {janela.snapMinutes} min · turno detectado automaticamente ao soltar
       </div>
     </div>
   )
@@ -825,6 +961,10 @@ function VerticalScheduledEvent({
     setDraft(null)
   }
 
+  const isInProduction = ordem.planning_status === 'IN_PRODUCTION'
+  const isCompact = height < 72
+  const isTiny = height < 46
+
   return (
     <div
       onPointerDown={(e) => handlePointerDown(e, 'move')}
@@ -843,56 +983,130 @@ function VerticalScheduledEvent({
         }
         if (!editing) onOpen(ordem)
       }}
-      className={`group absolute overflow-hidden rounded-[8px] border bg-white shadow-[var(--shadow-sm)] transition-colors duration-[120ms] hover:z-30 hover:border-[#CDD2DA] ${
-        editing ? 'z-40 cursor-grabbing border-[#2563EB] ring-2 ring-[#EFF6FF]' : 'cursor-pointer border-[#E4E7EC]'
+      className={`group absolute overflow-hidden rounded-[10px] border transition-all duration-150 hover:z-30 select-none ${
+        editing
+          ? 'z-40 cursor-grabbing shadow-lg'
+          : 'cursor-pointer hover:shadow-md'
       }`}
-      style={{ top, left, width, height }}
-      title={`${ordemLabel(ordem)}\n${formatarHora(inicio)} - ${formatarHora(fim)}`}
+      style={{
+        top, left, width, height,
+        backgroundColor: `${color}14`,
+        borderColor: editing ? color : `${color}50`,
+        boxShadow: editing ? `0 0 0 2px ${color}40, 0 8px 24px ${color}20` : undefined,
+      }}
+      title={`${ordemLabel(ordem)}\n${formatarHora(inicio)} – ${formatarHora(fim)}`}
     >
-      <div className="absolute inset-y-0 left-0 w-2.5" style={{ backgroundColor: color }} />
+      {/* Faixa esquerda colorida */}
       <div
-        className="absolute inset-x-0 top-0 z-10 h-2 cursor-ns-resize bg-[#2563EB]/0 transition group-hover:bg-[#2563EB]/20"
-        onPointerDown={(e) => handlePointerDown(e, 'resize-start')}
-        title="Ajustar inicio"
+        className="absolute inset-y-0 left-0 w-[3px] rounded-l-[10px]"
+        style={{ backgroundColor: color }}
       />
+
+      {/* Handle resize topo */}
       <div
-        className="absolute inset-x-0 bottom-0 z-10 h-2 cursor-ns-resize bg-[#2563EB]/0 transition group-hover:bg-[#2563EB]/20"
+        className="absolute inset-x-0 top-0 z-10 h-2.5 cursor-ns-resize opacity-0 transition-opacity group-hover:opacity-100"
+        style={{ background: `linear-gradient(to bottom, ${color}30, transparent)` }}
+        onPointerDown={(e) => handlePointerDown(e, 'resize-start')}
+        title="Ajustar início"
+      />
+      {/* Handle resize baixo */}
+      <div
+        className="absolute inset-x-0 bottom-0 z-10 h-2.5 cursor-ns-resize opacity-0 transition-opacity group-hover:opacity-100"
+        style={{ background: `linear-gradient(to top, ${color}30, transparent)` }}
         onPointerDown={(e) => handlePointerDown(e, 'resize-end')}
         title="Ajustar fim"
       />
 
-      <div className="flex h-full flex-col justify-between gap-2 bg-white py-3 pl-5 pr-3">
-        <div className="flex items-start gap-3">
-          <div className="min-w-0 flex-1 pr-1">
-            <div className="line-clamp-2 text-[14px] font-semibold leading-5 text-[#111827]">{ordemLabel(ordem)}</div>
-            <div className="mt-2 flex flex-wrap items-center gap-1.5">
-              <span className="rounded-[6px] bg-[#EFF6FF] px-2 py-1 font-mono text-[11px] font-medium text-[#2563EB]">
-                {formatarHora(inicio)} - {formatarHora(fim)}
-              </span>
-              <span className="rounded-[6px] bg-[#F0F2F5] px-2 py-1 font-mono text-[11px] font-medium text-[#4B5563]">
-                {formatarDuracao(duration)}
+      {/* Conteúdo */}
+      <div className="flex h-full min-h-0 flex-col pl-3 pr-2 py-2">
+        {isTiny ? (
+          /* Modo ultra-compacto: tudo em uma linha */
+          <div className="flex items-center gap-1.5 overflow-hidden">
+            {isInProduction && (
+              <span className="inline-flex h-1.5 w-1.5 shrink-0 animate-pulse rounded-full" style={{ backgroundColor: color }} />
+            )}
+            <span className="truncate text-[11px] font-semibold leading-none" style={{ color }}>
+              {formatarHora(inicio)}
+            </span>
+            <span className="truncate text-[11px] font-semibold leading-none text-[#111827]">
+              {ordemLabel(ordem)}
+            </span>
+          </div>
+        ) : isCompact ? (
+          /* Modo compacto: título + horário */
+          <div className="flex min-h-0 flex-1 flex-col justify-center gap-0.5">
+            <div className="flex items-center gap-1.5">
+              {isInProduction && (
+                <span className="inline-flex h-1.5 w-1.5 shrink-0 animate-pulse rounded-full" style={{ backgroundColor: color }} />
+              )}
+              <span className="truncate text-[12px] font-semibold leading-tight text-[#111827]">
+                {ordemLabel(ordem)}
               </span>
             </div>
+            <span className="font-mono text-[10px] leading-none" style={{ color }}>
+              {formatarHora(inicio)} – {formatarHora(fim)}
+            </span>
           </div>
-          <button
-            type="button"
-            className="grid h-8 w-8 shrink-0 place-items-center rounded-[8px] border border-[#E4E7EC] bg-white text-[#9CA3AF] transition hover:border-[#DC2626]/30 hover:bg-red-50 hover:text-[#DC2626]"
-            onPointerDown={(e) => e.stopPropagation()}
-            onClick={(e) => {
-              e.stopPropagation()
-              onRemove(ordem.id)
-            }}
-            title="Desagendar"
-          >
-            <X size={14} />
-          </button>
-        </div>
+        ) : (
+          /* Modo completo */
+          <>
+            <div className="flex min-w-0 items-start justify-between gap-1">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5">
+                  {isInProduction && (
+                    <span className="inline-flex h-2 w-2 shrink-0 animate-pulse rounded-full" style={{ backgroundColor: color }} />
+                  )}
+                  <span className="line-clamp-2 text-[13px] font-semibold leading-snug text-[#111827]">
+                    {ordemLabel(ordem)}
+                  </span>
+                </div>
+                <div className="mt-1 flex items-center gap-1">
+                  <span className="font-mono text-[11px] font-medium" style={{ color }}>
+                    {formatarHora(inicio)} – {formatarHora(fim)}
+                  </span>
+                  <span className="text-[10px] text-[#9CA3AF]">·</span>
+                  <span className="font-mono text-[10px] text-[#9CA3AF]">{formatarDuracao(duration)}</span>
+                </div>
+              </div>
+              {/* Botão remover — aparece só no hover */}
+              <button
+                type="button"
+                className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-[6px] text-transparent transition-all group-hover:bg-white/80 group-hover:text-[#9CA3AF] group-hover:shadow-sm hover:!text-[#DC2626]"
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onRemove(ordem.id)
+                }}
+                title="Desagendar"
+              >
+                <X size={12} />
+              </button>
+            </div>
 
-        <div className="flex min-h-6 flex-wrap items-center gap-1 overflow-hidden text-[10px] font-medium uppercase tracking-wide">
-          <span className="rounded-[6px] bg-[#111827] px-2 py-1 text-white">#{ordem.numero_externo}</span>
-          <span className="rounded-[6px] bg-[#F0F2F5] px-2 py-1 text-[#4B5563]">{ordem.etapa}</span>
-          {ordem.lote && <span className="truncate rounded-[6px] bg-[#F0F2F5] px-2 py-1 text-[#9CA3AF]">{ordem.lote}</span>}
-        </div>
+            {/* Rodapé com badges */}
+            <div className="mt-auto flex flex-wrap gap-1 pt-1.5">
+              <span
+                className="rounded-[5px] px-1.5 py-0.5 font-mono text-[10px] font-semibold tracking-wide text-white"
+                style={{ backgroundColor: color }}
+              >
+                {ordem.numero_externo.slice(-8)}
+              </span>
+              <span className="rounded-[5px] bg-white/60 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-[#6B7280]">
+                {ordem.etapa}
+              </span>
+              {isInProduction && (
+                <span className="rounded-[5px] bg-white/60 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#16A34A]">
+                  produzindo
+                </span>
+              )}
+              {ordem.lote && (
+                <span className="truncate rounded-[5px] bg-white/60 px-1.5 py-0.5 text-[10px] text-[#9CA3AF]">
+                  {ordem.lote}
+                </span>
+              )}
+            </div>
+          </>
+        )}
       </div>
     </div>
   )
@@ -1437,22 +1651,518 @@ function MachineInspector({
   )
 }
 
+type ScheduleDropState = {
+  ordemId: string
+  tankId: string
+  inicio: Date
+  ordemBacklog: OrdemBacklogItem | null
+}
+
+type TanqueOrdemDetail = {
+  id: string
+  numero_externo: string
+  tanque: string | null
+  tank_id: string | null
+  quantidade: number
+  unidade: string
+  data_prevista: string | null
+  planning_status: string
+  production_time_minutes: number | null
+  cleaning_time_minutes: number | null
+  total_duration_minutes: number | null
+  inicio_agendado: string | null
+  fim_calculado: string | null
+  ordens_pedidos_erp: {
+    id: string
+    numero_pedido: string
+    produto_descricao: string
+    quantidade: number
+    total_litros: number
+  }[]
+  agendamentos_producao: {
+    id: string
+    tank_id: string | null
+    data_agendamento: string | null
+    turno_id: string | null
+  }[]
+}
+
+function ScheduleTanqueModal({
+  scheduleDrop,
+  turnos,
+  onClose,
+  onConfirm,
+}: {
+  scheduleDrop: ScheduleDropState
+  turnos: Turno[]
+  onClose: () => void
+  onConfirm: (ordemId: string, tankId: string, inicio: Date) => Promise<void>
+}) {
+  const { ordemBacklog } = scheduleDrop
+  const duracao = ordemBacklog?.total_duration_minutes ?? 60
+  const [date, setDate] = useState(formatYmd(scheduleDrop.inicio))
+  const [time, setTime] = useState(format(scheduleDrop.inicio, 'HH:mm'))
+  const [saving, setSaving] = useState(false)
+
+  const inicio = useMemo(() => {
+    const d = new Date(`${date}T${time}:00`)
+    return Number.isFinite(d.getTime()) ? d : scheduleDrop.inicio
+  }, [date, time, scheduleDrop.inicio])
+
+  const fim = useMemo(() => new Date(inicio.getTime() + duracao * 60000), [inicio, duracao])
+
+  const turnosAtivos = useMemo(() => turnos.filter((t) => t.ativo), [turnos])
+  const turno = useMemo(() => {
+    const minutosDia = inicio.getHours() * 60 + inicio.getMinutes()
+    return turnosAtivos.find((t) => minutosDia >= t.hora_inicio && minutosDia < t.hora_fim) ?? null
+  }, [inicio, turnosAtivos])
+
+  const turnoIdx = turno ? turnosAtivos.findIndex((t) => t.id === turno.id) : -1
+  const turnoCor = turnoIdx >= 0 ? TURNO_COLORS[turnoIdx % TURNO_COLORS.length] : null
+
+  async function confirmar() {
+    setSaving(true)
+    try {
+      await onConfirm(scheduleDrop.ordemId, scheduleDrop.tankId, inicio)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const nome = ordemBacklog?.tanque ?? ordemBacklog?.numero_externo ?? 'Ordem'
+  const pedidosCount = ordemBacklog?.pedidos_count ?? 0
+
+  return (
+    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/35 p-4">
+      <div className="w-full max-w-md rounded-[12px] border border-[#E4E7EC] bg-white shadow-[var(--shadow-md)]">
+        <div className="border-b border-[#E4E7EC] px-5 py-4">
+          <h2 className="text-base font-semibold text-[#111827]">Agendar no Tanque</h2>
+          <p className="mt-0.5 truncate text-sm text-[#9CA3AF]">{nome}</p>
+        </div>
+
+        <div className="space-y-4 p-5">
+          <div className="flex flex-wrap gap-2">
+            {ordemBacklog?.quantidade && (
+              <span className="rounded-[6px] bg-[#EFF6FF] px-2 py-1 text-[12px] font-medium text-[#2563EB]">
+                {ordemBacklog.quantidade} {ordemBacklog.unidade}
+              </span>
+            )}
+            {pedidosCount > 0 && (
+              <span className="rounded-[6px] bg-[#F0F2F5] px-2 py-1 text-[12px] font-medium text-[#4B5563]">
+                {pedidosCount} pedido{pedidosCount !== 1 ? 's' : ''}
+              </span>
+            )}
+            <span className="rounded-[6px] bg-[#F0F2F5] px-2 py-1 text-[12px] font-medium text-[#4B5563]">
+              {duracao} min total
+            </span>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-[#9CA3AF]">Data</label>
+              <input
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                className="h-9 w-full rounded-[8px] border border-[#E4E7EC] bg-white px-3 text-sm text-[#111827]"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-[#9CA3AF]">Início</label>
+              <input
+                type="time"
+                value={time}
+                onChange={(e) => setTime(e.target.value)}
+                className="h-9 w-full rounded-[8px] border border-[#E4E7EC] bg-white px-3 text-sm text-[#111827]"
+              />
+            </div>
+          </div>
+
+          <div className="rounded-[8px] border border-[#E4E7EC] bg-[#F7F8FA] p-3">
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-[#9CA3AF]">Previsão de horário</div>
+            <div className="mt-2 flex items-center gap-3">
+              <div>
+                <div className="text-[10px] text-[#9CA3AF]">Início</div>
+                <div className="font-mono text-[16px] font-bold text-[#111827]">{format(inicio, 'HH:mm')}</div>
+              </div>
+              <div className="text-lg text-[#CDD2DA]">→</div>
+              <div>
+                <div className="text-[10px] text-[#9CA3AF]">Fim estimado</div>
+                <div className="font-mono text-[16px] font-bold text-[#111827]">{format(fim, 'HH:mm')}</div>
+              </div>
+              <div className="ml-auto text-right">
+                <div className="text-[10px] text-[#9CA3AF]">Duração</div>
+                <div className="font-mono text-[13px] font-semibold text-[#4B5563]">{duracao} min</div>
+              </div>
+            </div>
+            {turno && turnoCor ? (
+              <div className="mt-2.5 flex items-center gap-1.5">
+                <div className="h-2 w-2 rounded-full" style={{ backgroundColor: turnoCor.label }} />
+                <span className="text-[12px] font-medium" style={{ color: turnoCor.label }}>
+                  Turno: {turno.nome}
+                </span>
+              </div>
+            ) : (
+              <div className="mt-2.5 text-[12px] text-[#F59E0B]">
+                Fora de turno cadastrado — será registrado como Manual
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-2 border-t border-[#E4E7EC] px-5 py-4">
+          <button
+            onClick={onClose}
+            className="rounded-[8px] border border-[#CDD2DA] bg-white px-4 py-2 text-sm font-medium text-[#4B5563] hover:bg-[#F7F8FA]"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={confirmar}
+            disabled={saving}
+            className="rounded-[8px] bg-[#2563EB] px-4 py-2 text-sm font-medium text-white hover:bg-[#1D4ED8] disabled:opacity-50"
+          >
+            {saving ? 'Agendando...' : 'Confirmar agendamento'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function TanqueDetailModal({
+  ordemId,
+  turnos,
+  tanques,
+  onClose,
+}: {
+  ordemId: string
+  turnos: Turno[]
+  tanques: Tanque[]
+  onClose: () => void
+}) {
+  const [ordem, setOrdem] = useState<TanqueOrdemDetail | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [erro, setErro] = useState(false)
+
+  useEffect(() => {
+    setLoading(true)
+    setErro(false)
+    fetch(`/api/producao/ordens/${ordemId}`)
+      .then((r) => {
+        if (!r.ok) throw new Error('not ok')
+        return r.json()
+      })
+      .then((data) => {
+        if (data?.id) setOrdem(data)
+        else setErro(true)
+      })
+      .catch(() => setErro(true))
+      .finally(() => setLoading(false))
+  }, [ordemId])
+
+  const turnosAtivos = useMemo(() => turnos.filter((t) => t.ativo), [turnos])
+
+  const turno = useMemo(() => {
+    if (!ordem?.inicio_agendado) return null
+    const inicio = new Date(ordem.inicio_agendado)
+    const minutosDia = inicio.getHours() * 60 + inicio.getMinutes()
+    return turnosAtivos.find((t) => minutosDia >= t.hora_inicio && minutosDia < t.hora_fim) ?? null
+  }, [ordem, turnosAtivos])
+
+  const turnoIdx = turno ? turnosAtivos.findIndex((t) => t.id === turno.id) : -1
+  const turnoCor = turnoIdx >= 0 ? TURNO_COLORS[turnoIdx % TURNO_COLORS.length] : null
+  const tanque = tanques.find((t) => t.id === ordem?.tank_id)
+  const pedidos = ordem?.ordens_pedidos_erp ?? []
+  const totalLitrosPedidos = pedidos.reduce((acc, p) => acc + Number(p.total_litros ?? 0), 0)
+  const totalUnidadesPedidos = pedidos.reduce((acc, p) => acc + Number(p.quantidade ?? 0), 0)
+
+  const STATUS_MAP: Record<string, { label: string; dot: string; bg: string; text: string }> = {
+    BACKLOG:       { label: 'Backlog',      dot: '#9CA3AF', bg: '#F0F2F5', text: '#4B5563' },
+    SCHEDULED:     { label: 'Agendado',     dot: '#2563EB', bg: '#EFF6FF', text: '#2563EB' },
+    IN_PRODUCTION: { label: 'Em Produção',  dot: '#16A34A', bg: '#F0FDF4', text: '#16A34A' },
+    COMPLETED:     { label: 'Concluído',    dot: '#15803D', bg: '#DCFCE7', text: '#15803D' },
+    CANCELED:      { label: 'Cancelado',    dot: '#DC2626', bg: '#FEF2F2', text: '#DC2626' },
+  }
+  const statusCfg = STATUS_MAP[ordem?.planning_status ?? ''] ?? {
+    label: ordem?.planning_status ?? '—', dot: '#9CA3AF', bg: '#F0F2F5', text: '#4B5563'
+  }
+
+  const duracaoSoma = (ordem?.production_time_minutes ?? 0) + (ordem?.cleaning_time_minutes ?? 0)
+  const duracaoTotal = (ordem?.total_duration_minutes ?? duracaoSoma) || null
+
+  const producaoPct = duracaoTotal && ordem?.production_time_minutes
+    ? Math.round((ordem.production_time_minutes / duracaoTotal) * 100)
+    : null
+  const limpezaPct = duracaoTotal && ordem?.cleaning_time_minutes
+    ? Math.round((ordem.cleaning_time_minutes / duracaoTotal) * 100)
+    : null
+
+  return (
+    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/40 p-4" onClick={onClose}>
+      <div
+        className="flex w-full max-w-lg flex-col overflow-hidden rounded-[16px] border border-[#E4E7EC] bg-white shadow-2xl"
+        style={{ maxHeight: 'calc(100vh - 2rem)' }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header com gradiente */}
+        <div className="relative shrink-0 overflow-hidden bg-gradient-to-br from-[#1E3A5F] to-[#2563EB] px-5 pt-5 pb-4">
+          <button
+            onClick={onClose}
+            className="absolute right-4 top-4 grid h-7 w-7 place-items-center rounded-full bg-white/15 text-white/80 transition hover:bg-white/25 hover:text-white"
+          >
+            <X size={14} />
+          </button>
+
+          {loading ? (
+            <div className="h-14" />
+          ) : !ordem || erro ? null : (
+            <>
+              {/* Status badge */}
+              <div className="mb-2 flex items-center gap-2">
+                <span
+                  className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold"
+                  style={{ backgroundColor: statusCfg.bg, color: statusCfg.text }}
+                >
+                  <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: statusCfg.dot }} />
+                  {statusCfg.label}
+                </span>
+                {turno && turnoCor && (
+                  <span
+                    className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold"
+                    style={{ backgroundColor: turnoCor.bg, color: turnoCor.label }}
+                  >
+                    <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: turnoCor.label }} />
+                    {turno.nome}
+                  </span>
+                )}
+              </div>
+
+              {/* Título */}
+              <h2 className="text-[18px] font-bold leading-tight text-white">
+                {ordem.tanque || ordem.numero_externo || 'Ordem de Produção'}
+              </h2>
+              <p className="mt-0.5 font-mono text-[12px] text-white/60">
+                #{ordem.numero_externo}
+              </p>
+
+              {/* Horário em destaque */}
+              {ordem.inicio_agendado && ordem.fim_calculado && (
+                <div className="mt-3 flex items-center gap-2">
+                  <div className="rounded-[8px] bg-white/15 px-3 py-1.5">
+                    <div className="text-[10px] font-medium uppercase tracking-wide text-white/60">Início</div>
+                    <div className="font-mono text-[15px] font-bold text-white">
+                      {format(new Date(ordem.inicio_agendado), 'HH:mm')}
+                    </div>
+                  </div>
+                  <div className="text-white/40">→</div>
+                  <div className="rounded-[8px] bg-white/15 px-3 py-1.5">
+                    <div className="text-[10px] font-medium uppercase tracking-wide text-white/60">Fim</div>
+                    <div className="font-mono text-[15px] font-bold text-white">
+                      {format(new Date(ordem.fim_calculado), 'HH:mm')}
+                    </div>
+                  </div>
+                  <div className="ml-auto text-right">
+                    <div className="text-[10px] font-medium uppercase tracking-wide text-white/60">Data</div>
+                    <div className="font-mono text-[13px] font-semibold text-white">
+                      {format(new Date(ordem.inicio_agendado), 'dd/MM/yyyy')}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        {/* Body scrollável */}
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          {loading ? (
+            <div className="flex h-48 items-center justify-center gap-2 text-sm text-[#9CA3AF]">
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-[#E4E7EC] border-t-[#2563EB]" />
+              Carregando...
+            </div>
+          ) : erro || !ordem ? (
+            <div className="flex h-48 flex-col items-center justify-center gap-2 text-sm text-[#9CA3AF]">
+              <Package size={24} className="text-[#E4E7EC]" />
+              Não foi possível carregar os dados da ordem.
+            </div>
+          ) : (
+            <div className="space-y-0 divide-y divide-[#F0F2F5]">
+              {/* Resumo rápido */}
+              <div className="grid grid-cols-3 divide-x divide-[#F0F2F5]">
+                <div className="px-4 py-3 text-center">
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-[#9CA3AF]">Tanque</div>
+                  <div className="mt-1 text-[13px] font-semibold text-[#111827]">{tanque?.nome ?? '—'}</div>
+                </div>
+                <div className="px-4 py-3 text-center">
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-[#9CA3AF]">Volume</div>
+                  <div className="mt-1 font-mono text-[13px] font-semibold text-[#111827]">
+                    {Number(ordem.quantidade).toLocaleString('pt-BR')} {ordem.unidade}
+                  </div>
+                </div>
+                <div className="px-4 py-3 text-center">
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-[#9CA3AF]">Pedidos</div>
+                  <div className="mt-1 text-[13px] font-semibold text-[#111827]">{pedidos.length}</div>
+                </div>
+              </div>
+
+              {/* Tempos de produção */}
+              {duracaoTotal != null && (
+                <div className="px-5 py-4">
+                  <div className="mb-3 flex items-center justify-between">
+                    <span className="text-[11px] font-semibold uppercase tracking-wide text-[#9CA3AF]">Tempos</span>
+                    <span className="font-mono text-[12px] font-semibold text-[#2563EB]">{duracaoTotal} min total</span>
+                  </div>
+
+                  {/* Barra de progresso dos tempos */}
+                  {producaoPct !== null && (
+                    <div className="mb-3 overflow-hidden rounded-full bg-[#F0F2F5]" style={{ height: 6 }}>
+                      <div className="flex h-full">
+                        <div className="bg-[#2563EB]" style={{ width: `${producaoPct}%` }} />
+                        {limpezaPct !== null && (
+                          <div className="bg-[#93C5FD]" style={{ width: `${limpezaPct}%` }} />
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-3 gap-2">
+                    {ordem.production_time_minutes != null && (
+                      <div className="rounded-[8px] bg-[#EFF6FF] p-3 text-center">
+                        <div className="text-[9px] font-bold uppercase tracking-wider text-[#93C5FD]">Produção</div>
+                        <div className="mt-1 font-mono text-[16px] font-bold text-[#2563EB]">
+                          {ordem.production_time_minutes}
+                        </div>
+                        <div className="text-[10px] text-[#93C5FD]">min</div>
+                      </div>
+                    )}
+                    {ordem.cleaning_time_minutes != null && (
+                      <div className="rounded-[8px] bg-[#F0F2F5] p-3 text-center">
+                        <div className="text-[9px] font-bold uppercase tracking-wider text-[#9CA3AF]">Limpeza</div>
+                        <div className="mt-1 font-mono text-[16px] font-bold text-[#4B5563]">
+                          {ordem.cleaning_time_minutes}
+                        </div>
+                        <div className="text-[10px] text-[#9CA3AF]">min</div>
+                      </div>
+                    )}
+                    <div className="rounded-[8px] bg-[#111827] p-3 text-center">
+                      <div className="text-[9px] font-bold uppercase tracking-wider text-white/50">Total</div>
+                      <div className="mt-1 font-mono text-[16px] font-bold text-white">{duracaoTotal}</div>
+                      <div className="text-[10px] text-white/50">min</div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Pedidos vinculados */}
+              <div className="px-5 py-4">
+                <div className="mb-3 flex items-center justify-between">
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-[#9CA3AF]">
+                    Pedidos vinculados
+                  </span>
+                  {pedidos.length > 0 && (
+                    <span className="font-mono text-[11px] text-[#9CA3AF]">
+                      {totalLitrosPedidos.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} L ·{' '}
+                      {totalUnidadesPedidos.toLocaleString('pt-BR')} un
+                    </span>
+                  )}
+                </div>
+
+                {pedidos.length === 0 ? (
+                  <div className="rounded-[10px] border border-dashed border-[#E4E7EC] p-6 text-center text-[13px] text-[#9CA3AF]">
+                    Nenhum pedido vinculado
+                  </div>
+                ) : (
+                  <div className="overflow-hidden rounded-[10px] border border-[#E4E7EC]">
+                    {/* Cabeçalho */}
+                    <div className="grid grid-cols-[1fr_auto_auto_auto] gap-3 border-b border-[#E4E7EC] bg-[#F7F8FA] px-3 py-2">
+                      <span className="text-[10px] font-bold uppercase tracking-wide text-[#9CA3AF]">Produto</span>
+                      <span className="text-[10px] font-bold uppercase tracking-wide text-[#9CA3AF]">Pedido</span>
+                      <span className="text-[10px] font-bold uppercase tracking-wide text-[#9CA3AF]">Qtd</span>
+                      <span className="text-[10px] font-bold uppercase tracking-wide text-[#9CA3AF]">Litros</span>
+                    </div>
+                    {/* Linhas */}
+                    <div className="max-h-56 divide-y divide-[#F0F2F5] overflow-y-auto">
+                      {pedidos.map((p, idx) => (
+                        <div
+                          key={p.id}
+                          className={`grid grid-cols-[1fr_auto_auto_auto] items-center gap-3 px-3 py-2.5 ${
+                            idx % 2 === 0 ? 'bg-white' : 'bg-[#FAFAFA]'
+                          }`}
+                        >
+                          <span className="truncate text-[12px] font-medium text-[#111827]" title={p.produto_descricao}>
+                            {p.produto_descricao}
+                          </span>
+                          <span className="whitespace-nowrap font-mono text-[11px] text-[#6B7280]">
+                            #{p.numero_pedido}
+                          </span>
+                          <span className="whitespace-nowrap font-mono text-[12px] font-semibold text-[#111827]">
+                            {Number(p.quantidade).toLocaleString('pt-BR')}
+                          </span>
+                          <span className="whitespace-nowrap font-mono text-[12px] font-semibold text-[#2563EB]">
+                            {Number(p.total_litros).toLocaleString('pt-BR', { maximumFractionDigits: 0 })}L
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                    {/* Rodapé com total */}
+                    {pedidos.length > 1 && (
+                      <div className="grid grid-cols-[1fr_auto_auto_auto] gap-3 border-t border-[#E4E7EC] bg-[#F7F8FA] px-3 py-2">
+                        <span className="text-[11px] font-semibold text-[#4B5563]">Total</span>
+                        <span />
+                        <span className="font-mono text-[12px] font-bold text-[#111827]">
+                          {totalUnidadesPedidos.toLocaleString('pt-BR')}
+                        </span>
+                        <span className="font-mono text-[12px] font-bold text-[#2563EB]">
+                          {totalLitrosPedidos.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}L
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        {!loading && !erro && ordem && (
+          <div className="shrink-0 border-t border-[#E4E7EC] bg-[#F7F8FA] px-5 py-3">
+            <button
+              onClick={onClose}
+              className="w-full rounded-[10px] bg-white px-4 py-2.5 text-sm font-semibold text-[#4B5563] shadow-sm ring-1 ring-[#E4E7EC] transition hover:bg-[#F0F2F5]"
+            >
+              Fechar
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export default function CalendarioPage() {
   const [diaBase, setDiaBase] = useState<Date>(() => new Date())
   const [viewMode, setViewMode] = useState<ViewMode>('semana')
   const [maquinas, setMaquinas] = useState<Maquina[]>([])
   const [tanques, setTanques] = useState<Tanque[]>([])
+  const [turnos, setTurnos] = useState<Turno[]>([])
   const [ordens, setOrdens] = useState<Ordem[]>([])
   const [produtos, setProdutos] = useState<Produto[]>([])
+  const [ordensBacklogTanque, setOrdensBacklogTanque] = useState<OrdemBacklogItem[]>([])
+  const [ordensBacklogEnvase, setOrdensBacklogEnvase] = useState<OrdemBacklogEnvaseItem[]>([])
+  const [backlogLoading, setBacklogLoading] = useState(false)
+  const [backlogEnvaseLoading, setBacklogEnvaseLoading] = useState(false)
   const [mensagem, setMensagem] = useState('')
   const [novaOrdemAberta, setNovaOrdemAberta] = useState(false)
   const [janela, setJanela] = useState<JanelaProducao>(DEFAULT_JANELA_PRODUCAO)
   const [zoomIndex, setZoomIndex] = useState(1)
-  const [busca, setBusca] = useState('')
-  const [filtroEtapa, setFiltroEtapa] = useState<'todas' | 'tanque' | 'envase'>('todas')
+  const [buscaEnvase, setBuscaEnvase] = useState('')
   const [activePayload, setActivePayload] = useState<DragPayload | null>(null)
   const [pendingDrop, setPendingDrop] = useState<PendingDrop | null>(null)
   const [configOrder, setConfigOrder] = useState<Ordem | null>(null)
+  const [scheduleDrop, setScheduleDrop] = useState<ScheduleDropState | null>(null)
+  const [tanqueDetailOrdemId, setTanqueDetailOrdemId] = useState<string | null>(null)
   const [resourceTab, setResourceTab] = useState<'tanque' | 'envase'>('envase')
   const [selectedMachineId, setSelectedMachineId] = useState<string | null>(null)
   const rowRefs = useRef<Record<string, HTMLDivElement | null>>({})
@@ -1465,18 +2175,44 @@ export default function CalendarioPage() {
   const pxPerMinute = viewMode === 'dia' ? zoom.pxPerMinuteDay : zoom.pxPerMinuteWeek
   const dayWidth = (janela.endHour - janela.startHour) * 60 * pxPerMinute
 
+  const carregarBacklog = useCallback(async () => {
+    setBacklogLoading(true)
+    try {
+      const data = await fetch('/api/backlog').then((r) => r.json())
+      setOrdensBacklogTanque(Array.isArray(data) ? data : [])
+    } catch {
+      // silencioso — backlog continua com dados anteriores
+    } finally {
+      setBacklogLoading(false)
+    }
+  }, [])
+
+  const carregarBacklogEnvase = useCallback(async () => {
+    setBacklogEnvaseLoading(true)
+    try {
+      const data = await fetch('/api/backlog/envase').then((r) => r.json())
+      setOrdensBacklogEnvase(Array.isArray(data) ? data : [])
+    } catch {
+      // silencioso
+    } finally {
+      setBacklogEnvaseLoading(false)
+    }
+  }, [])
+
   const carregarDados = useCallback(async () => {
     try {
       setMensagem('')
-      const [m, t, o, p] = await Promise.all([
+      const [m, tn, tu, o, p] = await Promise.all([
         fetch('/api/maquinas').then((r) => r.json()),
         fetch('/api/tanques').then((r) => r.json()),
+        fetch('/api/turnos').then((r) => r.json()),
         fetch(`/api/ordens?inicio=${inicioYmd}&fim=${fimYmd}`).then((r) => r.json()),
         fetch('/api/produtos').then((r) => r.json()),
       ])
 
       setMaquinas(Array.isArray(m) ? m : [])
-      setTanques(Array.isArray(t) ? t : [])
+      setTanques(Array.isArray(tn) ? tn : [])
+      setTurnos(Array.isArray(tu) ? tu : [])
       setOrdens(Array.isArray(o) ? o : [])
       setProdutos(Array.isArray(p) ? p : [])
 
@@ -1486,9 +2222,13 @@ export default function CalendarioPage() {
     }
   }, [inicioYmd, fimYmd])
 
+  const carregarTudo = useCallback(async () => {
+    await Promise.all([carregarDados(), carregarBacklog(), carregarBacklogEnvase()])
+  }, [carregarDados, carregarBacklog, carregarBacklogEnvase])
+
   useEffect(() => {
-    carregarDados()
-  }, [carregarDados])
+    carregarTudo()
+  }, [carregarTudo])
 
   useEffect(() => {
     try {
@@ -1571,19 +2311,17 @@ export default function CalendarioPage() {
     }
   }, [recursosAtivos, selectedMachineId])
   const ordensBacklog = useMemo(() => {
-    const termo = normalizarBusca(busca)
-    const etapaBacklog = filtroEtapa === 'todas' ? resourceTab : filtroEtapa
-
+    const termo = normalizarBusca(buscaEnvase)
     return ordensAtivas
       .filter((o) => ordemPlanningStatus(o) === 'BACKLOG')
-      .filter((o) => o.etapa === etapaBacklog)
+      .filter((o) => o.etapa === 'envase')
       .filter((o) => {
         if (!termo) return true
         return [o.produto?.nome, o.produto_sku, o.numero_externo, o.lote, o.tanque]
           .filter(Boolean)
           .some((value) => String(value).toLowerCase().includes(termo))
       })
-  }, [ordensAtivas, busca, filtroEtapa, resourceTab])
+  }, [ordensAtivas, buscaEnvase])
 
   async function patchAgenda(
     ordemId: string,
@@ -1611,7 +2349,7 @@ export default function CalendarioPage() {
   async function salvarAgenda(ordemId: string, maquinaId: string, inicio: Date, fim?: Date) {
     const result = await patchAgenda(ordemId, maquinaId, inicio, fim)
     if (result.ok) {
-      await carregarDados()
+      await carregarTudo()
       return
     }
 
@@ -1638,15 +2376,6 @@ export default function CalendarioPage() {
 
   async function salvarAgendaComFim(ordemId: string, maquinaId: string, inicio: Date, fim: Date) {
     await salvarAgenda(ordemId, maquinaId, inicio, fim)
-  }
-
-  async function desagendar(ordemId: string) {
-    const result = await patchAgenda(ordemId, null, null)
-    if (!result.ok) {
-      setMensagem(result.error ?? 'Nao foi possivel desagendar.')
-      return
-    }
-    await carregarDados()
   }
 
   function handleDragStart(event: DragStartEvent) {
@@ -1678,13 +2407,22 @@ export default function CalendarioPage() {
     const x = centerX - rect.left + row.scrollLeft
     const y = centerY - rect.top + row.scrollTop
     const calendarMetrics = getCalendarMetrics(viewMode, zoomIndex)
+    const actualColumnWidth = isBoardDrop
+      ? row.getBoundingClientRect().width / range.dias.length
+      : dayWidth
     const inicio = snapDate(
       isBoardDrop
-        ? positionToCalendarDate(x, y, range.inicio, janela, calendarMetrics.columnWidth, calendarMetrics.pxPerMinute, range.dias.length)
+        ? positionToCalendarDate(x, y, range.inicio, janela, actualColumnWidth, calendarMetrics.pxPerMinute, range.dias.length)
         : positionToDate(x, range.inicio, janela, dayWidth, pxPerMinute),
       janela.snapMinutes
     )
-    await salvarAgenda(payload.ordemId, maquinaId, inicio)
+
+    if (resourceTab === 'tanque' && payload.type === 'backlog') {
+      const ordemBacklog = ordensBacklogTanque.find((o) => o.id === payload.ordemId) ?? null
+      setScheduleDrop({ ordemId: payload.ordemId, tankId: maquinaId, inicio, ordemBacklog })
+    } else {
+      await salvarAgenda(payload.ordemId, maquinaId, inicio)
+    }
   }
 
   async function salvarConflito(primary: PendingDrop, secondary?: PendingDrop) {
@@ -1708,7 +2446,7 @@ export default function CalendarioPage() {
     }
 
     setPendingDrop(null)
-    await carregarDados()
+    await carregarTudo()
   }
 
   async function salvarConfiguracaoPedido(ordem: Ordem, setupMin: number, producaoMin: number, limpezaMin: number) {
@@ -1749,7 +2487,87 @@ export default function CalendarioPage() {
       if (!result.ok) throw new Error(result.error ?? 'Tempos salvos, mas nao foi possivel recalcular a agenda.')
     }
 
-    await carregarDados()
+    await carregarTudo()
+  }
+
+  function encontrarTurno(hora: Date): Turno | null {
+    const minutosDia = hora.getHours() * 60 + hora.getMinutes()
+    return turnos.find((t) => t.ativo && minutosDia >= t.hora_inicio && minutosDia < t.hora_fim) ?? null
+  }
+
+  async function agendarTanque(ordemId: string, tankId: string, inicio: Date) {
+    const ordemBacklog = ordensBacklogTanque.find((o) => o.id === ordemId)
+    const duracao = ordemBacklog?.total_duration_minutes ?? 60
+    const fim = calcularFim(inicio, duracao)
+
+    const turno = encontrarTurno(inicio)
+    const turnoId = turno?.id ?? 'manual'
+    const turnoNome = turno?.nome ?? 'Manual'
+    const dataAgendamento = format(inicio, 'yyyy-MM-dd')
+
+    const producaoMin =
+      ordemBacklog?.production_time_minutes ??
+      ordemBacklog?.total_duration_minutes ??
+      duracao
+
+    const agendRes = await fetch('/api/producao/agendamentos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ordem_id: ordemId,
+        tank_id: tankId,
+        turno_id: turnoId,
+        turno_nome: turnoNome,
+        data_agendamento: dataAgendamento,
+        inicio_agendado: inicio.toISOString(),
+        fim_calculado: fim.toISOString(),
+        production_time_minutes: producaoMin,
+        cleaning_time_minutes: ordemBacklog?.cleaning_time_minutes ?? null,
+      }),
+    })
+
+    if (!agendRes.ok) {
+      const data = await agendRes.json().catch(() => ({}))
+      setMensagem(data.error ?? 'Erro ao criar agendamento no tanque.')
+      await carregarTudo()
+      return
+    }
+
+    await carregarTudo()
+  }
+
+  async function desagendar(ordemId: string) {
+    const ordem = ordens.find((o) => o.id === ordemId)
+    const isTanque = ordem?.etapa === 'tanque' || resourceTab === 'tanque'
+
+    if (isTanque) {
+      const agendRes = await fetch(`/api/producao/agendamentos?ordem_id=${ordemId}`)
+      if (agendRes.ok) {
+        const agendamento = await agendRes.json()
+        if (agendamento?.id) {
+          const deleteRes = await fetch(`/api/producao/agendamentos?id=${agendamento.id}`, { method: 'DELETE' })
+          if (!deleteRes.ok) {
+            const data = await deleteRes.json().catch(() => ({}))
+            setMensagem(data.error ?? 'Erro ao remover agendamento do tanque.')
+            return
+          }
+          await fetch('/api/ordens', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: ordemId, inicio_agendado: null, fim_calculado: null }),
+          })
+          await carregarTudo()
+          return
+        }
+      }
+    }
+
+    const result = await patchAgenda(ordemId, null, null)
+    if (!result.ok) {
+      setMensagem(result.error ?? 'Nao foi possivel desagendar.')
+      return
+    }
+    await carregarTudo()
   }
 
   const activeOrdem = activePayload ? ordens.find((ordem) => ordem.id === activePayload.ordemId) : null
@@ -1864,61 +2682,24 @@ export default function CalendarioPage() {
         {mensagem && <div className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800">{mensagem}</div>}
 
         <main className="flex min-h-0 flex-1 gap-3 p-3">
-          <aside className="flex w-72 shrink-0 flex-col overflow-hidden rounded-[12px] border border-[#E4E7EC] bg-white">
-            <div className="border-b border-[#E4E7EC] p-3">
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <h2 className="text-sm font-semibold text-[#111827]">Backlog</h2>
-                  <span className="grid h-4 min-w-4 place-items-center rounded-full bg-[#2563EB] px-1 text-[10px] font-medium text-white">
-                    {ordensBacklog.length}
-                  </span>
-                </div>
-                <button
-                  onClick={() => setNovaOrdemAberta(true)}
-                  className="grid h-7 w-7 place-items-center rounded-full bg-[#2563EB] text-white hover:bg-[#1D4ED8]"
-                  title="Nova ordem"
-                >
-                  <Plus size={16} />
-                </button>
-              </div>
-
-              <div className="mt-3 flex h-9 items-center gap-2 rounded-[8px] border border-[#E4E7EC] px-2 focus-within:border-[#2563EB]">
-                <Search size={15} className="text-[#9CA3AF]" />
-                <input
-                  value={busca}
-                  onChange={(e) => setBusca(e.target.value)}
-                  placeholder="Buscar produto, SKU, lote..."
-                  className="h-9 min-w-0 flex-1 text-sm text-[#111827] outline-none"
-                />
-              </div>
-
-              <div className="mt-2 grid grid-cols-3 gap-1 rounded-full bg-[#F0F2F5] p-1">
-                {(['todas', 'tanque', 'envase'] as const).map((value) => (
-                  <button
-                    key={value}
-                    onClick={() => {
-                      setFiltroEtapa(value)
-                      if (value !== 'todas') setResourceTab(value)
-                    }}
-                    className={`h-7 rounded-full text-xs font-medium ${filtroEtapa === value ? 'bg-[#2563EB] text-white' : 'text-[#9CA3AF]'}`}
-                  >
-                    {value}
-                  </button>
-                ))}
-              </div>
+          <aside className="flex w-80 shrink-0 flex-col overflow-hidden rounded-[12px] border border-[#E4E7EC] bg-white">
+            <div className="flex items-center justify-between border-b border-[#E4E7EC] px-3 py-2">
+              <span className="text-[11px] font-semibold uppercase tracking-wide text-[#9CA3AF]">
+                {resourceTab === 'tanque' ? 'Tanques' : 'Envase'}
+              </span>
+              <button
+                onClick={() => setNovaOrdemAberta(true)}
+                className="grid h-7 w-7 place-items-center rounded-full bg-[#2563EB] text-white hover:bg-[#1D4ED8]"
+                title="Nova ordem no Planejamento do Tanque"
+              >
+                <Plus size={16} />
+              </button>
             </div>
-
-            <div className="min-h-0 flex-1 overflow-y-auto">
-              <DroppableBacklog>
-                {ordensBacklog.length === 0 ? (
-                  <div className="rounded-[12px] border border-dashed border-[#E4E7EC] p-6 text-center text-[13px] text-[#9CA3AF]">
-                    Nenhuma ordem pendente nesta janela.
-                  </div>
-                ) : (
-                  ordensBacklog.map((ordem) => <DraggableBacklogCard key={ordem.id} ordem={ordem} />)
-                )}
-              </DroppableBacklog>
-            </div>
+            {resourceTab === 'tanque' ? (
+              <BacklogTanques ordens={ordensBacklogTanque} loading={backlogLoading} />
+            ) : (
+              <BacklogEnvase ordens={ordensBacklogEnvase} loading={backlogEnvaseLoading} />
+            )}
           </aside>
 
           <section className="min-w-0 flex-1 overflow-hidden rounded-[12px] border border-[#E4E7EC] bg-white">
@@ -1963,7 +2744,6 @@ export default function CalendarioPage() {
                       key={tab}
                       onClick={() => {
                         setResourceTab(tab)
-                        if (filtroEtapa !== 'todas') setFiltroEtapa(tab)
                       }}
                       className={`h-7 rounded-[6px] px-3 text-xs font-medium uppercase ${
                         resourceTab === tab ? 'bg-white text-[#2563EB] shadow-[var(--shadow-sm)]' : 'text-[#9CA3AF]'
@@ -1973,6 +2753,7 @@ export default function CalendarioPage() {
                     </button>
                   ))}
                 </div>
+
 
                 <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
                   {recursosAtivos.map((resource) => {
@@ -2012,11 +2793,12 @@ export default function CalendarioPage() {
                     viewMode={viewMode}
                     zoomIndex={zoomIndex}
                     zoomLabel={zoom.label}
+                    turnos={turnos}
                     boardRef={(node) => {
                       rowRefs.current[selectedMachine.id] = node
                     }}
                     onRemove={desagendar}
-                    onOpenOrder={setConfigOrder}
+                    onOpenOrder={resourceTab === 'tanque' ? (ordem) => setTanqueDetailOrdemId(ordem.id) : setConfigOrder}
                     onEdit={salvarAgendaComFim}
                   />
                 ) : (
@@ -2075,6 +2857,27 @@ export default function CalendarioPage() {
             maquinas={maquinas}
             onClose={() => setConfigOrder(null)}
             onSave={salvarConfiguracaoPedido}
+          />
+        )}
+
+        {scheduleDrop && (
+          <ScheduleTanqueModal
+            scheduleDrop={scheduleDrop}
+            turnos={turnos}
+            onClose={() => setScheduleDrop(null)}
+            onConfirm={async (ordemId, tankId, inicio) => {
+              setScheduleDrop(null)
+              await agendarTanque(ordemId, tankId, inicio)
+            }}
+          />
+        )}
+
+        {tanqueDetailOrdemId && (
+          <TanqueDetailModal
+            ordemId={tanqueDetailOrdemId}
+            turnos={turnos}
+            tanques={tanques}
+            onClose={() => setTanqueDetailOrdemId(null)}
           />
         )}
 

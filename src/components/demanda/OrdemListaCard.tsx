@@ -6,7 +6,7 @@ import { ptBR } from 'date-fns/locale'
 import {
   Clock, Calendar, Zap, CheckCircle2, XCircle,
   ChevronDown, ChevronUp, Edit3, Package, Layers,
-  AlertTriangle, Save, X, Trash2,
+  AlertTriangle, Save, X, Trash2, RotateCcw,
 } from 'lucide-react'
 import type { OrdemHistorico, PlanningStatus } from '@/types'
 
@@ -24,11 +24,13 @@ type StatusConfig = {
 }
 
 const STATUS_CONFIG: Record<PlanningStatus, StatusConfig> = {
-  BACKLOG:       { label: 'Backlog',      badge: 'bg-slate-100 text-slate-600 border border-slate-200',       icone: Clock,        dot: 'bg-slate-400' },
-  SCHEDULED:     { label: 'Agendada',     badge: 'bg-blue-100 text-blue-700 border border-blue-200',          icone: Calendar,     dot: 'bg-blue-500' },
-  IN_PRODUCTION: { label: 'Em Produção',  badge: 'bg-amber-100 text-amber-700 border border-amber-200',       icone: Zap,          dot: 'bg-amber-500' },
-  COMPLETED:     { label: 'Concluída',    badge: 'bg-emerald-100 text-emerald-700 border border-emerald-200', icone: CheckCircle2, dot: 'bg-emerald-500' },
-  CANCELED:      { label: 'Cancelada',    badge: 'bg-red-100 text-red-600 border border-red-200',             icone: XCircle,      dot: 'bg-red-500' },
+  BACKLOG:            { label: 'Backlog',           badge: 'bg-slate-100 text-slate-600 border border-slate-200',       icone: Clock,        dot: 'bg-slate-400' },
+  WAITING_TANK:       { label: 'Ag. Tanque',        badge: 'bg-purple-100 text-purple-700 border border-purple-200',    icone: Clock,        dot: 'bg-purple-500' },
+  READY_TO_SCHEDULE:  { label: 'Pronto p/ Agendar', badge: 'bg-teal-100 text-teal-700 border border-teal-200',          icone: Calendar,     dot: 'bg-teal-500' },
+  SCHEDULED:          { label: 'Agendada',          badge: 'bg-blue-100 text-blue-700 border border-blue-200',          icone: Calendar,     dot: 'bg-blue-500' },
+  IN_PRODUCTION:      { label: 'Em Produção',       badge: 'bg-amber-100 text-amber-700 border border-amber-200',       icone: Zap,          dot: 'bg-amber-500' },
+  COMPLETED:          { label: 'Concluída',         badge: 'bg-emerald-100 text-emerald-700 border border-emerald-200', icone: CheckCircle2, dot: 'bg-emerald-500' },
+  CANCELED:           { label: 'Cancelada',         badge: 'bg-red-100 text-red-600 border border-red-200',             icone: XCircle,      dot: 'bg-red-500' },
 }
 
 function fmtMin(m: number | null | undefined): string {
@@ -52,6 +54,7 @@ export function OrdemListaCard({ ordem, onAtualizado, onCancelado }: Props) {
   const [confirmCancel, setConfirmCancel] = useState(false)
   const [motivoCancel, setMotivoCancel] = useState('')
   const [cancelando, setCancelando] = useState(false)
+  const [revertendo, setRevertendo] = useState(false)
 
   // Edit state
   const [nomeOrdem, setNomeOrdem] = useState(ordem.numero_externo ?? '')
@@ -119,6 +122,23 @@ export function OrdemListaCard({ ordem, onAtualizado, onCancelado }: Props) {
     } finally {
       setCancelando(false)
       setConfirmCancel(false)
+    }
+  }
+
+  async function reverter() {
+    setRevertendo(true)
+    try {
+      const res = await fetch(`/api/producao/ordens/${ordem.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ planning_status: 'BACKLOG' }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        onAtualizado({ id: ordem.id, ...data })
+      }
+    } finally {
+      setRevertendo(false)
     }
   }
 
@@ -195,6 +215,17 @@ export function OrdemListaCard({ ordem, onAtualizado, onCancelado }: Props) {
               </div>
 
               <div className="flex items-center gap-2">
+                {isCancelada && (
+                  <button
+                    onClick={reverter}
+                    disabled={revertendo}
+                    className="flex items-center gap-1 text-xs text-amber-600 hover:text-amber-700 font-semibold transition-colors disabled:opacity-50"
+                    title="Reverter para Backlog"
+                  >
+                    <RotateCcw size={13} />
+                    {revertendo ? 'Revertendo...' : 'Reverter'}
+                  </button>
+                )}
                 {podeCancelar && !expandido && (
                   <button
                     onClick={() => setConfirmCancel(true)}

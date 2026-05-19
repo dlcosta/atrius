@@ -19,13 +19,14 @@ const METRICAS = [
 ]
 
 const STATUS_LABELS: Record<PlanningStatus, string> = {
-  BACKLOG: 'Backlog', SCHEDULED: 'Agendadas', IN_PRODUCTION: 'Em Produção',
+  BACKLOG: 'Backlog', WAITING_TANK: 'Ag. Tanque', READY_TO_SCHEDULE: 'Pronto p/ Agendar',
+  SCHEDULED: 'Agendadas', IN_PRODUCTION: 'Em Produção',
   COMPLETED: 'Concluídas', CANCELED: 'Canceladas',
 }
 
 const STATUS_ATIVOS: PlanningStatus[] = ['BACKLOG', 'SCHEDULED', 'IN_PRODUCTION']
 
-export function ListaProducaoContainer() {
+export function ListaProducaoContainer({ etapa = 'tanque' }: { etapa?: string } = {}) {
   const [ordens, setOrdens] = useState<OrdemHistorico[]>([])
   const [carregando, setCarregando] = useState(true)
   const [busca, setBusca] = useState('')
@@ -36,7 +37,7 @@ export function ListaProducaoContainer() {
   const carregarOrdens = useCallback(async () => {
     setCarregando(true)
     try {
-      const res = await fetch('/api/historico/producoes')
+      const res = await fetch(`/api/historico/producoes?etapa=${etapa}`)
       if (res.ok) {
         const data = await res.json()
         setOrdens(Array.isArray(data) ? data : [])

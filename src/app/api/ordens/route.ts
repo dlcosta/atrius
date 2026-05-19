@@ -75,10 +75,25 @@ function normalizarEtapa(valor: unknown, sku?: string | null, unidade?: string |
 }
 
 function normalizarPlanningStatus(valor: unknown): PlanningStatus | null {
-  if (valor === 'BACKLOG' || valor === 'SCHEDULED' || valor === 'IN_PRODUCTION' || valor === 'COMPLETED' || valor === 'CANCELED') {
+  if (
+    valor === 'BACKLOG' ||
+    valor === 'WAITING_TANK' ||
+    valor === 'READY_TO_SCHEDULE' ||
+    valor === 'SCHEDULED' ||
+    valor === 'IN_PRODUCTION' ||
+    valor === 'COMPLETED' ||
+    valor === 'CANCELED'
+  ) {
     return valor
   }
   return null
+}
+
+function resolverPlanningStatusEnvase(etapa: EtapaOrdem, origemTanque: OrigemTanque | null): PlanningStatus {
+  if (etapa !== 'envase') return 'SCHEDULED'
+  if (!origemTanque) return 'SCHEDULED'
+  if (origemTanque.planning_status === 'COMPLETED') return 'SCHEDULED'
+  return 'WAITING_TANK'
 }
 
 function normalizarCalcMode(valor: unknown): CalcMode {
@@ -477,10 +492,14 @@ export async function PATCH(req: NextRequest) {
   if (!Number.isFinite(litros) || litros <= 0) return NextResponse.json({ error: 'Litros invalido' }, { status: 422 })
 
   const setupTimeMinutes = normalizarInteiro(metaUpdates.setup_time_minutes ?? ordemData.setup_time_minutes) ?? 0
-  const productionTimeMinutes = normalizarInteiro(metaUpdates.production_time_minutes ?? ordemData.production_time_minutes) ?? 0
+  const rawProductionTimeMinutes = normalizarInteiro(metaUpdates.production_time_minutes ?? ordemData.production_time_minutes) ?? 0
   const cleaningTimeMinutes = normalizarInteiro(metaUpdates.cleaning_time_minutes ?? ordemData.cleaning_time_minutes) ?? 0
+  const totalDurationFallback = normalizarInteiro(ordemData.total_duration_minutes) ?? 0
+  const productionTimeMinutes = rawProductionTimeMinutes > 0
+    ? rawProductionTimeMinutes
+    : Math.max(0, totalDurationFallback - setupTimeMinutes - cleaningTimeMinutes)
   if (setupTimeMinutes < 0 || productionTimeMinutes <= 0 || cleaningTimeMinutes < 0) {
-    return NextResponse.json({ error: 'Tempos invalidos para setup/producao/limpeza' }, { status: 422 })
+    return NextResponse.json({ error: 'Defina o tempo de producao da ordem antes de agendar.' }, { status: 422 })
   }
   if (packageVolumeLiters !== null && packageVolumeLiters <= 0) {
     return NextResponse.json({ error: 'packageVolumeLiters deve ser maior que zero' }, { status: 422 })
@@ -493,9 +512,10 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: 'Volume planejado ultrapassa a capacidade do tanque selecionado' }, { status: 422 })
   }
 
+  let origemTanque: OrigemTanque | null = null
   if (etapa === 'envase' && originTankOrderId) {
-    const origem = await carregarOrigemTanque(supabase, originTankOrderId)
-    if (!origem || origem.etapa !== 'tanque') return NextResponse.json({ error: 'Origem de tanque invalida para envase' }, { status: 422 })
+    origemTanque = await carregarOrigemTanque(supabase, originTankOrderId)
+    if (!origemTanque || origemTanque.etapa !== 'tanque') return NextResponse.json({ error: 'Origem de tanque invalida para envase' }, { status: 422 })
   }
 
   const inicio = new Date(inicio_agendado)
@@ -545,7 +565,7 @@ export async function PATCH(req: NextRequest) {
     setup_time_minutes: setupTimeMinutes,
     production_time_minutes: productionTimeMinutes,
     cleaning_time_minutes: cleaningTimeMinutes,
-    planning_status: 'SCHEDULED',
+    planning_status: resolverPlanningStatusEnvase(etapa, origemTanque),
     calc_mode: calcMode,
     tank_volume_liters: tankVolumeLiters,
     package_volume_liters: packageVolumeLiters,
@@ -676,7 +696,7 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const numero_externo = `MAN-${Date.now()}`
+  const numero_externo = `MAN-${crypto.randomUUID().replace(/-/g, '').slice(0, 12).toUpperCase()}`
   const planningStatus: PlanningStatus = planningStatusFromBody ?? (startAt ? 'SCHEDULED' : 'BACKLOG')
 
   const { data: nova, error } = await supabase

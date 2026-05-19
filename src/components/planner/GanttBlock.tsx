@@ -1,4 +1,4 @@
-﻿import type { BlocoGantt } from '@/types'
+import type { BlocoGantt } from '@/types'
 import {
   JanelaProducao,
   horaParaPixel,
@@ -6,60 +6,125 @@ import {
   formatarHora,
   PIXELS_PER_MINUTE,
 } from '@/lib/planning/gantt-layout'
+import { X } from 'lucide-react'
 
 type Props = {
   bloco: BlocoGantt
   dia: Date
   janela: JanelaProducao
   conflito?: boolean
+  aguardandoTanque?: boolean
   onRemover?: (ordemId: string) => void
 }
 
-export function GanttBlock({ bloco, dia, janela, conflito, onRemover }: Props) {
+const TIPO_CONFIG = {
+  producao: {
+    label: 'Produção',
+    textClass: 'text-slate-900',
+    borderClass: 'border-black/15',
+    badgeClass: 'bg-black/10 text-slate-800',
+    stripedBg: false,
+  },
+  setup: {
+    label: 'Setup',
+    textClass: 'text-slate-700',
+    borderClass: 'border-slate-400/40',
+    badgeClass: 'bg-white/40 text-slate-700',
+    stripedBg: true,
+  },
+  limpeza: {
+    label: 'Limpeza',
+    textClass: 'text-amber-900',
+    borderClass: 'border-amber-600',
+    badgeClass: 'bg-amber-100 text-amber-800',
+    stripedBg: false,
+  },
+}
+
+export function GanttBlock({ bloco, dia, janela, conflito, aguardandoTanque, onRemover }: Props) {
   const left = horaParaPixel(bloco.inicio, dia, janela)
   const width = bloco.duracao_min * PIXELS_PER_MINUTE
+  const config = TIPO_CONFIG[bloco.tipo]
   const isLimpeza = bloco.tipo === 'limpeza'
   const isSetup = bloco.tipo === 'setup'
+  const isProducao = bloco.tipo === 'producao'
+
+  const tooltip = [
+    bloco.produto,
+    bloco.tanque ? `Tanque: ${bloco.tanque}` : '',
+    `${formatarHora(bloco.inicio)} → ${formatarHora(bloco.fim)}`,
+    `Duração: ${formatarDuracao(bloco.duracao_min)}`,
+    conflito ? '⚠ CONFLITO DE HORÁRIO' : '',
+  ]
+    .filter(Boolean)
+    .join('\n')
 
   return (
     <div
-      className={`absolute top-2 bottom-2 rounded-xl flex flex-col justify-center px-4 select-none overflow-hidden shadow-sm transition-all hover:scale-[1.02] hover:z-20 hover:shadow-xl
-        ${conflito ? 'ring-4 ring-red-600 z-10 animate-pulse' : ''}
-        ${isLimpeza ? 'opacity-90 border-2 border-dashed border-amber-600' : 'border-2 border-black/20'}
-        ${isSetup ? 'bg-[length:12px_12px] bg-[linear-gradient(-45deg,rgba(255,255,255,0.3)_25%,transparent_25%,transparent_50%,rgba(255,255,255,0.3)_50%,rgba(255,255,255,0.3)_75%,transparent_75%,transparent)]' : ''}
+      className={`group absolute top-2 bottom-2 flex flex-col justify-between overflow-hidden rounded-xl px-3 py-2 select-none shadow-sm transition-all duration-150
+        hover:z-20 hover:shadow-lg hover:scale-[1.01]
+        ${conflito ? 'ring-4 ring-red-500 z-10 animate-pulse' : ''}
+        ${isLimpeza ? 'border-2 border-dashed border-amber-500 opacity-90' : `border-2 ${config.borderClass}`}
+        ${isSetup ? 'bg-[length:10px_10px] bg-[repeating-linear-gradient(-45deg,rgba(255,255,255,0.25)_0,rgba(255,255,255,0.25)_1px,transparent_0,transparent_50%)]' : ''}
       `}
       style={{
         left,
-        width: Math.max(width, 80),
-        backgroundColor: bloco.cor,
+        width: Math.max(width, 72),
+        backgroundColor: isLimpeza ? '#FDE68A' : isSetup ? '#E5E7EB' : bloco.cor,
       }}
-      title={`${bloco.produto}\n${bloco.tanque ? `Tanque: ${bloco.tanque}\n` : ''}${formatarHora(bloco.inicio)} - ${formatarHora(bloco.fim)}\n${formatarDuracao(bloco.duracao_min)}`}
+      title={tooltip}
     >
-      <span className="text-lg font-black text-slate-900 truncate leading-none drop-shadow-md tracking-tighter">
-        {bloco.tanque && <span className="text-blue-900 opacity-60 mr-1">[{bloco.tanque.toUpperCase()}]</span>}
-        {bloco.produto}
-      </span>
-      <div className="flex items-center gap-2 mt-1">
-        <span className="text-xs bg-black/10 px-1.5 py-0.5 rounded font-bold text-slate-800">
-          {formatarHora(bloco.inicio)}
-        </span>
-        <span className="text-xs font-black text-slate-900 drop-shadow-sm">
-          {formatarDuracao(bloco.duracao_min)}
-        </span>
+      {/* Cabeçalho */}
+      <div className="flex items-start justify-between gap-1">
+        <div className="min-w-0 flex-1">
+          {bloco.tanque && isProducao && (
+            <div className="mb-0.5 truncate text-[10px] font-bold uppercase tracking-wider opacity-60">
+              [{bloco.tanque.toUpperCase()}]
+            </div>
+          )}
+          <div className={`truncate text-[13px] font-black leading-tight tracking-tight drop-shadow-sm ${config.textClass}`}>
+            {bloco.produto}
+          </div>
+        </div>
+
+        {isProducao && onRemover && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              onRemover(bloco.ordemId)
+            }}
+            className="invisible ml-1 grid h-5 w-5 shrink-0 place-items-center rounded-full border border-black/10 bg-white/60 text-slate-600 transition hover:bg-red-50 hover:text-red-600 group-hover:visible"
+            title="Remover do calendário"
+          >
+            <X size={10} />
+          </button>
+        )}
       </div>
 
-      {!isLimpeza && !isSetup && onRemover && (
-        <button
-          onClick={(e) => {
-            e.stopPropagation()
-            onRemover(bloco.ordemId)
-          }}
-          className="absolute top-0.5 right-0.5 text-slate-600 hover:text-red-600 text-xs leading-none"
-          title="Remover do gantt"
-        >
-          x
-        </button>
-      )}
+      {/* Rodapé com horário + duração */}
+      <div className="mt-auto flex items-center gap-1.5">
+        <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${config.badgeClass}`}>
+          {formatarHora(bloco.inicio)}
+        </span>
+        <span className={`text-[10px] font-semibold opacity-70 ${config.textClass}`}>
+          {formatarDuracao(bloco.duracao_min)}
+        </span>
+        {conflito && (
+          <span className="ml-auto rounded-full bg-red-600 px-1.5 py-0.5 text-[9px] font-bold text-white">
+            CONFLITO
+          </span>
+        )}
+        {!conflito && aguardandoTanque && isProducao && (
+          <span className="ml-auto rounded-full bg-purple-600 px-1.5 py-0.5 text-[9px] font-bold text-white">
+            AG. TANQUE
+          </span>
+        )}
+        {!conflito && !aguardandoTanque && (
+          <span className={`ml-auto rounded px-1.5 py-0.5 text-[9px] font-semibold uppercase opacity-50 ${config.textClass}`}>
+            {config.label}
+          </span>
+        )}
+      </div>
     </div>
   )
 }

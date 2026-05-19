@@ -9,6 +9,7 @@ export async function GET(req: NextRequest) {
   const search = searchParams.get('search')?.toLowerCase()
   const dataInicio = searchParams.get('data_inicio')
   const dataFim = searchParams.get('data_fim')
+  const etapaParam = searchParams.get('etapa') ?? 'tanque'
 
   // Buscar ordens com joins
   let query = supabase
@@ -40,7 +41,7 @@ export async function GET(req: NextRequest) {
         criado_em
       )
     `)
-    .eq('etapa', 'tanque')
+    .eq('etapa', etapaParam)
     .order('sincronizado_em', { ascending: false })
 
   // Filtro por status

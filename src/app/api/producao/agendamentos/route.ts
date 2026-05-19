@@ -1,12 +1,42 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
+// GET: Busca agendamento ativo de uma ordem pelo ordem_id
+export async function GET(req: NextRequest) {
+  const supabase = await createClient()
+  const { searchParams } = new URL(req.url)
+  const ordemId = searchParams.get('ordem_id')
+
+  if (!ordemId) {
+    return NextResponse.json({ error: 'ordem_id obrigatório' }, { status: 422 })
+  }
+
+  const { data, error } = await supabase
+    .from('agendamentos_producao')
+    .select('*')
+    .eq('ordem_id', ordemId)
+    .in('status', ['SCHEDULED', 'PAUSED'])
+    .order('criado_em', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+
+  return NextResponse.json(data ?? null)
+}
+
 type PostBody = {
   ordem_id: string
   tank_id: string
   turno_id: string
   turno_nome: string
   data_agendamento: string
+  inicio_agendado?: string
+  fim_calculado?: string
+  production_time_minutes?: number
+  cleaning_time_minutes?: number
 }
 
 function validar(body: Partial<PostBody>): string | null {
@@ -25,7 +55,7 @@ export async function POST(req: NextRequest) {
   const erroValidacao = validar(body)
   if (erroValidacao) return NextResponse.json({ error: erroValidacao }, { status: 422 })
 
-  const { ordem_id, tank_id, turno_id, turno_nome, data_agendamento } = body as PostBody
+  const { ordem_id, tank_id, turno_id, turno_nome, data_agendamento, inicio_agendado, fim_calculado, production_time_minutes, cleaning_time_minutes } = body as PostBody
 
   // Verificar se ordem existe e está em BACKLOG
   const { data: ordem, error: ordemError } = await supabase
@@ -77,10 +107,22 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  // Atualizar status da ordem para SCHEDULED
+  // Atualizar status da ordem para SCHEDULED com todos os dados de agendamento
+  const ordemUpdates: Record<string, unknown> = {
+    planning_status: 'SCHEDULED',
+    tank_id,
+  }
+  if (inicio_agendado) ordemUpdates.inicio_agendado = inicio_agendado
+  if (fim_calculado) ordemUpdates.fim_calculado = fim_calculado
+  if (production_time_minutes != null) ordemUpdates.production_time_minutes = production_time_minutes
+  if (cleaning_time_minutes != null) ordemUpdates.cleaning_time_minutes = cleaning_time_minutes
+  if (production_time_minutes != null || cleaning_time_minutes != null) {
+    ordemUpdates.total_duration_minutes = (production_time_minutes ?? 0) + (cleaning_time_minutes ?? 0) || null
+  }
+
   const { error: updateError } = await supabase
     .from('ordens')
-    .update({ planning_status: 'SCHEDULED' })
+    .update(ordemUpdates)
     .eq('id', ordem_id)
 
   if (updateError) {
@@ -99,7 +141,7 @@ export async function POST(req: NextRequest) {
     operacao: 'AGENDADO',
     descricao: `Agendado para ${turno_nome} em ${data_agendamento} — Tanque ${tank_id}`,
     dados_antes: { planning_status: 'BACKLOG' },
-    dados_depois: { planning_status: 'SCHEDULED', tank_id, turno_id, turno_nome, data_agendamento },
+    dados_depois: { planning_status: 'SCHEDULED', tank_id, turno_id, turno_nome, data_agendamento, inicio_agendado, fim_calculado },
   })
 
   return NextResponse.json(agendamento, { status: 201 })

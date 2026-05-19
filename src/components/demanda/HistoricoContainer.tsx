@@ -26,11 +26,12 @@ const METRICAS_CONFIG: MetricaStatus[] = [
 ]
 
 const STATUS_LABELS: Record<PlanningStatus, string> = {
-  BACKLOG: 'Backlog', SCHEDULED: 'Agendadas', IN_PRODUCTION: 'Em Produção',
+  BACKLOG: 'Backlog', WAITING_TANK: 'Ag. Tanque', READY_TO_SCHEDULE: 'Pronto p/ Agendar',
+  SCHEDULED: 'Agendadas', IN_PRODUCTION: 'Em Produção',
   COMPLETED: 'Concluídas', CANCELED: 'Canceladas',
 }
 
-export function HistoricoContainer() {
+export function HistoricoContainer({ etapa = 'tanque' }: { etapa?: string } = {}) {
   const [ordens, setOrdens] = useState<OrdemHistorico[]>([])
   const [carregando, setCarregando] = useState(true)
   const [busca, setBusca] = useState('')
@@ -43,7 +44,7 @@ export function HistoricoContainer() {
   const carregarOrdens = useCallback(async () => {
     setCarregando(true)
     try {
-      const res = await fetch('/api/historico/producoes')
+      const res = await fetch(`/api/historico/producoes?etapa=${etapa}`)
       if (res.ok) {
         const data = await res.json()
         setOrdens(Array.isArray(data) ? data : [])

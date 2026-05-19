@@ -25,11 +25,13 @@ type StatusConfig = {
 }
 
 const STATUS_CONFIG: Record<PlanningStatus, StatusConfig> = {
-  BACKLOG:       { label: 'Backlog',      badge: 'bg-slate-100 text-slate-600 border border-slate-200',       icone: Clock,         dot: 'bg-slate-400' },
-  SCHEDULED:     { label: 'Agendada',     badge: 'bg-blue-100 text-blue-700 border border-blue-200',          icone: Calendar,      dot: 'bg-blue-500' },
-  IN_PRODUCTION: { label: 'Em Produção',  badge: 'bg-amber-100 text-amber-700 border border-amber-200',       icone: Zap,           dot: 'bg-amber-500' },
-  COMPLETED:     { label: 'Concluída',    badge: 'bg-emerald-100 text-emerald-700 border border-emerald-200', icone: CheckCircle2,  dot: 'bg-emerald-500' },
-  CANCELED:      { label: 'Cancelada',    badge: 'bg-red-100 text-red-600 border border-red-200',             icone: XCircle,       dot: 'bg-red-500' },
+  BACKLOG:            { label: 'Backlog',           badge: 'bg-slate-100 text-slate-600 border border-slate-200',       icone: Clock,         dot: 'bg-slate-400' },
+  WAITING_TANK:       { label: 'Ag. Tanque',        badge: 'bg-purple-100 text-purple-700 border border-purple-200',    icone: Clock,         dot: 'bg-purple-500' },
+  READY_TO_SCHEDULE:  { label: 'Pronto p/ Agendar', badge: 'bg-teal-100 text-teal-700 border border-teal-200',          icone: Calendar,      dot: 'bg-teal-500' },
+  SCHEDULED:          { label: 'Agendada',          badge: 'bg-blue-100 text-blue-700 border border-blue-200',          icone: Calendar,      dot: 'bg-blue-500' },
+  IN_PRODUCTION:      { label: 'Em Produção',       badge: 'bg-amber-100 text-amber-700 border border-amber-200',       icone: Zap,           dot: 'bg-amber-500' },
+  COMPLETED:          { label: 'Concluída',         badge: 'bg-emerald-100 text-emerald-700 border border-emerald-200', icone: CheckCircle2,  dot: 'bg-emerald-500' },
+  CANCELED:           { label: 'Cancelada',         badge: 'bg-red-100 text-red-600 border border-red-200',             icone: XCircle,       dot: 'bg-red-500' },
 }
 
 function fmtMin(m: number | null | undefined): string {

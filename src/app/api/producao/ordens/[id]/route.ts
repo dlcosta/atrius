@@ -2,6 +2,43 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import type { PlanningStatus } from '@/types'
 
+export async function GET(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const supabase = await createClient()
+  const { id } = await params
+
+  const { data: ordem, error } = await supabase
+    .from('ordens')
+    .select(`
+      *,
+      ordens_pedidos_erp (
+        id,
+        numero_pedido,
+        produto_descricao,
+        quantidade,
+        total_litros
+      ),
+      agendamentos_producao (
+        id,
+        tank_id,
+        data_agendamento,
+        turno_id,
+        turno_nome,
+        status
+      )
+    `)
+    .eq('id', id)
+    .single()
+
+  if (error || !ordem) {
+    return NextResponse.json({ error: 'Ordem não encontrada' }, { status: 404 })
+  }
+
+  return NextResponse.json(ordem)
+}
+
 type PatchBody = {
   numero_externo?: string
   production_time_minutes?: number | null
@@ -122,6 +159,16 @@ export async function PATCH(
     dados_depois: dadosDepois,
     motivo: body.motivo ?? null,
   })
+
+  // Ao concluir um tanque, liberar os envases que estavam aguardando
+  if (body.planning_status === 'COMPLETED' && (ordemAtualizada as any).etapa === 'tanque') {
+    await supabase
+      .from('ordens')
+      .update({ planning_status: 'SCHEDULED' })
+      .eq('origin_tank_order_id', id)
+      .eq('etapa', 'envase')
+      .eq('planning_status', 'WAITING_TANK')
+  }
 
   return NextResponse.json(ordemAtualizada)
 }
