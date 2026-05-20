@@ -3,7 +3,7 @@ import { useEffect, useState, useCallback, useMemo } from 'react'
 import { format, addDays, subDays } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
-import type { Maquina, Ordem, Produto } from '@/types'
+import type { Maquina, Operador, Ordem, Produto } from '@/types'
 import { NovaOrdemForm } from '@/components/planner/NovaOrdemForm'
 import { OperacaoDashboard } from '@/components/planner/OperacaoDashboard'
 import { OperacaoTvPanel } from '@/components/planner/OperacaoTvPanel'
@@ -12,6 +12,11 @@ import {
   JanelaProducao,
   sanitizarJanelaProducao,
 } from '@/lib/planning/gantt-layout'
+
+const OPERADORES_RECURSO_STORAGE_KEY = 'atrius:planner:operadores-por-recurso'
+
+type AcaoOperacao = 'iniciar' | 'pausar' | 'retomar' | 'finalizar'
+type OperadorPorRecurso = Record<string, string>
 
 type TurnoPreset = {
   id: string
@@ -46,15 +51,25 @@ function detectarPreset(janela: JanelaProducao): string {
   return encontrado?.id ?? 'custom'
 }
 
+function getRecursoKey(ordem: Ordem): string | null {
+  if (ordem.etapa === 'envase') {
+    return ordem.maquina_id ? `machine:${ordem.maquina_id}` : null
+  }
+  return ordem.tank_id ? `tank:${ordem.tank_id}` : null
+}
+
 export default function PlannerPage() {
   const [dia, setDia] = useState<Date>(() => new Date())
   const [maquinas, setMaquinas] = useState<Maquina[]>([])
+  const [operadores, setOperadores] = useState<Operador[]>([])
   const [ordens, setOrdens] = useState<Ordem[]>([])
   const [produtos, setProdutos] = useState<Produto[]>([])
   const [sincronizando, setSincronizando] = useState(false)
   const [mensagem, setMensagem] = useState('')
   const [novaOrdemAberta, setNovaOrdemAberta] = useState(false)
   const [executandoOrdemId, setExecutandoOrdemId] = useState<string | null>(null)
+  const [operadorPorRecurso, setOperadorPorRecurso] = useState<OperadorPorRecurso>({})
+  const [pausaAberta, setPausaAberta] = useState<{ ordem: Ordem; observacao: string } | null>(null)
   const [isExpanded, setIsExpanded] = useState(false)
   const [janela, setJanela] = useState<JanelaProducao>(DEFAULT_JANELA_PRODUCAO)
   const [turnoSelecionado, setTurnoSelecionado] = useState<string>(() => detectarPreset(DEFAULT_JANELA_PRODUCAO))
@@ -62,21 +77,35 @@ export default function PlannerPage() {
   const carregarDados = useCallback(async () => {
     try {
       const dataStr = format(dia, 'yyyy-MM-dd')
-      const [m, o, p] = await Promise.all([
-        fetch('/api/maquinas').then((r) => r.json()),
-        fetch(`/api/ordens?data=${dataStr}`).then((r) => r.json()),
-        fetch('/api/produtos').then((r) => r.json()),
+      const [mRes, oRes, pRes, operadoresRes] = await Promise.all([
+        fetch('/api/maquinas'),
+        fetch(`/api/ordens?data=${dataStr}`),
+        fetch('/api/produtos'),
+        fetch('/api/operadores?ativos=1'),
       ])
+
+      const [m, o, p, operadoresData] = await Promise.all([
+        mRes.json(),
+        oRes.json(),
+        pRes.json(),
+        operadoresRes.json(),
+      ])
+
+      if (!mRes.ok) throw new Error(m?.error ?? 'Erro ao carregar máquinas')
+      if (!oRes.ok) throw new Error(o?.error ?? 'Erro ao carregar ordens')
+      if (!pRes.ok) throw new Error(p?.error ?? 'Erro ao carregar produtos')
+      if (!operadoresRes.ok) throw new Error(operadoresData?.error ?? 'Erro ao carregar operadores')
 
       setMaquinas(Array.isArray(m) ? m : [])
       setOrdens(Array.isArray(o) ? o : [])
       setProdutos(Array.isArray(p) ? p : [])
+      setOperadores(Array.isArray(operadoresData) ? operadoresData : [])
 
       if (o?.error) {
         setMensagem(o.error)
       }
     } catch {
-      setMensagem('Erro ao carregar dados. Verifique a conexao.')
+      setMensagem('Erro ao carregar dados. Verifique a conexão.')
     }
   }, [dia])
 
@@ -96,11 +125,24 @@ export default function PlannerPage() {
     } catch {
       // usa padrao caso localStorage esteja invalido
     }
+    try {
+      const operadoresSalvos = localStorage.getItem(OPERADORES_RECURSO_STORAGE_KEY)
+      if (operadoresSalvos) {
+        const parsed = JSON.parse(operadoresSalvos) as OperadorPorRecurso
+        if (parsed && typeof parsed === 'object') setOperadorPorRecurso(parsed)
+      }
+    } catch {
+      // ignora mapa invalido
+    }
   }, [])
 
   useEffect(() => {
     localStorage.setItem(JANELA_STORAGE_KEY, JSON.stringify(janela))
   }, [janela])
+
+  useEffect(() => {
+    localStorage.setItem(OPERADORES_RECURSO_STORAGE_KEY, JSON.stringify(operadorPorRecurso))
+  }, [operadorPorRecurso])
 
   const resumo = useMemo(() => {
     const total = ordens.length
@@ -139,7 +181,7 @@ export default function PlannerPage() {
         setMensagem(`Sincronizado: ${data.importadas} ordens importadas, ${data.erros} erros.`)
         await carregarDados()
       } else {
-        setMensagem(data.error ?? 'Erro na sincronizacao com a API externa.')
+        setMensagem(data.error ?? 'Erro na sincronização com a API externa.')
       }
     } catch {
       setMensagem('Erro de rede ao sincronizar.')
@@ -148,29 +190,95 @@ export default function PlannerPage() {
     setSincronizando(false)
   }
 
-  async function executarAcaoOperacao(ordemId: string, acao: 'iniciar' | 'finalizar') {
-    setExecutandoOrdemId(ordemId)
+  function selecionarOperadorParaRecurso(recursoKey: string, operadorId: string) {
+    setOperadorPorRecurso((atual) => ({
+      ...atual,
+      [recursoKey]: operadorId,
+    }))
+  }
+
+  function obterOperadorSelecionado(ordem: Ordem) {
+    const recursoKey = getRecursoKey(ordem)
+    if (!recursoKey) return null
+
+    const operadorId = operadorPorRecurso[recursoKey]
+    if (!operadorId) return null
+    return operadores.find((operador) => operador.id === operadorId) ?? null
+  }
+
+  async function executarAcaoOperacao(
+    ordem: Ordem,
+    acao: AcaoOperacao,
+    options?: { observacaoPausa?: string | null }
+  ) {
+    const operador = obterOperadorSelecionado(ordem)
+    if (!operador) {
+      setMensagem('Selecione um operador para esse recurso antes de registrar a operação.')
+      return
+    }
+
+    setExecutandoOrdemId(ordem.id)
     setMensagem('')
     try {
       const res = await fetch('/api/ordens/operacao', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ordem_id: ordemId, acao }),
+        body: JSON.stringify({
+          ordem_id: ordem.id,
+          acao,
+          operador_id: operador.id,
+          operador_nome: operador.nome,
+          observacao_pausa: options?.observacaoPausa ?? undefined,
+          flow_source: ordem.flow_source ?? 'legado',
+        }),
       })
 
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
-        setMensagem(data.error ?? 'Nao foi possivel registrar a operacao.')
+        setMensagem(data.error ?? 'Não foi possível registrar a operação.')
       } else {
-        setMensagem(acao === 'iniciar' ? 'Operacao iniciada com sucesso.' : 'Operacao finalizada com sucesso.')
+        const mensagens: Record<typeof acao, string> = {
+          iniciar: 'Operação iniciada com sucesso.',
+          pausar: 'Operação pausada com sucesso.',
+          retomar: 'Operação retomada com sucesso.',
+          finalizar: 'Operação finalizada com sucesso.',
+        }
+        setMensagem(mensagens[acao])
       }
     } catch {
-      setMensagem('Erro de rede ao registrar operacao.')
+      setMensagem('Erro de rede ao registrar operação.')
     } finally {
       setExecutandoOrdemId(null)
     }
 
     await carregarDados()
+  }
+
+  async function solicitarAcaoOperacao(ordem: Ordem, acao: AcaoOperacao) {
+    if (!obterOperadorSelecionado(ordem)) {
+      setMensagem('Selecione um operador para esse recurso antes de registrar a operação.')
+      return
+    }
+
+    if (acao === 'pausar') {
+      setPausaAberta({ ordem, observacao: '' })
+      return
+    }
+
+    await executarAcaoOperacao(ordem, acao)
+  }
+
+  async function confirmarPausa() {
+    if (!pausaAberta) return
+
+    const observacao = pausaAberta.observacao.trim()
+    if (!observacao) {
+      setMensagem('Informe a observação da pausa antes de continuar.')
+      return
+    }
+
+    await executarAcaoOperacao(pausaAberta.ordem, 'pausar', { observacaoPausa: observacao })
+    setPausaAberta(null)
   }
 
   return (
@@ -179,7 +287,7 @@ export default function PlannerPage() {
         <div className="flex items-start gap-4">
           <div>
             <h1 className="text-[22px] font-semibold leading-tight text-[#111827]">Painel de Controle Atrius</h1>
-            <p className="mt-1 text-[13px] text-[#9CA3AF]">Monitoramento e Gestao de Producao em Tempo Real</p>
+            <p className="mt-1 text-[13px] text-[#9CA3AF]">Monitoramento e Gestão de Produção em Tempo Real</p>
           </div>
 
           <div className="ml-auto flex items-center gap-2">
@@ -214,7 +322,7 @@ export default function PlannerPage() {
             <button
               onClick={() => setDia((d) => addDays(d, 1))}
               className="grid h-8 w-8 place-items-center rounded-[6px] text-[#4B5563] hover:bg-[#F0F2F5]"
-              title="Proximo dia"
+              title="Próximo dia"
             >
               <ChevronRight size={16} />
             </button>
@@ -246,7 +354,7 @@ export default function PlannerPage() {
           </div>
 
           <div className="flex flex-col gap-1">
-            <label className="text-[11px] font-semibold uppercase tracking-wide text-[#4B5563]">Inicio</label>
+            <label className="text-[11px] font-semibold uppercase tracking-wide text-[#4B5563]">Início</label>
             <input
               type="time"
               step={3600}
@@ -280,6 +388,14 @@ export default function PlannerPage() {
           <span className="inline-flex h-9 items-center rounded-[12px] bg-[#EFF6FF] px-3 text-xs font-medium text-[#2563EB]">
             Janela ativa: {horaParaInput(janela.startHour)} - {horaParaInput(janela.endHour % 24 === 0 ? 0 : janela.endHour)}
           </span>
+
+          <span className="inline-flex h-9 items-center rounded-[12px] bg-white px-3 text-xs font-medium text-[#475467]">
+            Operadores ativos: {operadores.length}
+          </span>
+
+          <span className="inline-flex h-9 items-center rounded-[12px] bg-white px-3 text-xs text-[#667085]">
+            Selecione o operador diretamente em cada máquina ou tanque antes de iniciar, pausar, retomar ou concluir.
+          </span>
         </div>
 
         <div className="flex flex-wrap gap-3 border-t border-[#E4E7EC] pt-4">
@@ -300,7 +416,7 @@ export default function PlannerPage() {
             <span className="mt-2 block font-mono text-4xl font-semibold leading-none text-[#16A34A]">{resumo.agendadas}</span>
           </div>
           <div className="min-w-32 rounded-[8px] border border-[#E4E7EC] bg-white p-4">
-            <span className="block text-[10px] uppercase tracking-[0.08em] text-[#9CA3AF]">CONCLUIDAS</span>
+            <span className="block text-[10px] uppercase tracking-[0.08em] text-[#9CA3AF]">CONCLUÍDAS</span>
             <span className="mt-2 block font-mono text-4xl font-semibold leading-none text-[#16A34A]">{resumo.concluidas}</span>
           </div>
         </div>
@@ -326,8 +442,10 @@ export default function PlannerPage() {
         {isExpanded ? (
           <OperacaoTvPanel
             maquinas={maquinas}
+            operadores={operadores}
             ordens={ordens.filter((o) => o.inicio_agendado !== null)}
             executandoOrdemId={executandoOrdemId}
+            operadorPorRecurso={operadorPorRecurso}
             dia={dia}
             janela={janela}
             onNavigateDay={(acao) => {
@@ -342,17 +460,55 @@ export default function PlannerPage() {
               setDia(new Date())
             }}
             onExit={() => setIsExpanded(false)}
-            onAcao={executarAcaoOperacao}
+            onSelecionarOperador={selecionarOperadorParaRecurso}
+            onAcao={solicitarAcaoOperacao}
           />
         ) : (
           <OperacaoDashboard
             maquinas={maquinas}
+            operadores={operadores}
             ordens={ordens.filter((o) => o.inicio_agendado !== null)}
             executandoOrdemId={executandoOrdemId}
-            onAcao={executarAcaoOperacao}
+            operadorPorRecurso={operadorPorRecurso}
+            onSelecionarOperador={selecionarOperadorParaRecurso}
+            onAcao={solicitarAcaoOperacao}
           />
         )}
       </main>
+
+      {pausaAberta && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/35 p-4">
+          <div className="w-full max-w-lg rounded-[16px] bg-white p-6 shadow-2xl">
+            <h2 className="text-lg font-semibold text-[#111827]">Registrar pausa</h2>
+            <p className="mt-2 text-sm text-[#667085]">
+              Informe o motivo da pausa para a ordem <span className="font-semibold">#{pausaAberta.ordem.numero_externo}</span>.
+            </p>
+
+            <textarea
+              value={pausaAberta.observacao}
+              onChange={(e) => setPausaAberta((atual) => (atual ? { ...atual, observacao: e.target.value } : atual))}
+              placeholder="Descreva o motivo da parada"
+              rows={5}
+              className="mt-4 w-full rounded-[12px] border border-[#D0D5DD] px-3 py-2 text-sm text-[#111827]"
+            />
+
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                onClick={() => setPausaAberta(null)}
+                className="rounded-[10px] border border-[#D0D5DD] px-4 py-2 text-sm font-medium text-[#475467]"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmarPausa}
+                className="rounded-[10px] bg-[#D97706] px-4 py-2 text-sm font-semibold text-white"
+              >
+                Confirmar pausa
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

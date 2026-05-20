@@ -25,11 +25,13 @@ const METRICAS_CONFIG: MetricaStatus[] = [
   { status: 'CANCELED',      label: 'Canceladas',   cor: 'bg-red-50    border-red-200    text-red-600',    icone: XCircle },
 ]
 
-const STATUS_LABELS: Record<PlanningStatus, string> = {
+const STATUS_LABELS: Partial<Record<PlanningStatus, string>> = {
   BACKLOG: 'Backlog', WAITING_TANK: 'Ag. Tanque', READY_TO_SCHEDULE: 'Pronto p/ Agendar',
   SCHEDULED: 'Agendadas', IN_PRODUCTION: 'Em Produção',
   COMPLETED: 'Concluídas', CANCELED: 'Canceladas',
 }
+
+STATUS_LABELS.PAUSED = 'Pausadas'
 
 export function HistoricoContainer({ etapa = 'tanque' }: { etapa?: string } = {}) {
   const [ordens, setOrdens] = useState<OrdemHistorico[]>([])
@@ -54,7 +56,7 @@ export function HistoricoContainer({ etapa = 'tanque' }: { etapa?: string } = {}
     } finally {
       setCarregando(false)
     }
-  }, [])
+  }, [etapa])
 
   useEffect(() => {
     carregarOrdens()

@@ -3,15 +3,24 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Calendar, BarChart3, Settings, LayoutDashboard, ChevronLeft, ChevronRight, ClipboardList, FlaskConical } from 'lucide-react'
+import {
+  Calendar,
+  BarChart3,
+  Settings,
+  LayoutDashboard,
+  ChevronLeft,
+  ChevronRight,
+  FlaskConical,
+  Droplets,
+} from 'lucide-react'
 
 const navItems = [
   { name: 'Dashboard', href: '/planner', icon: LayoutDashboard },
-  { name: 'Calendario', href: '/calendario', icon: Calendar },
+  { name: 'Calendário', href: '/calendario', icon: Calendar },
   { name: 'Monitoramento', href: '/monitoramento', icon: BarChart3 },
-  { name: 'Planejamento do Tanque', href: '/demanda', icon: ClipboardList },
-  { name: 'Planejamento de Envase', href: '/envase', icon: FlaskConical },
-  { name: 'Admin', href: '/admin', icon: Settings },
+  { name: 'Ordem de Produção - Tanques', href: '/ordem-producao-tanques', icon: Droplets },
+  { name: 'Ordem de Produção - Envase', href: '/ordem-producao-envase', icon: FlaskConical },
+  { name: 'Administração', href: '/admin', icon: Settings },
 ]
 
 export function Sidebar() {
@@ -21,7 +30,7 @@ export function Sidebar() {
   return (
     <aside
       className={`relative sticky top-0 flex h-screen flex-col border-r border-[#E4E7EC] bg-white transition-all duration-150 ${
-        isCollapsed ? 'w-[74px]' : 'w-[248px]'
+        isCollapsed ? 'w-[74px]' : 'w-[288px]'
       }`}
     >
       <button
@@ -46,17 +55,23 @@ export function Sidebar() {
                 key={item.href}
                 href={item.href}
                 title={isCollapsed ? item.name : ''}
-                className={`relative flex h-10 items-center rounded-[8px] text-sm font-medium transition-all duration-[120ms] ${
-                  isCollapsed ? 'justify-center px-2' : 'gap-3 px-3'
+                className={`relative flex rounded-[8px] text-sm font-medium transition-all duration-[120ms] ${
+                  isCollapsed ? 'h-10 justify-center px-2' : 'min-h-[48px] items-center gap-3 px-3 py-2'
                 } ${
                   isActive
                     ? 'bg-[#EFF6FF] text-[#2563EB]'
                     : 'text-[#4B5563] hover:bg-[#F0F2F5] hover:text-[#111827]'
                 }`}
               >
-                {isActive && <span className="absolute left-0 top-1/2 h-6 w-[3px] -translate-y-1/2 rounded-r-full bg-[#2563EB]" />}
-                <Icon size={18} className={isActive ? 'text-[#2563EB]' : 'text-[#9CA3AF]'} />
-                {!isCollapsed && <span className="truncate">{item.name}</span>}
+                {isActive && (
+                  <span className="absolute left-0 top-1/2 h-6 w-[3px] -translate-y-1/2 rounded-r-full bg-[#2563EB]" />
+                )}
+                <Icon size={18} className={`shrink-0 ${isActive ? 'text-[#2563EB]' : 'text-[#9CA3AF]'}`} />
+                {!isCollapsed && (
+                  <span className="line-clamp-2 leading-5 text-left">
+                    {item.name}
+                  </span>
+                )}
               </Link>
             )
           })}

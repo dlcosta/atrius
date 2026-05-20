@@ -28,17 +28,19 @@ export function TimerDisplay({ ordens, nomeMaquina }: Props) {
   }, [])
 
   const ordemEmProducao = ordens.find((o) => o.status === 'produzindo')
+  const ordemPausada = ordens.find((o) => o.status === 'pausada')
 
   const ordemAtualPorHorario = ordens.find((o) => {
     if (!o.inicio_agendado || !o.fim_calculado) return false
+    if (o.status === 'pausada') return false
     return new Date(o.inicio_agendado).getTime() <= agora && new Date(o.fim_calculado).getTime() > agora
   })
-  const ordemAtual = ordemEmProducao ?? ordemAtualPorHorario
+  const ordemAtual = ordemEmProducao ?? ordemPausada ?? ordemAtualPorHorario
 
   const proximas = ordens
     .filter((o) => {
       if (!o.inicio_agendado) return false
-      if (o.status === 'concluida' || o.status === 'cancelada') return false
+      if (o.status === 'concluida' || o.status === 'cancelada' || o.status === 'pausada') return false
       return new Date(o.inicio_agendado).getTime() > agora
     })
     .slice(0, 2)
@@ -56,7 +58,7 @@ export function TimerDisplay({ ordens, nomeMaquina }: Props) {
 
         {proximas.length > 0 && (
           <div className="space-y-3 mt-8 w-full max-w-md">
-            <div className="text-sm text-slate-500 uppercase tracking-widest text-center mb-4">Proximas ordens</div>
+            <div className="text-sm text-slate-500 uppercase tracking-widest text-center mb-4">Próximas ordens</div>
             {proximas.map((o) => (
               <div key={o.id} className="bg-slate-800 rounded-lg p-4 text-center">
                 <div className="text-lg font-semibold">{o.produto?.nome ?? o.produto_sku}</div>
@@ -74,7 +76,10 @@ export function TimerDisplay({ ordens, nomeMaquina }: Props) {
     )
   }
 
-  const msRestante = calcularTempoRestante(ordemAtual.fim_calculado!)
+  const msRestante =
+    ordemAtual.status === 'pausada' && ordemAtual.tempo_restante_pausado_seg
+      ? ordemAtual.tempo_restante_pausado_seg * 1000
+      : calcularTempoRestante(ordemAtual.fim_calculado!)
   const duracaoTotal = duracaoOrdemMin(ordemAtual) * 60 * 1000 || 60000
   const progresso = Math.min(100, ((duracaoTotal - msRestante) / duracaoTotal) * 100)
   const cor = ordemAtual.produto?.cor ?? '#5B9BD5'
@@ -82,7 +87,9 @@ export function TimerDisplay({ ordens, nomeMaquina }: Props) {
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-slate-950 text-white p-8">
       <div className="text-xl font-semibold text-slate-400 mb-4">{nomeMaquina}</div>
-      <div className="text-sm uppercase tracking-widest text-emerald-400 mb-3">Produzindo</div>
+      <div className={`text-sm uppercase tracking-widest mb-3 ${ordemAtual.status === 'pausada' ? 'text-amber-400' : 'text-emerald-400'}`}>
+        {ordemAtual.status === 'pausada' ? 'Pausada' : 'Produzindo'}
+      </div>
 
       <div className="text-5xl font-bold text-center mb-8 leading-tight">{ordemAtual.produto?.nome ?? ordemAtual.produto_sku}</div>
 
@@ -98,11 +105,12 @@ export function TimerDisplay({ ordens, nomeMaquina }: Props) {
         #{ordemAtual.numero_externo} - {ordemAtual.quantidade} {ordemAtual.unidade}
         {ordemAtual.tanque && <span className="ml-2 font-bold text-cyan-300">[{ordemAtual.tanque.toUpperCase()}]</span>}
         {ordemAtual.lote && <span className="ml-2 font-bold text-slate-300">{ordemAtual.lote.toUpperCase()}</span>}
+        {ordemAtual.operador_nome && <span className="ml-2 font-bold text-amber-300">Operador: {ordemAtual.operador_nome}</span>}
       </div>
 
       {proximas.length > 0 && (
         <div className="w-full max-w-2xl">
-          <div className="text-xs text-slate-500 uppercase tracking-widest mb-3">Proximas</div>
+          <div className="text-xs text-slate-500 uppercase tracking-widest mb-3">Próximas</div>
           <div className="space-y-2">
             {proximas.map((o) => (
               <div key={o.id} className="bg-slate-800 rounded px-4 py-3 flex items-center justify-between">

@@ -1,20 +1,20 @@
-﻿'use client'
+'use client'
+
 import { useState } from 'react'
-import type { Produto, Maquina } from '@/types'
+import type { Produto } from '@/types'
 import { ProdutoForm } from './ProdutoForm'
 
 type Props = {
   produtos: Produto[]
-  maquinas: Maquina[]
   onAtualizado: () => void
 }
 
-export function ProdutoList({ produtos, maquinas, onAtualizado }: Props) {
+export function ProdutoList({ produtos, onAtualizado }: Props) {
   const [editando, setEditando] = useState<Produto | null>(null)
   const [criando, setCriando] = useState(false)
 
   async function deletar(id: string, nome: string) {
-    if (!confirm(`Excluir \"${nome}\"?`)) return
+    if (!confirm(`Excluir "${nome}"?`)) return
     const res = await fetch('/api/produtos', {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
@@ -32,16 +32,18 @@ export function ProdutoList({ produtos, maquinas, onAtualizado }: Props) {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold text-slate-900">Produtos</h2>
-          <p className="text-sm text-slate-500">Defina o tempo de cada maquina considerando o volume base do produto.</p>
+          <h3 className="text-lg font-semibold text-slate-900">Produtos</h3>
+          <p className="text-sm text-slate-500">
+            Cadastre SKU, nome e cor do produto usados no planejamento e na operação.
+          </p>
         </div>
 
         {!criando && (
           <button
             onClick={() => setCriando(true)}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-semibold hover:bg-blue-700 transition-colors shadow-sm"
+            className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700"
           >
             + Novo produto
           </button>
@@ -49,9 +51,8 @@ export function ProdutoList({ produtos, maquinas, onAtualizado }: Props) {
       </div>
 
       {criando && (
-        <div className="border border-blue-200 bg-blue-50 rounded-lg p-4">
+        <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4">
           <ProdutoForm
-            maquinas={maquinas}
             onSalvo={() => {
               setCriando(false)
               onAtualizado()
@@ -61,26 +62,24 @@ export function ProdutoList({ produtos, maquinas, onAtualizado }: Props) {
         </div>
       )}
 
-      <div className="border border-slate-200 rounded-lg overflow-hidden bg-white shadow-sm">
+      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <table className="w-full text-sm">
-          <thead className="bg-slate-50 text-slate-600 text-[11px] uppercase tracking-wider font-semibold">
+          <thead className="bg-slate-50 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
             <tr>
               <th className="px-4 py-3 text-left">SKU</th>
               <th className="px-4 py-3 text-left">Nome</th>
-              <th className="px-4 py-3 text-right">Volume base</th>
               <th className="px-4 py-3 text-center">Cor</th>
-              <th className="px-4 py-3 text-right">Acoes</th>
+              <th className="px-4 py-3 text-right">Ações</th>
             </tr>
           </thead>
 
           <tbody className="divide-y divide-slate-100">
-            {produtos.map((p) => (
-              <tr key={p.id}>
-                {editando?.id === p.id ? (
-                  <td colSpan={5} className="px-4 py-3 bg-slate-50">
+            {produtos.map((produto) => (
+              <tr key={produto.id}>
+                {editando?.id === produto.id ? (
+                  <td colSpan={4} className="bg-slate-50 px-4 py-3">
                     <ProdutoForm
-                      maquinas={maquinas}
-                      produto={p}
+                      produto={produto}
                       onSalvo={() => {
                         setEditando(null)
                         onAtualizado()
@@ -90,23 +89,25 @@ export function ProdutoList({ produtos, maquinas, onAtualizado }: Props) {
                   </td>
                 ) : (
                   <>
-                    <td className="px-4 py-3 font-mono text-slate-600">{p.sku}</td>
-                    <td className="px-4 py-3 font-medium text-slate-900">{p.nome}</td>
-                    <td className="px-4 py-3 text-right text-slate-700">{p.volume_base || 3800} L</td>
+                    <td className="px-4 py-3 font-mono text-slate-600">{produto.sku}</td>
+                    <td className="px-4 py-3 font-medium text-slate-900">{produto.nome}</td>
                     <td className="px-4 py-3 text-center">
                       <span
-                        className="inline-block w-5 h-5 rounded-full border border-slate-300"
-                        style={{ backgroundColor: p.cor }}
+                        className="inline-block h-5 w-5 rounded-full border border-slate-300"
+                        style={{ backgroundColor: produto.cor }}
                       />
                     </td>
                     <td className="px-4 py-3 text-right">
                       <button
-                        onClick={() => setEditando(p)}
-                        className="text-blue-600 hover:underline mr-3"
+                        onClick={() => setEditando(produto)}
+                        className="mr-3 text-blue-600 hover:underline"
                       >
                         Editar
                       </button>
-                      <button onClick={() => deletar(p.id, p.nome)} className="text-red-600 hover:underline">
+                      <button
+                        onClick={() => deletar(produto.id, produto.nome)}
+                        className="text-red-600 hover:underline"
+                      >
                         Excluir
                       </button>
                     </td>
@@ -117,7 +118,7 @@ export function ProdutoList({ produtos, maquinas, onAtualizado }: Props) {
 
             {produtos.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-4 py-8 text-center text-slate-400">
+                <td colSpan={4} className="px-4 py-8 text-center text-slate-400">
                   Nenhum produto cadastrado
                 </td>
               </tr>

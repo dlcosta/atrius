@@ -9,8 +9,10 @@ export function Topbar() {
   const getPageTitle = (path: string) => {
     if (path.startsWith('/planner')) return 'Dashboard Operacional'
     if (path.startsWith('/calendario')) return 'Planejamento Visual'
-    if (path.startsWith('/monitoramento')) return 'Monitoramento Realtime'
-    if (path.startsWith('/admin')) return 'Administracao do Sistema'
+    if (path.startsWith('/monitoramento')) return 'Monitoramento em Tempo Real'
+    if (path.startsWith('/ordem-producao-tanques')) return 'Ordem de Produção - Tanques'
+    if (path.startsWith('/ordem-producao-envase')) return 'Ordem de Produção - Envase'
+    if (path.startsWith('/admin')) return 'Administração do Sistema'
     return 'Atrius Planner'
   }
 

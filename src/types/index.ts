@@ -5,6 +5,13 @@ export type Maquina = {
   criado_em: string
 }
 
+export type Operador = {
+  id: string
+  nome: string
+  ativo: boolean
+  criado_em: string
+}
+
 export type Tanque = {
   id: string
   nome: string
@@ -43,6 +50,7 @@ export type EtapaOrdem = 'tanque' | 'envase'
 export type StatusOrdem =
   | 'aguardando'
   | 'produzindo'
+  | 'pausada'
   | 'limpeza'
   | 'concluida'
   | 'atrasada'
@@ -54,10 +62,12 @@ export type PlanningStatus =
   | 'READY_TO_SCHEDULE'
   | 'SCHEDULED'
   | 'IN_PRODUCTION'
+  | 'PAUSED'
   | 'COMPLETED'
   | 'CANCELED'
 
 export type CalcMode = 'LITERS_MASTER' | 'BOXES_MASTER'
+export type FlowSource = 'legado' | 'novo_fluxo_tanque' | 'novo_fluxo_envase'
 
 export type Ordem = {
   id: string
@@ -93,6 +103,13 @@ export type Ordem = {
   fim_calculado: string | null    // ISO string
   inicio_operacao_em?: string | null
   fim_operacao_em?: string | null
+  pausado_em?: string | null
+  tempo_restante_pausado_seg?: number | null
+  operador_id?: string | null
+  operador_nome?: string | null
+  observacao_pausa?: string | null
+  notes?: string | null
+  flow_source?: FlowSource
   duracao_planejada_min?: number | null
   quantidade_referencia_litros?: number | null
   status: StatusOrdem

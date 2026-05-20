@@ -284,7 +284,7 @@ export function BacklogTanques({ ordens, loading }: Props) {
         {/* Origem */}
         <div className="mt-1.5 flex items-center gap-1 text-[11px] text-[#9CA3AF]">
           <span className="rounded-[4px] bg-[#EFF6FF] px-1.5 py-0.5 font-medium text-[#2563EB]">
-            Planejamento do Tanque
+            Ordem de Produção - Tanques
           </span>
           <span>→ aguardando agendamento</span>
         </div>
@@ -343,7 +343,7 @@ export function BacklogTanques({ ordens, loading }: Props) {
             <div className="text-[11px] text-[#9CA3AF]">
               {busca
                 ? 'Tente outro termo de busca'
-                : 'Crie ordens no Planejamento do Tanque para preencher o backlog'}
+                : 'Crie ordens em Ordem de Produção - Tanques para preencher o backlog'}
             </div>
           </div>
         ) : (

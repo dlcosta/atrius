@@ -6,7 +6,7 @@ import {
   Clock, Calendar, Zap, CheckCircle2, XCircle, ChevronDown,
   ChevronUp, Package, Layers, History, AlertTriangle,
 } from 'lucide-react'
-import type { AuditLog, OrdemHistorico, PlanningStatus } from '@/types'
+import type { AgendamentoProducaoDetalhado, AuditLog, OrdemHistorico, PlanningStatus } from '@/types'
 import { ProducaoTimeline } from './ProducaoTimeline'
 
 type Props = {
@@ -24,7 +24,18 @@ type StatusConfig = {
   dot: string
 }
 
-const STATUS_CONFIG: Record<PlanningStatus, StatusConfig> = {
+type AgendamentoDetalhado = AgendamentoProducaoDetalhado & {
+  observacao_pausa?: string | null
+}
+
+const FALLBACK_STATUS_CONFIG: StatusConfig = {
+  label: 'Backlog',
+  badge: 'bg-slate-100 text-slate-600 border border-slate-200',
+  icone: Clock,
+  dot: 'bg-slate-400',
+}
+
+const STATUS_CONFIG: Partial<Record<PlanningStatus, StatusConfig>> = {
   BACKLOG:            { label: 'Backlog',           badge: 'bg-slate-100 text-slate-600 border border-slate-200',       icone: Clock,         dot: 'bg-slate-400' },
   WAITING_TANK:       { label: 'Ag. Tanque',        badge: 'bg-purple-100 text-purple-700 border border-purple-200',    icone: Clock,         dot: 'bg-purple-500' },
   READY_TO_SCHEDULE:  { label: 'Pronto p/ Agendar', badge: 'bg-teal-100 text-teal-700 border border-teal-200',          icone: Calendar,      dot: 'bg-teal-500' },
@@ -32,6 +43,13 @@ const STATUS_CONFIG: Record<PlanningStatus, StatusConfig> = {
   IN_PRODUCTION:      { label: 'Em Produção',       badge: 'bg-amber-100 text-amber-700 border border-amber-200',       icone: Zap,           dot: 'bg-amber-500' },
   COMPLETED:          { label: 'Concluída',         badge: 'bg-emerald-100 text-emerald-700 border border-emerald-200', icone: CheckCircle2,  dot: 'bg-emerald-500' },
   CANCELED:           { label: 'Cancelada',         badge: 'bg-red-100 text-red-600 border border-red-200',             icone: XCircle,       dot: 'bg-red-500' },
+}
+
+STATUS_CONFIG.PAUSED = {
+  label: 'Pausada',
+  badge: 'bg-orange-100 text-orange-700 border border-orange-200',
+  icone: AlertTriangle,
+  dot: 'bg-orange-500',
 }
 
 function fmtMin(m: number | null | undefined): string {
@@ -63,13 +81,13 @@ function BarraTempo({ producao, limpeza, total }: { producao?: number | null; li
 
 export function OrdemHistoricoCard({ ordem, auditLogs, expandido, carregandoAudit, onToggle }: Props) {
   const statusKey = (ordem.planning_status ?? 'BACKLOG') as PlanningStatus
-  const cfg = STATUS_CONFIG[statusKey] ?? STATUS_CONFIG.BACKLOG
+  const cfg = STATUS_CONFIG[statusKey] ?? STATUS_CONFIG.BACKLOG ?? FALLBACK_STATUS_CONFIG
   const StatusIcone = cfg.icone
 
-  const agendamentoPrincipal = ordem.agendamentos?.[0]
+  const agendamentoPrincipal = ordem.agendamentos?.[0] as AgendamentoDetalhado | undefined
   const dataAgendamento = agendamentoPrincipal?.data_agendamento
   const turnoNome = agendamentoPrincipal?.turno_nome
-  const tankNome = (agendamentoPrincipal as any)?.tank_nome
+  const tankNome = agendamentoPrincipal?.tank_nome
 
   const alertas = []
   if (statusKey === 'BACKLOG') alertas.push('Aguardando agendamento')
@@ -225,8 +243,8 @@ export function OrdemHistoricoCard({ ordem, auditLogs, expandido, carregandoAudi
                         <p className="font-semibold text-amber-700">
                           {format(parseISO(agendamentoPrincipal.data_pausa), 'dd/MM HH:mm', { locale: ptBR })}
                         </p>
-                        {(agendamentoPrincipal as any).observacao_pausa && (
-                          <p className="text-slate-500 mt-0.5 italic">{(agendamentoPrincipal as any).observacao_pausa}</p>
+                        {agendamentoPrincipal.observacao_pausa && (
+                          <p className="text-slate-500 mt-0.5 italic">{agendamentoPrincipal.observacao_pausa}</p>
                         )}
                       </div>
                     )}

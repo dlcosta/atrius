@@ -377,7 +377,7 @@ export function BacklogEnvase({ ordens, loading }: Props) {
 
         <div className="mt-1.5 flex items-center gap-1 text-[11px] text-[#9CA3AF]">
           <span className="rounded-[4px] bg-[#ECFDF5] px-1.5 py-0.5 font-medium text-[#10B981]">
-            Planejamento de Envase
+            Ordem de Produção - Envase
           </span>
           <span>→ aguardando máquina</span>
         </div>
@@ -436,7 +436,7 @@ export function BacklogEnvase({ ordens, loading }: Props) {
             <div className="text-[11px] text-[#9CA3AF]">
               {busca
                 ? 'Tente outro termo de busca'
-                : 'Ordens de envase aparecem aqui quando sincronizadas do ERP'}
+                : 'Crie ordens em Ordem de Produção - Envase para preencher o backlog'}
             </div>
           </div>
         ) : (

@@ -38,7 +38,7 @@ export function SincronizacaoOlist() {
     }
   }
 
-  const sincronizar = async (tipo: 'pedidos' | 'itens' | 'produtos' | 'categorias', full: boolean = false) => {
+  const sincronizar = async (tipo: 'pedidos' | 'itens' | 'produtos' | 'categorias', full = false) => {
     setResultados((prev) => {
       const existing = prev.findIndex((r) => r.tipo === tipo)
       const novo: SyncResult = { tipo, carregando: true }
@@ -50,7 +50,6 @@ export function SincronizacaoOlist() {
     })
 
     try {
-      // Renovar token antes de sincronizar
       const refreshRes = await fetch('/api/olist/refresh-token', { method: 'POST' })
       if (!refreshRes.ok) {
         const refreshData = await refreshRes.json()
@@ -69,7 +68,7 @@ export function SincronizacaoOlist() {
           url = `/api/sincronizar/produtos${full ? '?full=1' : ''}`
           break
         case 'categorias':
-          url = `/api/sincronizar/categorias`
+          url = '/api/sincronizar/categorias'
           break
       }
 
@@ -101,7 +100,7 @@ export function SincronizacaoOlist() {
     }
   }
 
-  const sincronizarTudo = async (full: boolean = false) => {
+  const sincronizarTudo = async (full = false) => {
     setCarregandoGlobal(true)
     await sincronizar('produtos', full)
     await sincronizar('pedidos', full)
@@ -109,27 +108,38 @@ export function SincronizacaoOlist() {
     setCarregandoGlobal(false)
   }
 
-  const getResultado = (tipo: string) => resultados.find((r) => r.tipo === tipo)
-
   return (
     <div className="space-y-6">
-      <div className="p-4 rounded-lg border" style={{backgroundColor: status.connected ? '#f0fdf4' : '#fef2f2', borderColor: status.connected ? '#86efac' : '#fecaca'}}>
+      <div
+        className="rounded-lg border p-4"
+        style={{
+          backgroundColor: status.connected ? '#f0fdf4' : '#fef2f2',
+          borderColor: status.connected ? '#86efac' : '#fecaca',
+        }}
+      >
         <div className="flex items-start justify-between">
           <div>
-            <h3 className="text-lg font-semibold" style={{color: status.connected ? '#15803d' : '#991b1b'}}>
-              {status.connected ? '✓ Olist ERP Conectado' : '✕ Olist ERP Desconectado'}
+            <h3 className="text-lg font-semibold" style={{ color: status.connected ? '#15803d' : '#991b1b' }}>
+              {status.connected ? '✓ Olist ERP conectado' : '✕ Olist ERP desconectado'}
             </h3>
             {status.connected && status.expiresAt && (
-              <div className="text-sm mt-2 space-y-1" style={{color: '#166534'}}>
+              <div className="mt-2 space-y-1 text-sm" style={{ color: '#166534' }}>
                 <p>Token válido até: {new Date(status.expiresAt).toLocaleString('pt-BR')}</p>
               </div>
             )}
           </div>
           <div className="flex gap-2">
-            <a href="/api/olist/oauth/login" className="px-4 py-2 text-white text-sm font-semibold rounded-lg whitespace-nowrap" style={{backgroundColor: status.connected ? '#64748b' : '#dc2626'}}>
+            <a
+              href="/api/olist/oauth/login"
+              className="whitespace-nowrap rounded-lg px-4 py-2 text-sm font-semibold text-white"
+              style={{ backgroundColor: status.connected ? '#64748b' : '#dc2626' }}
+            >
               {status.connected ? 'Reconectar' : 'Conectar'}
             </a>
-            <button onClick={checkStatus} className="px-4 py-2 text-slate-700 text-sm font-semibold rounded-lg whitespace-nowrap border border-slate-300 hover:bg-slate-100">
+            <button
+              onClick={checkStatus}
+              className="whitespace-nowrap rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
+            >
               Recarregar
             </button>
           </div>
@@ -137,133 +147,132 @@ export function SincronizacaoOlist() {
       </div>
 
       {status.connected && (
-      <div>
-        <h3 className="text-lg font-semibold text-slate-900 mb-4">Sincronizar com Olist</h3>
+        <div>
+          <h3 className="mb-4 text-lg font-semibold text-slate-900">Sincronizar com Olist</h3>
 
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-6">
-          <button
-            onClick={() => sincronizarTudo(false)}
-            disabled={carregandoGlobal}
-            className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-lg transition-colors"
-          >
-            <RefreshCw size={16} />
-            Tudo (incremental)
-          </button>
+          <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-3">
+            <button
+              onClick={() => sincronizarTudo(false)}
+              disabled={carregandoGlobal}
+              className="flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <RefreshCw size={16} />
+              Tudo (incremental)
+            </button>
 
-          <button
-            onClick={() => sincronizarTudo(true)}
-            disabled={carregandoGlobal}
-            className="flex items-center justify-center gap-2 px-4 py-2 bg-orange-600 hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-lg transition-colors"
-          >
-            <Zap size={16} />
-            Tudo (full)
-          </button>
+            <button
+              onClick={() => sincronizarTudo(true)}
+              disabled={carregandoGlobal}
+              className="flex items-center justify-center gap-2 rounded-lg bg-orange-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Zap size={16} />
+              Tudo (full)
+            </button>
 
-          <button
-            onClick={() => sincronizar('categorias')}
-            disabled={true}
-            className="flex items-center justify-center gap-2 px-4 py-2 bg-gray-400 cursor-not-allowed text-white text-sm font-semibold rounded-lg transition-colors"
-            title="Token não tem permissão para acessar categorias"
-          >
-            <RefreshCw size={16} />
-            Categorias (indisponível)
-          </button>
-        </div>
-
-        <div className="grid grid-cols-2 md:grid-cols-2 gap-3 mb-6">
-          <button
-            onClick={() => sincronizar('produtos')}
-            disabled={carregandoGlobal}
-            className="flex items-center justify-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-lg transition-colors"
-          >
-            <RefreshCw size={16} />
-            Produtos
-          </button>
-
-          <button
-            onClick={() => sincronizar('pedidos')}
-            disabled={carregandoGlobal}
-            className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-lg transition-colors"
-          >
-            <RefreshCw size={16} />
-            Pedidos
-          </button>
-
-          <button
-            onClick={() => sincronizar('itens')}
-            disabled={carregandoGlobal}
-            className="flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-lg transition-colors"
-          >
-            <RefreshCw size={16} />
-            Itens de Pedidos
-          </button>
-        </div>
-
-        {/* Resultados */}
-        {resultados.length > 0 && (
-          <div className="space-y-3">
-          <h4 className="text-sm font-semibold text-slate-900">Resultados</h4>
-          <div className="space-y-2">
-            {resultados.map((resultado) => {
-              const titulo = {
-                pedidos: 'Pedidos',
-                itens: 'Itens de Pedidos',
-                produtos: 'Produtos',
-                categorias: 'Categorias',
-              }[resultado.tipo]
-
-              return (
-                <div
-                  key={resultado.tipo}
-                  className={`p-3 rounded-lg border ${
-                    resultado.carregando
-                      ? 'bg-blue-50 border-blue-200'
-                      : resultado.sucesso
-                        ? 'bg-green-50 border-green-200'
-                        : 'bg-red-50 border-red-200'
-                  }`}
-                >
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <div className="text-sm font-semibold text-slate-900">{titulo}</div>
-                      {resultado.carregando && (
-                        <div className="text-xs text-slate-600 mt-1">Sincronizando...</div>
-                      )}
-                      {resultado.sucesso && resultado.dados && (
-                        <div className="text-xs text-slate-600 mt-1 space-y-0.5">
-                          {Object.entries(resultado.dados).map(([key, value]) => (
-                            <div key={key}>
-                              <span className="font-medium">{key}:</span> {String(value)}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                      {resultado.erro && (
-                        <div className="text-xs text-red-700 mt-1">{resultado.erro}</div>
-                      )}
-                    </div>
-                    {resultado.carregando && (
-                      <RefreshCw className="animate-spin text-blue-600 flex-shrink-0" size={16} />
-                    )}
-                    {resultado.sucesso && (
-                      <div className="text-green-600 flex-shrink-0">✓</div>
-                    )}
-                    {resultado.erro && (
-                      <div className="text-red-600 flex-shrink-0">✕</div>
-                    )}
-                  </div>
-                </div>
-              )
-            })}
+            <button
+              onClick={() => sincronizar('categorias')}
+              disabled
+              title="Token não tem permissão para acessar categorias"
+              className="flex cursor-not-allowed items-center justify-center gap-2 rounded-lg bg-gray-400 px-4 py-2 text-sm font-semibold text-white transition-colors"
+            >
+              <RefreshCw size={16} />
+              Categorias (indisponível)
+            </button>
           </div>
+
+          <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-2">
+            <button
+              onClick={() => sincronizar('produtos')}
+              disabled={carregandoGlobal}
+              className="flex items-center justify-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <RefreshCw size={16} />
+              Produtos
+            </button>
+
+            <button
+              onClick={() => sincronizar('pedidos')}
+              disabled={carregandoGlobal}
+              className="flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <RefreshCw size={16} />
+              Pedidos
+            </button>
+
+            <button
+              onClick={() => sincronizar('itens')}
+              disabled={carregandoGlobal}
+              className="flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <RefreshCw size={16} />
+              Itens de pedidos
+            </button>
+          </div>
+
+          {resultados.length > 0 && (
+            <div className="space-y-3">
+              <h4 className="text-sm font-semibold text-slate-900">Resultados</h4>
+              <div className="space-y-2">
+                {resultados.map((resultado) => {
+                  const titulo = {
+                    pedidos: 'Pedidos',
+                    itens: 'Itens de pedidos',
+                    produtos: 'Produtos',
+                    categorias: 'Categorias',
+                  }[resultado.tipo]
+
+                  return (
+                    <div
+                      key={resultado.tipo}
+                      className={`rounded-lg border p-3 ${
+                        resultado.carregando
+                          ? 'border-blue-200 bg-blue-50'
+                          : resultado.sucesso
+                            ? 'border-green-200 bg-green-50'
+                            : 'border-red-200 bg-red-50'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <div className="text-sm font-semibold text-slate-900">{titulo}</div>
+                          {resultado.carregando && (
+                            <div className="mt-1 text-xs text-slate-600">Sincronizando...</div>
+                          )}
+                          {resultado.sucesso && resultado.dados && (
+                            <div className="mt-1 space-y-0.5 text-xs text-slate-600">
+                              {Object.entries(resultado.dados).map(([key, value]) => (
+                                <div key={key}>
+                                  <span className="font-medium">{key}:</span> {String(value)}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          {resultado.erro && (
+                            <div className="mt-1 text-xs text-red-700">{resultado.erro}</div>
+                          )}
+                        </div>
+                        {resultado.carregando && (
+                          <RefreshCw className="flex-shrink-0 animate-spin text-blue-600" size={16} />
+                        )}
+                        {resultado.sucesso && (
+                          <div className="flex-shrink-0 text-green-600">✓</div>
+                        )}
+                        {resultado.erro && (
+                          <div className="flex-shrink-0 text-red-600">✕</div>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
         </div>
-        )}
-      </div>
       )}
 
       {!status.connected && (
-        <div className="p-4 rounded-lg border border-gray-200 bg-gray-50 text-center">
-          <p className="text-gray-700 text-sm">Conecte-se com o Olist ERP para acessar as opções de sincronização.</p>
+        <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 text-center">
+          <p className="text-sm text-gray-700">Conecte-se com o Olist ERP para acessar as opções de sincronização.</p>
         </div>
       )}
     </div>

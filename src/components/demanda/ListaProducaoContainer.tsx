@@ -18,13 +18,15 @@ const METRICAS = [
   { status: 'CANCELED' as PlanningStatus,      label: 'Canceladas',   cor: 'bg-red-50    border-red-200    text-red-600',    icone: XCircle },
 ]
 
-const STATUS_LABELS: Record<PlanningStatus, string> = {
+const STATUS_LABELS: Partial<Record<PlanningStatus, string>> = {
   BACKLOG: 'Backlog', WAITING_TANK: 'Ag. Tanque', READY_TO_SCHEDULE: 'Pronto p/ Agendar',
   SCHEDULED: 'Agendadas', IN_PRODUCTION: 'Em Produção',
   COMPLETED: 'Concluídas', CANCELED: 'Canceladas',
 }
 
-const STATUS_ATIVOS: PlanningStatus[] = ['BACKLOG', 'SCHEDULED', 'IN_PRODUCTION']
+STATUS_LABELS.PAUSED = 'Pausadas'
+
+const STATUS_ATIVOS: PlanningStatus[] = ['BACKLOG', 'WAITING_TANK', 'SCHEDULED', 'IN_PRODUCTION', 'PAUSED']
 
 export function ListaProducaoContainer({ etapa = 'tanque' }: { etapa?: string } = {}) {
   const [ordens, setOrdens] = useState<OrdemHistorico[]>([])
@@ -47,7 +49,7 @@ export function ListaProducaoContainer({ etapa = 'tanque' }: { etapa?: string } 
     } finally {
       setCarregando(false)
     }
-  }, [])
+  }, [etapa])
 
   useEffect(() => {
     carregarOrdens()
@@ -98,7 +100,7 @@ export function ListaProducaoContainer({ etapa = 'tanque' }: { etapa?: string } 
         case 'antigo':  return (a.sincronizado_em ?? '').localeCompare(b.sincronizado_em ?? '')
         case 'nome':    return (a.numero_externo ?? '').localeCompare(b.numero_externo ?? '')
         case 'status': {
-          const ordem: Record<string, number> = { IN_PRODUCTION: 0, SCHEDULED: 1, BACKLOG: 2, COMPLETED: 3, CANCELED: 4 }
+          const ordem: Record<string, number> = { IN_PRODUCTION: 0, PAUSED: 1, WAITING_TANK: 2, SCHEDULED: 3, BACKLOG: 4, COMPLETED: 5, CANCELED: 6 }
           return (ordem[a.planning_status ?? 'BACKLOG'] ?? 5) - (ordem[b.planning_status ?? 'BACKLOG'] ?? 5)
         }
         default: return 0

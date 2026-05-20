@@ -80,7 +80,7 @@ describe('planning production helpers', () => {
   })
 
   it('detecta conflito por tanque em producao de tanque', () => {
-    const existing = [baseOrder({ id: 'B', etapa: 'tanque', machine_id: null, tank_id: 'tank-3800' })]
+    const existing = [baseOrder({ id: 'B', etapa: 'tanque', maquina_id: null, tank_id: 'tank-3800' })]
     const conflict = hasScheduleConflict({
       productionType: 'TANK',
       tankId: 'tank-3800',

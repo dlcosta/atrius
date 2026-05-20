@@ -105,6 +105,7 @@ function ordemPlanningStatus(ordem: Ordem): string {
   if (ordem.planning_status) return ordem.planning_status
   if (ordem.status === 'cancelada') return 'CANCELED'
   if (ordem.status === 'concluida') return 'COMPLETED'
+  if (ordem.status === 'pausada') return 'PAUSED'
   if (ordem.status === 'produzindo' || ordem.status === 'limpeza') return 'IN_PRODUCTION'
   if (ordem.inicio_agendado) return 'SCHEDULED'
   return 'BACKLOG'
@@ -2690,7 +2691,7 @@ export default function CalendarioPage() {
               <button
                 onClick={() => setNovaOrdemAberta(true)}
                 className="grid h-7 w-7 place-items-center rounded-full bg-[#2563EB] text-white hover:bg-[#1D4ED8]"
-                title="Nova ordem no Planejamento do Tanque"
+                title="Nova ordem de produção"
               >
                 <Plus size={16} />
               </button>
@@ -2708,7 +2709,7 @@ export default function CalendarioPage() {
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <h2 className="text-base font-semibold text-[#111827]">
-                      {resourceTab === 'envase' ? 'Calendario de Envase (Maquinas)' : 'Calendario de Tanques'}
+                      {resourceTab === 'envase' ? 'Calendário de Envase (Máquinas)' : 'Calendário de Tanques'}
                     </h2>
                     <p className="text-xs text-[#9CA3AF]">
                       {selectedMachine ? `${selectedMachine.nome} com ${selectedMachineOrdens.length} ordens agendadas` : 'Selecione um recurso ativo'}

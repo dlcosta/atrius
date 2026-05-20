@@ -13,7 +13,7 @@ import {
   validateTankCapacity,
   VOLUME_BALANCE_TOLERANCE_LITERS,
 } from '@/lib/planning/production'
-import type { EtapaOrdem, Ordem, PlanningStatus } from '@/types'
+import type { EtapaOrdem, Maquina, Ordem, PlanningStatus, Produto, Tanque } from '@/types'
 
 type LinhaVolume = {
   id: string
@@ -38,6 +38,92 @@ type EnvaseDaOrigem = {
   quantidade: number
   planning_status: PlanningStatus | null
   status: string
+}
+
+type NovoFluxoTanque = {
+  id: string
+  numero_externo: string
+  produto_sku: string | null
+  quantidade: number
+  unidade: string
+  tanque: string | null
+  lote: string | null
+  etapa: string
+  tank_id: string | null
+  tank_volume_liters: number | null
+  setup_time_minutes: number | null
+  production_time_minutes: number | null
+  cleaning_time_minutes: number | null
+  total_duration_minutes: number | null
+  planning_status: PlanningStatus | null
+  color: string | null
+  notes?: string | null
+  data_prevista: string | null
+  inicio_agendado: string | null
+  fim_calculado: string | null
+  inicio_operacao_em: string | null
+  fim_operacao_em: string | null
+  pausado_em: string | null
+  tempo_restante_pausado_seg: number | null
+  operador_nome: string | null
+  status: string
+  sincronizado_em: string
+}
+
+type NovoFluxoEnvase = {
+  id: string
+  numero_externo: string
+  produto_sku: string | null
+  quantidade: number
+  unidade: string
+  tanque: string | null
+  lote: string | null
+  etapa: string
+  maquina_id: string | null
+  package_volume_liters: number | null
+  units_per_box: number | null
+  box_volume_liters: number | null
+  estimated_boxes: number | null
+  production_time_minutes: number | null
+  cleaning_time_minutes: number | null
+  total_duration_minutes: number | null
+  planning_status: PlanningStatus | null
+  calc_mode: CalcMode | null
+  color: string | null
+  notes?: string | null
+  origin_tank_order_id: string | null
+  data_prevista: string | null
+  inicio_agendado: string | null
+  fim_calculado: string | null
+  inicio_operacao_em: string | null
+  fim_operacao_em: string | null
+  pausado_em: string | null
+  tempo_restante_pausado_seg: number | null
+  operador_nome: string | null
+  status: string
+  sincronizado_em: string
+}
+
+type NovoFluxoEnvaseDaOrigem = {
+  origin_tank_order_id: string | null
+  quantidade: number
+  planning_status: PlanningStatus | null
+  status: string
+}
+
+type CompatOperacaoState = {
+  inicio_operacao_em?: string | null
+  fim_operacao_em?: string | null
+  pausado_em?: string | null
+  tempo_restante_pausado_seg?: number | null
+  operador_id?: string | null
+  operador_nome?: string | null
+  observacao_pausa?: string | null
+}
+
+type CompatNotesPayload = {
+  legacy_text?: string | null
+  operacao?: CompatOperacaoState | null
 }
 
 const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/
@@ -81,6 +167,7 @@ function normalizarPlanningStatus(valor: unknown): PlanningStatus | null {
     valor === 'READY_TO_SCHEDULE' ||
     valor === 'SCHEDULED' ||
     valor === 'IN_PRODUCTION' ||
+    valor === 'PAUSED' ||
     valor === 'COMPLETED' ||
     valor === 'CANCELED'
   ) {
@@ -103,6 +190,7 @@ function normalizarCalcMode(valor: unknown): CalcMode {
 function statusPlanejamentoPadrao(statusOperacao: string | null | undefined, inicioAgendado: string | null | undefined): PlanningStatus {
   if (statusOperacao === 'cancelada') return 'CANCELED'
   if (statusOperacao === 'concluida') return 'COMPLETED'
+  if (statusOperacao === 'pausada') return 'PAUSED'
   if (statusOperacao === 'produzindo' || statusOperacao === 'limpeza') return 'IN_PRODUCTION'
   if (inicioAgendado) return 'SCHEDULED'
   return 'BACKLOG'
@@ -121,6 +209,19 @@ function isDateOnlyInRange(dataYmd: string | null | undefined, inicioYmd: string
 
 function isCanceled(planningStatus: PlanningStatus | null, status: string | null | undefined): boolean {
   return planningStatus === 'CANCELED' || status === 'cancelada'
+}
+
+function parseCompatNotes(notes: string | null | undefined): CompatNotesPayload {
+  if (!notes) return {}
+
+  try {
+    const parsed = JSON.parse(notes) as CompatNotesPayload
+    if (parsed && typeof parsed === 'object') return parsed
+  } catch {
+    return { legacy_text: notes }
+  }
+
+  return {}
 }
 
 async function carregarVolumeTanque(supabase: Awaited<ReturnType<typeof createClient>>, tankId: string | null): Promise<number | null> {
@@ -263,6 +364,92 @@ export async function GET(req: NextRequest) {
 
   let lista = Array.isArray(ordens) ? ordens : []
 
+  let queryTanquesNovo = supabase
+    .from('ordens_tanque_novo_fluxo')
+    .select('*')
+    .neq('status', 'cancelada')
+    .order('inicio_agendado', { ascending: true, nullsFirst: false })
+
+  let queryEnvasesNovo = supabase
+    .from('ordens_envase_novo_fluxo')
+    .select('*')
+    .neq('status', 'cancelada')
+    .order('inicio_agendado', { ascending: true, nullsFirst: false })
+
+  if (inicioParam && fimParam) {
+    const rangeFilter =
+      `and(data_prevista.gte.${inicioParam},data_prevista.lte.${fimParam}),` +
+      `and(inicio_agendado.gte.${inicioParam}T00:00:00.000Z,inicio_agendado.lte.${fimParam}T23:59:59.999Z),` +
+      `and(fim_calculado.gte.${inicioParam}T00:00:00.000Z,fim_calculado.lte.${fimParam}T23:59:59.999Z),` +
+      'inicio_agendado.is.null'
+    queryTanquesNovo = queryTanquesNovo.or(rangeFilter)
+    queryEnvasesNovo = queryEnvasesNovo.or(rangeFilter)
+  } else if (data && !dias) {
+    const sameDayFilter = `data_prevista.eq.${data},inicio_agendado.is.null`
+    queryTanquesNovo = queryTanquesNovo.or(sameDayFilter)
+    queryEnvasesNovo = queryEnvasesNovo.or(sameDayFilter)
+  }
+
+  const [
+    { data: tanquesNovo, error: tanquesNovoError },
+    { data: envasesNovo, error: envasesNovoError },
+    { data: produtosNovo },
+    { data: maquinasNovo },
+    { data: tanquesRefNovo },
+  ] = await Promise.all([
+    queryTanquesNovo,
+    queryEnvasesNovo,
+    supabase.from('produtos').select('*'),
+    supabase.from('maquinas').select('*'),
+    supabase.from('tanques').select('*'),
+  ])
+
+  if (tanquesNovoError) return NextResponse.json({ error: mensagemErroOrdem(tanquesNovoError.message) }, { status: 500 })
+  if (envasesNovoError) return NextResponse.json({ error: mensagemErroOrdem(envasesNovoError.message) }, { status: 500 })
+
+  const produtosMap = new Map(((produtosNovo as Produto[] | null) ?? []).map((produto) => [produto.sku, produto]))
+  const maquinasMap = new Map(((maquinasNovo as Maquina[] | null) ?? []).map((maquina) => [maquina.id, maquina]))
+  const tanquesMap = new Map(((tanquesRefNovo as Tanque[] | null) ?? []).map((tanque) => [tanque.id, tanque]))
+
+  lista = [
+    ...lista,
+    ...(((tanquesNovo as NovoFluxoTanque[] | null) ?? []).map((ordem) => {
+      const compat = parseCompatNotes(ordem.notes)
+      const operacao = compat.operacao ?? {}
+      return {
+        ...ordem,
+        inicio_operacao_em: ordem.inicio_operacao_em ?? operacao.inicio_operacao_em ?? null,
+        fim_operacao_em: ordem.fim_operacao_em ?? operacao.fim_operacao_em ?? null,
+        pausado_em: ordem.pausado_em ?? operacao.pausado_em ?? null,
+        tempo_restante_pausado_seg: ordem.tempo_restante_pausado_seg ?? operacao.tempo_restante_pausado_seg ?? null,
+        operador_nome: ordem.operador_nome ?? operacao.operador_nome ?? null,
+        etapa: 'tanque',
+        calc_mode: 'LITERS_MASTER',
+        flow_source: 'novo_fluxo_tanque',
+        produto: ordem.produto_sku ? produtosMap.get(ordem.produto_sku) ?? undefined : undefined,
+        maquina: undefined,
+        tanque_ref: ordem.tank_id ? tanquesMap.get(ordem.tank_id) ?? undefined : undefined,
+      }
+    })),
+    ...(((envasesNovo as NovoFluxoEnvase[] | null) ?? []).map((ordem) => {
+      const compat = parseCompatNotes(ordem.notes)
+      const operacao = compat.operacao ?? {}
+      return {
+        ...ordem,
+        inicio_operacao_em: ordem.inicio_operacao_em ?? operacao.inicio_operacao_em ?? null,
+        fim_operacao_em: ordem.fim_operacao_em ?? operacao.fim_operacao_em ?? null,
+        pausado_em: ordem.pausado_em ?? operacao.pausado_em ?? null,
+        tempo_restante_pausado_seg: ordem.tempo_restante_pausado_seg ?? operacao.tempo_restante_pausado_seg ?? null,
+        operador_nome: ordem.operador_nome ?? operacao.operador_nome ?? null,
+        etapa: 'envase',
+        flow_source: 'novo_fluxo_envase',
+        produto: ordem.produto_sku ? produtosMap.get(ordem.produto_sku) ?? undefined : undefined,
+        maquina: ordem.maquina_id ? maquinasMap.get(ordem.maquina_id) ?? undefined : undefined,
+        tanque_ref: undefined,
+      }
+    })),
+  ]
+
   if (inicioParam && fimParam) {
     const inicioMs = new Date(`${inicioParam}T00:00:00`).getTime()
     const fimDate = new Date(`${fimParam}T00:00:00`)
@@ -300,6 +487,13 @@ export async function GET(req: NextRequest) {
     })
   }
 
+  lista = lista.sort((a, b) => {
+    const aTime = a.inicio_agendado ? new Date(a.inicio_agendado).getTime() : Number.MAX_SAFE_INTEGER
+    const bTime = b.inicio_agendado ? new Date(b.inicio_agendado).getTime() : Number.MAX_SAFE_INTEGER
+    if (aTime !== bTime) return aTime - bTime
+    return String(a.numero_externo ?? '').localeCompare(String(b.numero_externo ?? ''))
+  })
+
   const volumePorOrdem = mapearVolumeReferenciaPorOrdem(
     lista.map((ordem) => ({
       id: ordem.id,
@@ -318,14 +512,28 @@ export async function GET(req: NextRequest) {
 
   const envasedByOrigin = new Map<string, number>()
   if (tankOrderIds.size > 0) {
-    const { data: envases } = await supabase
-      .from('ordens')
-      .select('origin_tank_order_id, quantidade, planning_status, status')
-      .eq('etapa', 'envase')
-      .in('origin_tank_order_id', Array.from(tankOrderIds))
-      .neq('status', 'cancelada')
+    const [{ data: envases }, { data: novosEnvasesDaOrigem }] = await Promise.all([
+      supabase
+        .from('ordens')
+        .select('origin_tank_order_id, quantidade, planning_status, status')
+        .eq('etapa', 'envase')
+        .in('origin_tank_order_id', Array.from(tankOrderIds))
+        .neq('status', 'cancelada'),
+      supabase
+        .from('ordens_envase_novo_fluxo')
+        .select('origin_tank_order_id, quantidade, planning_status, status')
+        .in('origin_tank_order_id', Array.from(tankOrderIds))
+        .neq('status', 'cancelada'),
+    ])
 
-    for (const envase of (envases as Array<{ origin_tank_order_id: string | null; quantidade: number; planning_status: PlanningStatus | null; status: string }> ) ?? []) {
+    for (const envase of ((envases as Array<{ origin_tank_order_id: string | null; quantidade: number; planning_status: PlanningStatus | null; status: string }>) ?? [])) {
+      if (!envase.origin_tank_order_id) continue
+      if (isCanceled(normalizarPlanningStatus(envase.planning_status), envase.status)) continue
+      const current = envasedByOrigin.get(envase.origin_tank_order_id) ?? 0
+      envasedByOrigin.set(envase.origin_tank_order_id, current + Number(envase.quantidade || 0))
+    }
+
+    for (const envase of ((novosEnvasesDaOrigem as NovoFluxoEnvaseDaOrigem[] | null) ?? [])) {
       if (!envase.origin_tank_order_id) continue
       if (isCanceled(normalizarPlanningStatus(envase.planning_status), envase.status)) continue
       const current = envasedByOrigin.get(envase.origin_tank_order_id) ?? 0
@@ -336,11 +544,17 @@ export async function GET(req: NextRequest) {
   const comVolume = lista.map((ordem) => {
     const planning_status =
       normalizarPlanningStatus(ordem.planning_status) ?? statusPlanejamentoPadrao(ordem.status, ordem.inicio_agendado)
+    const compat = parseCompatNotes(ordem.notes)
+    const operacaoCompat = compat.operacao ?? {}
     const enriched: Record<string, unknown> = {
       ...ordem,
       etapa: normalizarEtapa(ordem.etapa, ordem.produto_sku, ordem.unidade),
       planning_status,
       calc_mode: normalizarCalcMode(ordem.calc_mode),
+      flow_source: ordem.flow_source ?? 'legado',
+      operador_id: ordem.operador_id ?? operacaoCompat.operador_id ?? null,
+      operador_nome: ordem.operador_nome ?? operacaoCompat.operador_nome ?? null,
+      observacao_pausa: ordem.observacao_pausa ?? operacaoCompat.observacao_pausa ?? null,
       quantidade_referencia_litros: volumePorOrdem[ordem.id] ?? Number(ordem.quantidade),
     }
 

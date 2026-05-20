@@ -74,7 +74,7 @@ export function NovaOrdemForm({ produtos, dataInicial, onSalvo, onFechar }: Prop
         setTanques(Array.isArray(t) ? t.filter((item) => item.ativo) : [])
         setOrigensTanque(Array.isArray(o) ? o : [])
       } catch {
-        // O formulario continua funcional mesmo sem carregar os recursos.
+        // O formulário continua funcional mesmo sem carregar os recursos.
       }
     }
     carregarRecursos()
@@ -263,13 +263,13 @@ export function NovaOrdemForm({ produtos, dataInicial, onSalvo, onFechar }: Prop
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/35 p-4">
       <div className="max-h-[95vh] w-full max-w-4xl overflow-y-auto rounded-[12px] border border-[#E4E7EC] bg-white p-6 shadow-[var(--shadow-md)]">
-        <h2 className="text-xl font-semibold text-[#111827]">Nova producao manual</h2>
-        <p className="mb-6 text-sm text-[#9CA3AF]">Fluxo separado para Tanque e Envase com controle de volume operacional.</p>
+        <h2 className="text-xl font-semibold text-[#111827]">Nova produção manual</h2>
+        <p className="mb-6 text-sm text-[#9CA3AF]">Fluxo separado para tanque e envase com controle de volume operacional.</p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
             <div>
-              <label className="mb-1 block text-sm font-medium text-[#4B5563]">Tipo de producao</label>
+              <label className="mb-1 block text-sm font-medium text-[#4B5563]">Tipo de produção</label>
               <select
                 value={etapa}
                 onChange={(e) => setEtapa(e.target.value as 'tanque' | 'envase')}
@@ -280,7 +280,7 @@ export function NovaOrdemForm({ produtos, dataInicial, onSalvo, onFechar }: Prop
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-[#4B5563]">Data de producao</label>
+              <label className="mb-1 block text-sm font-medium text-[#4B5563]">Data de produção</label>
               <input
                 type="date"
                 required
@@ -308,7 +308,7 @@ export function NovaOrdemForm({ produtos, dataInicial, onSalvo, onFechar }: Prop
                 ))}
               </select>
               {origensTanque.length === 0 && (
-                <p className="mt-1 text-xs text-amber-700">Nao ha ordens de tanque com saldo disponivel para envase.</p>
+                <p className="mt-1 text-xs text-amber-700">Não há ordens de tanque com saldo disponível para envase.</p>
               )}
             </div>
           )}
@@ -342,7 +342,7 @@ export function NovaOrdemForm({ produtos, dataInicial, onSalvo, onFechar }: Prop
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-[#4B5563]">{etapa === 'tanque' ? 'Tanque' : 'Maquina'}</label>
+              <label className="mb-1 block text-sm font-medium text-[#4B5563]">{etapa === 'tanque' ? 'Tanque' : 'Máquina'}</label>
               {etapa === 'tanque' ? (
                 <select
                   value={tankId}
@@ -394,7 +394,7 @@ export function NovaOrdemForm({ produtos, dataInicial, onSalvo, onFechar }: Prop
               <input type="number" min={0} required value={setupTimeMinutes} onChange={(e) => setSetupTimeMinutes(e.target.value)} className="w-full rounded-[8px] border border-[#E4E7EC] bg-white px-3 py-2 text-sm text-[#111827]" />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-[#4B5563]">Producao (min)</label>
+              <label className="mb-1 block text-sm font-medium text-[#4B5563]">Produção (min)</label>
               <input type="number" min={1} required value={productionTimeMinutes} onChange={(e) => setProductionTimeMinutes(e.target.value)} className="w-full rounded-[8px] border border-[#E4E7EC] bg-white px-3 py-2 text-sm text-[#111827]" />
             </div>
             <div>
@@ -407,7 +407,7 @@ export function NovaOrdemForm({ produtos, dataInicial, onSalvo, onFechar }: Prop
             <>
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-[#4B5563]">Modo de calculo</label>
+                  <label className="mb-1 block text-sm font-medium text-[#4B5563]">Modo de cálculo</label>
                   <select
                     value={calcMode}
                     onChange={(e) => setCalcMode(e.target.value as CalcMode)}
@@ -471,7 +471,7 @@ export function NovaOrdemForm({ produtos, dataInicial, onSalvo, onFechar }: Prop
               <input type="color" value={cor} onChange={(e) => setCor(e.target.value)} className="h-10 w-full rounded-[8px] border border-[#E4E7EC] bg-white px-2" />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-[#4B5563]">Observacoes</label>
+              <label className="mb-1 block text-sm font-medium text-[#4B5563]">Observações</label>
               <input type="text" value={notes} onChange={(e) => setNotes(e.target.value)} className="w-full rounded-[8px] border border-[#E4E7EC] bg-white px-3 py-2 text-sm text-[#111827]" />
             </div>
           </div>
@@ -479,11 +479,11 @@ export function NovaOrdemForm({ produtos, dataInicial, onSalvo, onFechar }: Prop
           <div className="rounded-[8px] border border-[#E4E7EC] bg-[#F7F8FA] p-3">
             <label className="flex items-center gap-2 text-sm font-medium text-[#4B5563]">
               <input type="checkbox" checked={usarHoraInicio} onChange={(e) => setUsarHoraInicio(e.target.checked)} />
-              Informar hora de inicio no cadastro (se desmarcado, vai para backlog com data)
+              Informar hora de início no cadastro (se desmarcado, vai para backlog com data)
             </label>
             {usarHoraInicio && (
               <div className="mt-3">
-                <label className="mb-1 block text-sm font-medium text-[#4B5563]">Hora de inicio</label>
+                <label className="mb-1 block text-sm font-medium text-[#4B5563]">Hora de início</label>
                 <input type="time" value={horaInicio} onChange={(e) => setHoraInicio(e.target.value)} className="w-full rounded-[8px] border border-[#E4E7EC] bg-white px-3 py-2 text-sm text-[#111827] md:w-48" />
               </div>
             )}
@@ -493,7 +493,7 @@ export function NovaOrdemForm({ produtos, dataInicial, onSalvo, onFechar }: Prop
             <div>Tempo total: <span className="font-semibold">{totalDurationMinutes} min</span></div>
             {preview.startAt && preview.endAt && (
               <div>
-                Inicio planejado: <span className="font-semibold">{format(preview.startAt, 'dd/MM/yyyy HH:mm')}</span> | Fim previsto: <span className="font-semibold">{format(preview.endAt, 'dd/MM/yyyy HH:mm')}</span>
+                Início planejado: <span className="font-semibold">{format(preview.startAt, 'dd/MM/yyyy HH:mm')}</span> | Fim previsto: <span className="font-semibold">{format(preview.endAt, 'dd/MM/yyyy HH:mm')}</span>
               </div>
             )}
             {etapa === 'envase' ? (
@@ -532,7 +532,7 @@ export function NovaOrdemForm({ produtos, dataInicial, onSalvo, onFechar }: Prop
               Cancelar
             </button>
             <button type="submit" disabled={salvando} className="rounded-[8px] bg-[#2563EB] px-4 py-2 text-sm font-medium text-white hover:bg-[#1D4ED8] disabled:opacity-50">
-              {salvando ? 'Salvando...' : 'Salvar producao'}
+              {salvando ? 'Salvando...' : 'Salvar produção'}
             </button>
           </div>
         </form>

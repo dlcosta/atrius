@@ -5,47 +5,30 @@ import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { Package } from 'lucide-react'
 import type { JanelaProducao } from '@/lib/planning/gantt-layout'
-import type { Maquina, Ordem } from '@/types'
+import type { Maquina, Operador, Ordem } from '@/types'
 
-type AcaoOperacao = 'iniciar' | 'finalizar'
+type AcaoOperacao = 'iniciar' | 'pausar' | 'retomar' | 'finalizar'
 type PainelTab = 'envase' | 'tanque'
 
 type Props = {
   maquinas: Maquina[]
+  operadores: Operador[]
   ordens: Ordem[]
   executandoOrdemId: string | null
+  operadorPorRecurso: Record<string, string>
   dia: Date
   janela: JanelaProducao
   onNavigateDay: (acao: 'prev' | 'today' | 'next') => void
   onExit: () => void
-  onAcao: (ordemId: string, acao: AcaoOperacao) => Promise<void>
+  onSelecionarOperador: (recursoKey: string, operadorId: string) => void
+  onAcao: (ordem: Ordem, acao: AcaoOperacao) => Promise<void>
 }
 
 type RecursoColuna = {
   id: string
   nome: string
-  ordens: Ordem[]
   tipo: PainelTab
-}
-
-const TV_COLORS = {
-  bgBase: '#F4F6F8',
-  bgPanel: '#FFFFFF',
-  bgSubtle: '#EBEEF2',
-  border: '#DDE1E8',
-  borderStrong: '#C4CAD4',
-  textPrimary: '#0F1623',
-  textSecondary: '#4A5568',
-  textMuted: '#8896A8',
-  accent: '#2563EB',
-  accentSubtle: '#EFF6FF',
-  success: '#16A34A',
-  successSubtle: '#F0FDF4',
-  warning: '#D97706',
-  warningSubtle: '#FFFBEB',
-  danger: '#DC2626',
-  dangerSubtle: '#FEF2F2',
-  neutral: '#64748B',
+  ordens: Ordem[]
 }
 
 function ordenarPorInicio(ordens: Ordem[]): Ordem[] {
@@ -56,59 +39,63 @@ function ordenarPorInicio(ordens: Ordem[]): Ordem[] {
   })
 }
 
-function prioridadeStatus(status: Ordem['status']): number {
-  if (status === 'produzindo') return 0
-  if (status === 'limpeza') return 1
-  if (status === 'atrasada') return 2
-  if (status === 'aguardando') return 3
-  if (status === 'concluida') return 4
-  return 5
-}
-
-function formatarHoraMin(dataIso: string | null | undefined): string {
+function formatarHora(dataIso: string | null | undefined): string {
   if (!dataIso) return '--:--'
   return format(new Date(dataIso), 'HH:mm')
 }
 
-function formatarDuracao(ms: number): string {
-  if (!Number.isFinite(ms) || ms <= 0) return '00:00:00'
-  const totalSeg = Math.floor(ms / 1000)
+function formatarDuracaoSegundos(segundos: number): string {
+  const totalSeg = Math.max(0, Math.floor(segundos))
   const horas = Math.floor(totalSeg / 3600)
-  const min = Math.floor((totalSeg % 3600) / 60)
-  const seg = totalSeg % 60
-  return [horas, min, seg].map((valor) => String(valor).padStart(2, '0')).join(':')
+  const minutos = Math.floor((totalSeg % 3600) / 60)
+  const segundosRestantes = totalSeg % 60
+  return [horas, minutos, segundosRestantes].map((v) => String(v).padStart(2, '0')).join(':')
 }
 
-function formatarEstimativaCurta(ms: number): string {
-  if (!Number.isFinite(ms) || ms <= 0) return '0min'
-  const totalMin = Math.round(ms / 60000)
-  const h = Math.floor(totalMin / 60)
-  const m = totalMin % 60
-  if (h === 0) return `${m}min`
-  return `${h}h ${m}min`
-}
+function calcularSegundosRestantes(ordem: Ordem, agoraMs: number): number | null {
+  if (ordem.status === 'pausada' && ordem.tempo_restante_pausado_seg !== null && ordem.tempo_restante_pausado_seg !== undefined) {
+    return ordem.tempo_restante_pausado_seg
+  }
 
-function statusChip(status: Ordem['status']) {
-  if (status === 'produzindo') return { label: 'Em Produção', bg: TV_COLORS.accentSubtle, text: TV_COLORS.accent }
-  if (status === 'limpeza') return { label: 'Limpeza', bg: TV_COLORS.warningSubtle, text: TV_COLORS.warning }
-  if (status === 'concluida') return { label: 'Concluída', bg: TV_COLORS.successSubtle, text: TV_COLORS.success }
-  if (status === 'atrasada') return { label: 'Atrasada', bg: TV_COLORS.dangerSubtle, text: TV_COLORS.danger }
-  return { label: 'Agendada', bg: TV_COLORS.bgSubtle, text: TV_COLORS.neutral }
+  if (!ordem.fim_calculado) return null
+  return Math.max(0, Math.floor((new Date(ordem.fim_calculado).getTime() - agoraMs) / 1000))
 }
 
 function statusRecurso(ordens: Ordem[]) {
   if (ordens.some((ordem) => ordem.status === 'produzindo')) {
-    return { label: 'Em Produção', color: TV_COLORS.accent, pulse: true }
+    return { label: 'Em andamento', chip: 'bg-emerald-100 text-emerald-700 border-emerald-200' }
+  }
+  if (ordens.some((ordem) => ordem.status === 'pausada')) {
+    return { label: 'Pausado', chip: 'bg-orange-100 text-orange-700 border-orange-200' }
+  }
+  if (ordens.some((ordem) => ordem.planning_status === 'WAITING_TANK')) {
+    return { label: 'Aguardando tanque', chip: 'bg-amber-100 text-amber-700 border-amber-200' }
   }
   if (ordens.length > 0 && ordens.every((ordem) => ordem.status === 'concluida')) {
-    return { label: 'Concluído', color: TV_COLORS.success, pulse: false }
+    return { label: 'Concluído', chip: 'bg-slate-100 text-slate-600 border-slate-200' }
   }
-  return { label: 'Aguardando', color: TV_COLORS.neutral, pulse: false }
+  return { label: 'Programado', chip: 'bg-blue-100 text-blue-700 border-blue-200' }
+}
+
+function labelStatus(ordem: Ordem): string {
+  if (ordem.status === 'produzindo') return 'Em andamento'
+  if (ordem.status === 'pausada') return 'Pausado'
+  if (ordem.status === 'concluida') return 'Concluído'
+  if (ordem.planning_status === 'WAITING_TANK') return 'Aguardando tanque'
+  return 'Programada'
+}
+
+function statusClass(ordem: Ordem): string {
+  if (ordem.status === 'produzindo') return 'bg-emerald-100 text-emerald-700 border-emerald-200'
+  if (ordem.status === 'pausada') return 'bg-orange-100 text-orange-700 border-orange-200'
+  if (ordem.status === 'concluida') return 'bg-slate-100 text-slate-600 border-slate-200'
+  if (ordem.planning_status === 'WAITING_TANK') return 'bg-amber-100 text-amber-700 border-amber-200'
+  return 'bg-blue-100 text-blue-700 border-blue-200'
 }
 
 function montarRecursosEnvase(maquinas: Maquina[], ordens: Ordem[]): RecursoColuna[] {
   return maquinas
-    .filter((m) => m.ativa)
+    .filter((maquina) => maquina.ativa)
     .map((maquina) => ({
       id: maquina.id,
       nome: maquina.nome.toUpperCase(),
@@ -118,20 +105,23 @@ function montarRecursosEnvase(maquinas: Maquina[], ordens: Ordem[]): RecursoColu
 }
 
 function montarRecursosTanque(ordens: Ordem[]): RecursoColuna[] {
-  const tanques = ordens.filter((ordem) => ordem.etapa === 'tanque')
   const mapa = new Map<string, RecursoColuna>()
 
-  tanques.forEach((ordem, index) => {
-    const key = ordem.tank_id ?? ordem.tanque_ref?.id ?? ordem.tanque ?? `tanque-sem-id-${index}`
-    const nomeBase = ordem.tanque_ref?.nome ?? ordem.tanque ?? `TANQUE ${index + 1}`
-    const nome = nomeBase.toUpperCase().startsWith('TANQUE') ? nomeBase.toUpperCase() : `TANQUE ${nomeBase.toUpperCase()}`
-
-    if (!mapa.has(key)) {
-      mapa.set(key, { id: key, nome, tipo: 'tanque', ordens: [] })
-    }
-
-    mapa.get(key)?.ordens.push(ordem)
-  })
+  ordens
+    .filter((ordem) => ordem.etapa === 'tanque')
+    .forEach((ordem, index) => {
+      const key = ordem.tank_id ?? ordem.tanque_ref?.id ?? ordem.tanque ?? `tanque-${index}`
+      const nome = ordem.tanque_ref?.nome ?? ordem.tanque ?? `Tanque ${index + 1}`
+      if (!mapa.has(key)) {
+        mapa.set(key, {
+          id: key,
+          nome: nome.toUpperCase(),
+          tipo: 'tanque',
+          ordens: [],
+        })
+      }
+      mapa.get(key)?.ordens.push(ordem)
+    })
 
   return Array.from(mapa.values()).map((recurso) => ({
     ...recurso,
@@ -139,253 +129,205 @@ function montarRecursosTanque(ordens: Ordem[]): RecursoColuna[] {
   }))
 }
 
-function selecionarOrdensVisiveis(ordens: Ordem[]) {
-  const ordenadas = [...ordens].sort((a, b) => {
-    const diffPrioridade = prioridadeStatus(a.status) - prioridadeStatus(b.status)
-    if (diffPrioridade !== 0) return diffPrioridade
-    const aTime = a.inicio_agendado ? new Date(a.inicio_agendado).getTime() : Number.MAX_SAFE_INTEGER
-    const bTime = b.inicio_agendado ? new Date(b.inicio_agendado).getTime() : Number.MAX_SAFE_INTEGER
-    return aTime - bTime
-  })
-
-  const possuiHero = ordenadas.some((ordem) => ordem.status === 'produzindo' || ordem.status === 'limpeza')
-  const limite = possuiHero ? 3 : 4
-  return {
-    visiveis: ordenadas.slice(0, limite),
-    ocultas: Math.max(0, ordenadas.length - limite),
-  }
-}
-
-function calcularMetricasTempo(ordem: Ordem, agoraMs: number) {
-  const inicioMs = ordem.inicio_operacao_em
-    ? new Date(ordem.inicio_operacao_em).getTime()
-    : ordem.inicio_agendado
-      ? new Date(ordem.inicio_agendado).getTime()
-      : null
-
-  const fimMs = ordem.fim_calculado ? new Date(ordem.fim_calculado).getTime() : null
-  const totalMs = inicioMs !== null && fimMs !== null ? Math.max(1, fimMs - inicioMs) : null
-  const elapsedMs = inicioMs !== null ? Math.max(0, agoraMs - inicioMs) : 0
-  const remainingMs = fimMs !== null ? Math.max(0, fimMs - agoraMs) : 0
-  const progressPct = totalMs ? (elapsedMs / totalMs) * 100 : 0
-
-  return {
-    elapsedMs,
-    remainingMs,
-    totalMs,
-    progressPct,
-  }
+function getResourceKey(recurso: RecursoColuna) {
+  return recurso.tipo === 'envase' ? `machine:${recurso.id}` : `tank:${recurso.id}`
 }
 
 function CardOrdem({
   ordem,
-  hero,
-  agoraMs,
   executandoOrdemId,
-  ordemProduzindoId,
-  mostrarFasesTanque,
-  habilitarAcoes,
+  ordemBloqueanteId,
+  operadorSelecionadoId,
+  agoraMs,
   onAcao,
 }: {
   ordem: Ordem
-  hero: boolean
-  agoraMs: number
   executandoOrdemId: string | null
-  ordemProduzindoId: string | null
-  mostrarFasesTanque: boolean
-  habilitarAcoes: boolean
-  onAcao: (ordemId: string, acao: AcaoOperacao) => Promise<void>
+  ordemBloqueanteId: string | null
+  operadorSelecionadoId: string
+  agoraMs: number
+  onAcao: (ordem: Ordem, acao: AcaoOperacao) => Promise<void>
 }) {
-  const chip = statusChip(ordem.status)
   const emExecucao = executandoOrdemId === ordem.id
-  const podeIniciar = (ordem.status === 'aguardando' || ordem.status === 'atrasada') && (!ordemProduzindoId || ordemProduzindoId === ordem.id)
-  const podeFinalizar = ordem.status === 'produzindo' || ordem.status === 'limpeza'
-  const isConcluida = ordem.status === 'concluida'
-  const isLimpeza = ordem.status === 'limpeza'
-  const isAtrasada = ordem.status === 'atrasada'
-  const { elapsedMs, remainingMs, totalMs, progressPct } = calcularMetricasTempo(ordem, agoraMs)
-
-  const progressoLimitado = Math.max(0, Math.min(progressPct, 100))
-  const progressoCor =
-    progressPct >= 90 ? TV_COLORS.danger : progressPct >= 75 ? TV_COLORS.warning : TV_COLORS.accent
-
-  const cardBase = isConcluida
-    ? {
-        background: TV_COLORS.successSubtle,
-        borderLeft: `4px solid ${TV_COLORS.success}`,
-      }
-    : isLimpeza
-      ? {
-          background: TV_COLORS.warningSubtle,
-          borderLeft: `4px solid ${TV_COLORS.warning}`,
-        }
-      : hero
-        ? {
-            background: 'linear-gradient(180deg, #EFF6FF 0%, #FFFFFF 46%)',
-            borderLeft: `4px solid ${TV_COLORS.accent}`,
-          }
-        : {
-            background: '#FFFFFF',
-            borderLeft: `4px solid ${isAtrasada ? TV_COLORS.danger : TV_COLORS.borderStrong}`,
-          }
+  const podeIniciar =
+    ordem.status === 'aguardando' &&
+    ordem.planning_status !== 'WAITING_TANK' &&
+    (!ordemBloqueanteId || ordemBloqueanteId === ordem.id)
+  const podeRetomar =
+    ordem.status === 'pausada' &&
+    ordem.planning_status !== 'WAITING_TANK' &&
+    (!ordemBloqueanteId || ordemBloqueanteId === ordem.id)
+  const podePausar = ordem.status === 'produzindo'
+  const podeFinalizar = ordem.status === 'produzindo' || ordem.status === 'pausada' || ordem.status === 'limpeza'
+  const semOperadorSelecionado = !operadorSelecionadoId
+  const restanteSegundos = calcularSegundosRestantes(ordem, agoraMs)
 
   return (
-    <article
-      className={`rounded-[10px] border p-4 ${hero ? 'shadow-[0_10px_24px_rgba(15,22,35,0.12)]' : 'shadow-[0_2px_8px_rgba(15,22,35,0.05)]'} ${
-        isConcluida ? 'py-3' : ''
-      }`}
-      style={{ borderColor: TV_COLORS.border, ...cardBase }}
-    >
+    <article className="rounded-[18px] border border-[#DDE1E8] bg-white p-4 shadow-[0_10px_24px_rgba(15,22,35,0.08)]">
       <div className="flex items-start gap-3">
         <div className="min-w-0 flex-1">
-          <h3
-            className={`truncate text-[#0F1623] ${hero ? 'text-[22px] font-bold leading-tight' : 'text-[20px] font-semibold leading-tight'} ${
-              isConcluida ? 'text-[18px]' : ''
-            }`}
-            title={ordem.produto?.nome ?? ordem.produto_sku ?? ordem.numero_externo}
-          >
+          <h3 className="truncate text-[22px] font-semibold leading-tight text-[#0F1623]">
             {ordem.produto?.nome ?? ordem.produto_sku ?? `Ordem ${ordem.numero_externo}`}
           </h3>
-          <p className={`${hero ? 'mt-2 text-[16px]' : 'mt-1 text-[14px]'} font-mono text-[#4A5568]`}>
-            {ordem.produto_sku ?? '--'} • Lote {ordem.lote?.toUpperCase() ?? '--'} • {ordem.quantidade.toLocaleString('pt-BR')} {ordem.unidade}
+          <p className="mt-2 font-mono text-[14px] text-[#4A5568]">
+            #{ordem.numero_externo} | {ordem.quantidade.toLocaleString('pt-BR')} {ordem.unidade} | lote {ordem.lote ?? '--'}
           </p>
         </div>
-        <div className="flex min-w-[120px] flex-col items-end gap-2">
-          <span
-            className="inline-flex rounded-full px-2.5 py-1 text-[13px] font-semibold"
-            style={{ background: chip.bg, color: chip.text }}
-          >
-            {chip.label}
-          </span>
-          <span className="text-[13px] text-[#8896A8]">{formatarHoraMin(ordem.inicio_agendado)}</span>
+        <span className={`rounded-full border px-3 py-1 text-[12px] font-semibold uppercase tracking-[0.08em] ${statusClass(ordem)}`}>
+          {labelStatus(ordem)}
+        </span>
+      </div>
+
+      <div className="mt-4 grid grid-cols-2 gap-3 text-[13px] text-[#4A5568] xl:grid-cols-4">
+        <div className="rounded-[12px] bg-[#F8FAFC] px-3 py-2">
+          <div className="text-[11px] uppercase tracking-wide text-[#8896A8]">Início previsto</div>
+          <div className="mt-1 font-semibold text-[#0F1623]">{formatarHora(ordem.inicio_agendado)}</div>
+        </div>
+        <div className="rounded-[12px] bg-[#F8FAFC] px-3 py-2">
+          <div className="text-[11px] uppercase tracking-wide text-[#8896A8]">Início real</div>
+          <div className="mt-1 font-semibold text-[#0F1623]">{formatarHora(ordem.inicio_operacao_em)}</div>
+        </div>
+        <div className="rounded-[12px] bg-[#F8FAFC] px-3 py-2">
+          <div className="text-[11px] uppercase tracking-wide text-[#8896A8]">Fim previsto</div>
+          <div className="mt-1 font-semibold text-[#0F1623]">{formatarHora(ordem.fim_calculado)}</div>
+        </div>
+        <div className="rounded-[12px] bg-[#F8FAFC] px-3 py-2">
+          <div className="text-[11px] uppercase tracking-wide text-[#8896A8]">Operador</div>
+          <div className="mt-1 font-semibold text-[#0F1623]">{ordem.operador_nome ?? '--'}</div>
         </div>
       </div>
 
-      {(hero || isLimpeza) && !isConcluida && (
-        <div className="mt-4 rounded-[10px] bg-[#F8FAFC] px-4 py-3">
-          <div className="text-center text-[11px] uppercase tracking-[0.1em] text-[#8896A8]">Tempo Decorrido</div>
-          <div className={`mt-1 text-center font-mono text-[52px] font-bold ${isLimpeza ? 'text-[#D97706]' : 'text-[#2563EB]'}`}>
-            {formatarDuracao(elapsedMs)}
+      {restanteSegundos !== null && (ordem.status === 'produzindo' || ordem.status === 'pausada') && (
+        <div className="mt-4 rounded-[14px] bg-[#0F172A] px-4 py-3">
+          <div className="text-[11px] uppercase tracking-[0.12em] text-[#94A3B8]">
+            {ordem.status === 'pausada' ? 'Tempo restante pausado' : 'Tempo restante'}
           </div>
-
-          <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-[#EBEEF2]">
-            <div
-              className={`h-2 rounded-full transition-all duration-500 ${progressPct >= 90 ? 'animate-[status-pulse_1s_infinite]' : ''}`}
-              style={{ width: `${progressoLimitado}%`, background: progressoCor }}
-            />
-          </div>
-
-          <div className="mt-2 text-center text-[13px] text-[#8896A8]">
-            Estimado: {formatarEstimativaCurta(totalMs ?? 0)} | Restante: {formatarEstimativaCurta(remainingMs)}
-          </div>
+          <div className="mt-1 font-mono text-[34px] font-bold text-white">{formatarDuracaoSegundos(restanteSegundos)}</div>
         </div>
       )}
 
-      {mostrarFasesTanque && (
-        <div className="mt-3 rounded-[8px] border border-[#DDE1E8] bg-[#F8FAFC] px-3 py-2">
-          <div className="text-[11px] uppercase tracking-[0.08em] text-[#8896A8]">Fases</div>
-          <div className="mt-1 flex items-center gap-2 text-[13px] font-semibold text-[#4A5568]">
-            <span className="rounded-full bg-[#DBEAFE] px-2 py-0.5 text-[#1D4ED8]">1</span>
-            Mistura
-            <span className="text-[#C4CAD4]">→</span>
-            <span className="rounded-full bg-[#EBEEF2] px-2 py-0.5">2</span>
-            Repouso
-            <span className="text-[#C4CAD4]">→</span>
-            <span className="rounded-full bg-[#EBEEF2] px-2 py-0.5">3</span>
-            Transferência
-          </div>
+      {ordem.planning_status === 'WAITING_TANK' && (
+        <div className="mt-4 rounded-[12px] border border-amber-200 bg-amber-50 px-4 py-3 text-[13px] text-amber-800">
+          Esta ordem de envase já foi criada, mas só pode iniciar quando a ordem do tanque vinculada estiver concluída.
         </div>
       )}
 
-      {!isConcluida && habilitarAcoes && (
-        <div className="mt-4 flex gap-2">
-          <button
-            onClick={() => onAcao(ordem.id, 'iniciar')}
-            disabled={!podeIniciar || emExecucao}
-            className="h-10 flex-1 rounded-[10px] border border-[#D97706] bg-white text-[15px] font-semibold text-[#D97706] disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            {emExecucao && podeIniciar ? 'Iniciando...' : 'Iniciar'}
-          </button>
-          <button
-            onClick={() => onAcao(ordem.id, 'finalizar')}
-            disabled={!podeFinalizar || emExecucao}
-            className="h-10 flex-1 rounded-[10px] bg-[#16A34A] text-[15px] font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            {emExecucao && podeFinalizar ? 'Finalizando...' : 'Concluir'}
-          </button>
+      {semOperadorSelecionado && (
+        <div className="mt-4 rounded-[12px] border border-slate-200 bg-slate-50 px-4 py-3 text-[13px] text-slate-600">
+          Selecione um operador para liberar as ações desse recurso.
         </div>
       )}
 
-      {!isConcluida && !habilitarAcoes && (
-        <div className="mt-3 rounded-[8px] bg-[#EBEEF2] px-3 py-2 text-[13px] text-[#64748B]">
-          Controle operacional indisponível nesta ordem.
+      {ordem.observacao_pausa && (
+        <div className="mt-4 rounded-[12px] border border-amber-200 bg-amber-50 px-4 py-3 text-[13px] text-amber-800">
+          Motivo da pausa: {ordem.observacao_pausa}
         </div>
       )}
+
+      <div className="mt-4 grid grid-cols-3 gap-2">
+        <button
+          onClick={() => onAcao(ordem, podeRetomar ? 'retomar' : 'iniciar')}
+          disabled={(!podeIniciar && !podeRetomar) || emExecucao || semOperadorSelecionado}
+          className="h-11 rounded-[12px] bg-[#2563EB] px-3 text-[15px] font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          {emExecucao && (podeIniciar || podeRetomar)
+            ? podeRetomar ? 'Retomando...' : 'Iniciando...'
+            : podeRetomar ? 'Retomar' : 'Iniciar'}
+        </button>
+        <button
+          onClick={() => onAcao(ordem, 'pausar')}
+          disabled={!podePausar || emExecucao || semOperadorSelecionado}
+          className="h-11 rounded-[12px] border border-[#D97706] bg-white px-3 text-[15px] font-semibold text-[#D97706] disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          {emExecucao && podePausar ? 'Pausando...' : 'Pausar'}
+        </button>
+        <button
+          onClick={() => onAcao(ordem, 'finalizar')}
+          disabled={!podeFinalizar || emExecucao || semOperadorSelecionado}
+          className="h-11 rounded-[12px] bg-[#16A34A] px-3 text-[15px] font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          {emExecucao && podeFinalizar ? 'Concluindo...' : 'Concluir'}
+        </button>
+      </div>
     </article>
   )
 }
 
 function ColunaRecurso({
   recurso,
+  operadores,
+  operadorPorRecurso,
+  onSelecionarOperador,
   executandoOrdemId,
   agoraMs,
   onAcao,
 }: {
   recurso: RecursoColuna
+  operadores: Operador[]
+  operadorPorRecurso: Record<string, string>
+  onSelecionarOperador: (recursoKey: string, operadorId: string) => void
   executandoOrdemId: string | null
   agoraMs: number
-  onAcao: (ordemId: string, acao: AcaoOperacao) => Promise<void>
+  onAcao: (ordem: Ordem, acao: AcaoOperacao) => Promise<void>
 }) {
-  const ordens = recurso.ordens
-  const status = statusRecurso(ordens)
-  const ordemProduzindo = ordens.find((ordem) => ordem.status === 'produzindo')
-  const { visiveis, ocultas } = selecionarOrdensVisiveis(ordens)
+  const ordemBloqueante = recurso.ordens.find((ordem) => ordem.status === 'produzindo' || ordem.status === 'pausada')
+  const status = statusRecurso(recurso.ordens)
+  const recursoKey = getResourceKey(recurso)
+  const operadorSelecionadoId = operadorPorRecurso[recursoKey] ?? ''
+  const operadorSelecionado = operadores.find((operador) => operador.id === operadorSelecionadoId) ?? null
 
   return (
-    <section className="flex h-full min-h-0 flex-col bg-[#FFFFFF]">
-      <header className="flex h-20 items-center justify-between border-b border-[#DDE1E8] px-4">
-        <div className="min-w-0">
-          <h2 className="truncate text-[28px] font-bold text-[#0F1623]">{recurso.nome}</h2>
-          <div className="mt-1 flex items-center gap-2 text-[14px] text-[#4A5568]">
-            <span
-              className={`h-2.5 w-2.5 rounded-full ${status.pulse ? 'animate-[status-pulse_1.5s_infinite]' : ''}`}
-              style={{ background: status.color }}
-            />
+    <section className="flex h-full min-h-0 flex-col rounded-[18px] border border-[#DDE1E8] bg-[#FFFFFF]">
+      <header className="flex items-center justify-between border-b border-[#E5E7EB] px-5 py-4">
+        <div>
+          <h2 className="text-[26px] font-bold text-[#0F1623]">{recurso.nome}</h2>
+          <span className={`mt-2 inline-flex rounded-full border px-3 py-1 text-[12px] font-semibold uppercase tracking-[0.08em] ${status.chip}`}>
             {status.label}
+          </span>
+          <div className="mt-3">
+            <select
+              value={operadorSelecionadoId}
+              onChange={(e) => onSelecionarOperador(recursoKey, e.target.value)}
+              className="h-9 min-w-60 rounded-[10px] border border-[#D0D5DD] bg-white px-3 text-sm text-[#111827]"
+            >
+              <option value="">Selecione o operador...</option>
+              {operadores.map((operador) => (
+                <option key={operador.id} value={operador.id}>
+                  {operador.nome}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
-        <span className="rounded-full bg-[#EBEEF2] px-3 py-1 text-[14px] text-[#64748B]">{ordens.length} ordens</span>
+        <div className="text-right">
+          <div className="text-[11px] uppercase tracking-wide text-[#94A3B8]">Ordens no recurso</div>
+          <div className="mt-1 text-[28px] font-semibold text-[#0F1623]">{recurso.ordens.length}</div>
+          <div className="mt-2 text-[12px] text-[#667085]">
+            Operador: <span className="font-semibold">{operadorSelecionado?.nome ?? '--'}</span>
+          </div>
+        </div>
       </header>
 
-      {ordens.length === 0 ? (
-        <div className="m-4 flex min-h-0 flex-1 items-center justify-center rounded-[20px] border border-dashed border-[#DDE1E8] bg-[#FAFBFC]">
+      {recurso.ordens.length === 0 ? (
+        <div className="m-5 flex min-h-0 flex-1 items-center justify-center rounded-[20px] border border-dashed border-[#DDE1E8] bg-[#FAFBFC]">
           <div className="text-center">
-            <Package size={48} color="#8896A8" className="mx-auto" />
-            <p className="mt-4 text-[18px] text-[#64748B]">Sem ordens agendadas</p>
-            <p className="text-[15px] text-[#8896A8]">para este recurso</p>
+            <Package size={52} color="#94A3B8" className="mx-auto" />
+            <p className="mt-4 text-[20px] font-semibold text-[#475467]">Sem ordens programadas</p>
           </div>
         </div>
       ) : (
-        <div className="flex min-h-0 flex-1 flex-col gap-3 p-3">
-          {visiveis.map((ordem) => (
+        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-5">
+          {recurso.ordens.map((ordem) => (
             <CardOrdem
               key={ordem.id}
               ordem={ordem}
-              hero={ordem.status === 'produzindo'}
-              agoraMs={agoraMs}
               executandoOrdemId={executandoOrdemId}
-              ordemProduzindoId={ordemProduzindo?.id ?? null}
-              mostrarFasesTanque={recurso.tipo === 'tanque'}
-              habilitarAcoes={recurso.tipo === 'envase' || Boolean(ordem.maquina_id)}
+              ordemBloqueanteId={ordemBloqueante?.id ?? null}
+              operadorSelecionadoId={operadorSelecionadoId}
+              agoraMs={agoraMs}
               onAcao={onAcao}
             />
           ))}
-
-          {ocultas > 0 && (
-            <div className="mt-auto rounded-[10px] border border-[#DDE1E8] bg-[#F8FAFC] px-3 py-2 text-center text-[15px] font-semibold text-[#64748B]">
-              +{ocultas} ordens não exibidas neste turno
-            </div>
-          )}
         </div>
       )}
     </section>
@@ -394,12 +336,15 @@ function ColunaRecurso({
 
 export function OperacaoTvPanel({
   maquinas,
+  operadores,
   ordens,
   executandoOrdemId,
+  operadorPorRecurso,
   dia,
   janela,
   onNavigateDay,
   onExit,
+  onSelecionarOperador,
   onAcao,
 }: Props) {
   const [agora, setAgora] = useState(() => new Date())
@@ -413,60 +358,51 @@ export function OperacaoTvPanel({
   const recursosEnvase = useMemo(() => montarRecursosEnvase(maquinas, ordens), [maquinas, ordens])
   const recursosTanque = useMemo(() => montarRecursosTanque(ordens), [ordens])
   const recursos = tabAtiva === 'envase' ? recursosEnvase : recursosTanque
-
-  const dataLabel = format(dia, "EEEE, dd 'de' MMMM", { locale: ptBR })
   const janelaLabel = `${String(janela.startHour).padStart(2, '0')}:00 - ${String(janela.endHour % 24 === 0 ? 0 : janela.endHour).padStart(2, '0')}:00`
 
   return (
-    <div className="fixed inset-0 z-[100] h-screen w-screen overflow-hidden bg-[#F4F6F8] text-[#0F1623]">
-      <div className="grid h-full grid-rows-[60px_64px_1fr]">
-        <header className="flex items-center border-b border-[#DDE1E8] bg-[#FFFFFF] px-5">
-          <div className="min-w-[280px] text-[20px] font-bold">Painel de Produção</div>
-
-          <div className="flex-1 text-center text-[16px] text-[#8896A8]">
-            {dataLabel} • Turno ativo {janelaLabel}
+    <div className="fixed inset-0 z-[100] h-screen w-screen overflow-hidden bg-[#F3F5F7] text-[#0F1623]">
+      <div className="grid h-full grid-rows-[72px_76px_1fr]">
+        <header className="flex items-center gap-4 border-b border-[#DDE1E8] bg-white px-6">
+          <div>
+            <div className="text-[24px] font-bold">Painel de Produção</div>
+            <div className="text-[13px] text-[#667085]">
+              {format(dia, "EEEE, dd 'de' MMMM", { locale: ptBR })} | turno {janelaLabel}
+            </div>
           </div>
 
-          <div className="ml-auto flex items-center gap-2.5">
-            <span className="font-mono text-[18px] font-semibold text-[#0F1623]">{format(agora, 'HH:mm:ss')}</span>
-            <span className="inline-flex items-center gap-2 rounded-full bg-[#F0FDF4] px-3 py-1 text-[13px] font-semibold text-[#16A34A]">
-              <span className="h-2 w-2 rounded-full bg-[#16A34A] animate-[status-pulse_1.2s_infinite]" />
-              EM PRODUCAO
-            </span>
-            <button
-              onClick={() => onNavigateDay('prev')}
-              className="h-8 rounded-full border border-[#C4CAD4] bg-white px-3 text-[13px] font-medium text-[#4A5568]"
-            >
+          <div className="ml-auto flex items-center gap-3">
+            <div className="rounded-full bg-[#F8FAFC] px-4 py-2 text-[14px] font-medium text-[#475467]">
+              Operadores ativos: {operadores.length}
+            </div>
+            <div className="rounded-full bg-[#0F172A] px-4 py-2 font-mono text-[18px] font-semibold text-white">
+              {format(agora, 'HH:mm:ss')}
+            </div>
+            <button onClick={() => onNavigateDay('prev')} className="rounded-full border border-[#D0D5DD] bg-white px-4 py-2 text-[14px] font-medium text-[#344054]">
               Ontem
             </button>
-            <button
-              onClick={() => onNavigateDay('today')}
-              className="h-8 rounded-full border border-[#2563EB] bg-[#EFF6FF] px-3 text-[13px] font-semibold text-[#2563EB]"
-            >
+            <button onClick={() => onNavigateDay('today')} className="rounded-full border border-[#2563EB] bg-[#EFF6FF] px-4 py-2 text-[14px] font-semibold text-[#2563EB]">
               Hoje
             </button>
-            <button
-              onClick={() => onNavigateDay('next')}
-              className="h-8 rounded-full border border-[#C4CAD4] bg-white px-3 text-[13px] font-medium text-[#4A5568]"
-            >
+            <button onClick={() => onNavigateDay('next')} className="rounded-full border border-[#D0D5DD] bg-white px-4 py-2 text-[14px] font-medium text-[#344054]">
               Amanhã
             </button>
-            <button onClick={onExit} className="h-8 rounded-full px-2 text-[13px] text-[#8896A8]">
+            <button onClick={onExit} className="rounded-full px-3 py-2 text-[14px] text-[#667085]">
               Sair
             </button>
           </div>
         </header>
 
-        <div className="flex items-center px-5">
-          <div className="inline-flex h-12 rounded-full bg-[#EBEEF2] p-1">
+        <div className="flex items-center gap-4 px-6">
+          <div className="inline-flex rounded-full bg-[#E5E7EB] p-1">
             {(['envase', 'tanque'] as const).map((tab) => {
-              const ativa = tabAtiva === tab
+              const ativa = tab === tabAtiva
               return (
                 <button
                   key={tab}
                   onClick={() => setTabAtiva(tab)}
-                  className={`min-w-36 rounded-full px-5 text-[15px] font-semibold uppercase tracking-[0.05em] transition ${
-                    ativa ? 'bg-[#2563EB] text-white shadow-[0_5px_14px_rgba(37,99,235,0.35)]' : 'text-[#4A5568]'
+                  className={`min-w-36 rounded-full px-5 py-3 text-[15px] font-semibold uppercase tracking-[0.08em] transition ${
+                    ativa ? 'bg-[#2563EB] text-white shadow-[0_8px_18px_rgba(37,99,235,0.35)]' : 'text-[#4B5563]'
                   }`}
                 >
                   {tab}
@@ -476,29 +412,31 @@ export function OperacaoTvPanel({
           </div>
         </div>
 
-        <main className="min-h-0 overflow-hidden px-5 pb-5">
+        <main className="min-h-0 overflow-hidden px-6 pb-6">
           {recursos.length === 0 ? (
-            <div className="flex h-full items-center justify-center rounded-[16px] border border-dashed border-[#DDE1E8] bg-[#FFFFFF]">
+            <div className="flex h-full items-center justify-center rounded-[20px] border border-dashed border-[#DDE1E8] bg-white">
               <div className="text-center">
-                <Package size={56} color="#8896A8" className="mx-auto" />
-                <p className="mt-4 text-[20px] font-semibold text-[#4A5568]">Nenhum recurso ativo</p>
-                <p className="text-[16px] text-[#8896A8]">Não há ordens para o painel selecionado.</p>
+                <Package size={56} color="#94A3B8" className="mx-auto" />
+                <p className="mt-4 text-[22px] font-semibold text-[#475467]">Nenhum recurso ativo</p>
+                <p className="text-[16px] text-[#667085]">Não há ordens para o painel selecionado.</p>
               </div>
             </div>
           ) : (
             <div
-              className="grid h-full overflow-hidden rounded-[12px] border border-[#DDE1E8] bg-[#FFFFFF]"
+              className="grid h-full gap-4 overflow-hidden"
               style={{ gridTemplateColumns: `repeat(${recursos.length}, minmax(0, 1fr))` }}
             >
-              {recursos.map((recurso, index) => (
-                <div key={recurso.id} className={index > 0 ? 'border-l border-[#DDE1E8]' : ''}>
-                  <ColunaRecurso
-                    recurso={recurso}
-                    executandoOrdemId={executandoOrdemId}
-                    agoraMs={agora.getTime()}
-                    onAcao={onAcao}
-                  />
-                </div>
+              {recursos.map((recurso) => (
+                <ColunaRecurso
+                  key={recurso.id}
+                  recurso={recurso}
+                  operadores={operadores}
+                  operadorPorRecurso={operadorPorRecurso}
+                  onSelecionarOperador={onSelecionarOperador}
+                  executandoOrdemId={executandoOrdemId}
+                  agoraMs={agora.getTime()}
+                  onAcao={onAcao}
+                />
               ))}
             </div>
           )}

@@ -1,15 +1,15 @@
 'use client'
 
 import { useState } from 'react'
-import type { Maquina } from '@/types'
+import type { Operador } from '@/types'
 
 type Props = {
-  maquinas: Maquina[]
+  operadores: Operador[]
   onAtualizado: () => void
 }
 
-export function MaquinaList({ maquinas, onAtualizado }: Props) {
-  const [novaNome, setNovaNome] = useState('')
+export function OperadorList({ operadores, onAtualizado }: Props) {
+  const [novoNome, setNovoNome] = useState('')
   const [criando, setCriando] = useState(false)
   const [editandoId, setEditandoId] = useState<string | null>(null)
   const [nomeEdicao, setNomeEdicao] = useState('')
@@ -17,44 +17,43 @@ export function MaquinaList({ maquinas, onAtualizado }: Props) {
 
   async function criar(e: React.FormEvent) {
     e.preventDefault()
-
-    const res = await fetch('/api/maquinas', {
+    const res = await fetch('/api/operadores', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ nome: novaNome }),
+      body: JSON.stringify({ nome: novoNome }),
     })
 
     if (!res.ok) {
       const data = await res.json().catch(() => ({}))
-      alert(data.error ?? 'Erro ao criar máquina')
+      alert(data.error ?? 'Erro ao criar operador')
       return
     }
 
-    setNovaNome('')
+    setNovoNome('')
     setCriando(false)
     onAtualizado()
   }
 
-  function iniciarEdicao(maquina: Maquina) {
-    setEditandoId(maquina.id)
-    setNomeEdicao(maquina.nome)
+  function iniciarEdicao(operador: Operador) {
+    setEditandoId(operador.id)
+    setNomeEdicao(operador.nome)
   }
 
-  async function salvarEdicao(e: React.FormEvent, maquinaId: string) {
+  async function salvarEdicao(e: React.FormEvent, operadorId: string) {
     e.preventDefault()
     setSalvando(true)
 
-    const res = await fetch('/api/maquinas', {
+    const res = await fetch('/api/operadores', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: maquinaId, nome: nomeEdicao }),
+      body: JSON.stringify({ id: operadorId, nome: nomeEdicao }),
     })
 
     setSalvando(false)
 
     if (!res.ok) {
       const data = await res.json().catch(() => ({}))
-      alert(data.error ?? 'Erro ao atualizar máquina')
+      alert(data.error ?? 'Erro ao atualizar operador')
       return
     }
 
@@ -63,34 +62,34 @@ export function MaquinaList({ maquinas, onAtualizado }: Props) {
     onAtualizado()
   }
 
-  async function toggleAtiva(maquina: Maquina) {
-    const res = await fetch('/api/maquinas', {
+  async function toggleAtivo(operador: Operador) {
+    const res = await fetch('/api/operadores', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: maquina.id, ativa: !maquina.ativa }),
+      body: JSON.stringify({ id: operador.id, ativo: !operador.ativo }),
     })
 
     if (!res.ok) {
       const data = await res.json().catch(() => ({}))
-      alert(data.error ?? 'Erro ao atualizar máquina')
+      alert(data.error ?? 'Erro ao atualizar operador')
       return
     }
 
     onAtualizado()
   }
 
-  async function excluir(maquina: Maquina) {
-    if (!confirm(`Excluir "${maquina.nome}"?`)) return
+  async function excluir(operador: Operador) {
+    if (!confirm(`Excluir "${operador.nome}"?`)) return
 
-    const res = await fetch('/api/maquinas', {
+    const res = await fetch('/api/operadores', {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: maquina.id }),
+      body: JSON.stringify({ id: operador.id }),
     })
 
     if (!res.ok) {
       const data = await res.json().catch(() => ({}))
-      alert(data.error ?? 'Erro ao excluir máquina')
+      alert(data.error ?? 'Erro ao excluir operador')
       return
     }
 
@@ -101,9 +100,9 @@ export function MaquinaList({ maquinas, onAtualizado }: Props) {
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h3 className="text-lg font-semibold text-slate-900">Máquinas</h3>
+          <h3 className="text-lg font-semibold text-slate-900">Operadores</h3>
           <p className="text-sm text-slate-500">
-            Cadastre e mantenha os recursos usados no envase, no planner e nas métricas operacionais.
+            Cadastro manual da equipe que opera máquinas e tanques na produção.
           </p>
         </div>
 
@@ -112,25 +111,22 @@ export function MaquinaList({ maquinas, onAtualizado }: Props) {
             onClick={() => setCriando(true)}
             className="rounded-xl bg-slate-950 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-slate-800"
           >
-            + Nova máquina
+            + Novo operador
           </button>
         )}
       </div>
 
       {criando && (
-        <form onSubmit={criar} className="rounded-2xl border border-blue-200 bg-blue-50 p-4">
+        <form onSubmit={criar} className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
           <div className="grid gap-3 md:grid-cols-[1fr_auto_auto]">
             <input
-              value={novaNome}
-              onChange={(e) => setNovaNome(e.target.value)}
-              placeholder="Ex.: MAQ 4"
+              value={novoNome}
+              onChange={(e) => setNovoNome(e.target.value)}
+              placeholder="Nome do operador"
               required
-              className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800"
+              className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"
             />
-            <button
-              type="submit"
-              className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
-            >
+            <button type="submit" className="rounded-xl bg-amber-500 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-600">
               Criar
             </button>
             <button
@@ -149,16 +145,16 @@ export function MaquinaList({ maquinas, onAtualizado }: Props) {
           <thead className="bg-slate-50 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
             <tr>
               <th className="px-4 py-3 text-left">Nome</th>
-              <th className="px-4 py-3 text-left">Criada em</th>
+              <th className="px-4 py-3 text-left">Criado em</th>
               <th className="px-4 py-3 text-right">Ações</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {maquinas.map((maquina) =>
-              editandoId === maquina.id ? (
-                <tr key={maquina.id} className="bg-blue-50/70">
+            {operadores.map((operador) =>
+              editandoId === operador.id ? (
+                <tr key={operador.id} className="bg-amber-50/70">
                   <td colSpan={3} className="px-4 py-4">
-                    <form onSubmit={(e) => salvarEdicao(e, maquina.id)} className="grid gap-3 md:grid-cols-[1fr_auto_auto]">
+                    <form onSubmit={(e) => salvarEdicao(e, operador.id)} className="grid gap-3 md:grid-cols-[1fr_auto_auto]">
                       <input
                         value={nomeEdicao}
                         onChange={(e) => setNomeEdicao(e.target.value)}
@@ -168,7 +164,7 @@ export function MaquinaList({ maquinas, onAtualizado }: Props) {
                       <button
                         type="submit"
                         disabled={salvando}
-                        className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+                        className="rounded-xl bg-amber-500 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-600 disabled:opacity-50"
                       >
                         {salvando ? 'Salvando...' : 'Salvar'}
                       </button>
@@ -186,29 +182,31 @@ export function MaquinaList({ maquinas, onAtualizado }: Props) {
                   </td>
                 </tr>
               ) : (
-                <tr key={maquina.id}>
-                  <td className="px-4 py-3 font-medium text-slate-900">{maquina.nome}</td>
-                  <td className="px-4 py-3 text-slate-500">{new Date(maquina.criado_em).toLocaleString('pt-BR')}</td>
+                <tr key={operador.id}>
+                  <td className="px-4 py-3 font-medium text-slate-900">{operador.nome}</td>
+                  <td className="px-4 py-3 text-slate-500">
+                    {new Date(operador.criado_em).toLocaleString('pt-BR')}
+                  </td>
                   <td className="px-4 py-3">
                     <div className="flex justify-end gap-2">
                       <button
-                        onClick={() => iniciarEdicao(maquina)}
+                        onClick={() => iniciarEdicao(operador)}
                         className="rounded-xl border border-slate-300 bg-white px-3 py-1 text-sm font-medium text-slate-700 hover:bg-slate-50"
                       >
                         Editar
                       </button>
                       <button
-                        onClick={() => toggleAtiva(maquina)}
+                        onClick={() => toggleAtivo(operador)}
                         className={`rounded-full px-3 py-1 text-sm ${
-                          maquina.ativa
-                            ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
+                          operador.ativo
+                            ? 'bg-green-100 text-green-700 hover:bg-green-200'
                             : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
                         }`}
                       >
-                        {maquina.ativa ? 'Ativa' : 'Inativa'}
+                        {operador.ativo ? 'Ativo' : 'Inativo'}
                       </button>
                       <button
-                        onClick={() => excluir(maquina)}
+                        onClick={() => excluir(operador)}
                         className="rounded-xl bg-red-50 px-3 py-1 text-sm font-medium text-red-700 hover:bg-red-100"
                       >
                         Excluir
@@ -219,10 +217,10 @@ export function MaquinaList({ maquinas, onAtualizado }: Props) {
               )
             )}
 
-            {maquinas.length === 0 && (
+            {operadores.length === 0 && (
               <tr>
                 <td colSpan={3} className="px-4 py-8 text-center text-slate-400">
-                  Nenhuma máquina cadastrada
+                  Nenhum operador cadastrado
                 </td>
               </tr>
             )}
