@@ -82,7 +82,9 @@
       "PowerShell(cd \"c:\\\\Users\\\\lucaw\\\\Documents\\\\VS Code Páginas\\\\atrius-apresentação\"; npx tsc --noEmit 2>&1 | Where-Object { $_ -notmatch \"tests/\" } | Select-Object -First 20)",
       "PowerShell(cd \"c:\\\\Users\\\\lucaw\\\\Documents\\\\VS Code Páginas\\\\atrius-apresentação\"; npx tsc --noEmit 2>&1 | Where-Object { $_ -notmatch \"production.test.ts\" })",
       "PowerShell(git add -A)",
-      "PowerShell(git commit -m \"feat: modulo de envase e atualizacoes do planejamento\")"
+      "PowerShell(git commit -m \"feat: modulo de envase e atualizacoes do planejamento\")",
+      "PowerShell(git push origin main)",
+      "PowerShell(cd \"c:\\\\Users\\\\lucaw\\\\Documents\\\\VS Code Páginas\\\\atrius-apresentação\\\\backend\"; $proc = Start-Process -FilePath \"node\" -ArgumentList \"node_modules/.bin/tsx src/server.ts\" -PassThru -WindowStyle Hidden; Start-Sleep -Seconds 3; if \\(-not $proc.HasExited\\) { Write-Host \"Server started successfully \\(PID $\\($proc.Id\\)\\)\"; $proc.Kill\\(\\) } else { Write-Host \"Server exited with code: $\\($proc.ExitCode\\)\" })"
     ],
     "additionalDirectories": [
       "\\tmp"
