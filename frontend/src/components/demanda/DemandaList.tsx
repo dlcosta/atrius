@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 import { apiUrl } from '@/lib/api'
 
 import { useState, useCallback, useMemo, useEffect } from 'react'
@@ -45,7 +45,7 @@ export function DemandaList({ itensIniciais, tanques }: Props) {
   const recarregar = useCallback(async () => {
     setCarregando(true)
     try {
-      const res = await fetch(apiUrl(`/api/)demanda${mostrarAlocados ? '?mostrar_alocados=true' : ''}`)
+      const res = await fetch(apiUrl(`/api/demanda${mostrarAlocados ? '?mostrar_alocados=true' : ''}`))
       if (res.ok) {
         const dados = await res.json()
         setItens(dados)

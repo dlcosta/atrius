@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 import { apiUrl } from '@/lib/api'
 
 import { useState, useMemo } from 'react'
@@ -139,7 +139,7 @@ export function ProducaoCalendar({ ordens, tanques, turnos = [] }: Props) {
       const agendamento = Object.entries(agendamentos).find(([id]) => id === ordemId)
       if (!agendamento) throw new Error('Agendamento não encontrado')
 
-      const res = await fetch(apiUrl(`/api/)producao/agendamentos?id=${ordemId}`, {
+      const res = await fetch(apiUrl(`/api/producao/agendamentos?id=${ordemId}`), {
         method: 'DELETE',
       })
 

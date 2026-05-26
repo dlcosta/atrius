@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 import { apiUrl } from '@/lib/api'
 
 import { useEffect, useMemo, useState } from 'react'
@@ -103,7 +103,7 @@ export function OrdemProducaoEnvasePage({ maquinas, produtos }: Props) {
     async function carregarAgendaDoDia() {
       setCarregandoAgenda(true)
       try {
-        const response = await fetch(apiUrl(`/api/)novo-fluxo/envase?inicio=${dataProducao}&fim=${dataProducao}`)
+        const response = await fetch(apiUrl(`/api/novo-fluxo/envase?inicio=${dataProducao}&fim=${dataProducao}`))
         const data = await response.json()
         setOrdensDoDia(Array.isArray(data) ? data : [])
       } catch {
@@ -239,7 +239,7 @@ export function OrdemProducaoEnvasePage({ maquinas, produtos }: Props) {
     try {
       const [origensRes, agendaRes] = await Promise.all([
         fetch(apiUrl('/api/novo-fluxo/tanques/origens')),
-        fetch(apiUrl(`/api/)novo-fluxo/envase?inicio=${dataProducao}&fim=${dataProducao}`),
+        fetch(apiUrl(`/api/novo-fluxo/envase?inicio=${dataProducao}&fim=${dataProducao}`)),
       ])
       const [origensData, agendaData] = await Promise.all([origensRes.json(), agendaRes.json()])
       setOrigensTanque(Array.isArray(origensData) ? (origensData as TankOriginOption[]) : [])

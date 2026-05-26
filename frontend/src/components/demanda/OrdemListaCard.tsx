@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 import { apiUrl } from '@/lib/api'
 
 import { useState } from 'react'
@@ -110,7 +110,7 @@ export function OrdemListaCard({ ordem, onAtualizado, onCancelado }: Props) {
         return
       }
 
-      const res = await fetch(apiUrl(`/api/)producao/ordens/${ordem.id}`, {
+      const res = await fetch(apiUrl(`/api/producao/ordens/${ordem.id}`), {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -130,7 +130,7 @@ export function OrdemListaCard({ ordem, onAtualizado, onCancelado }: Props) {
   async function cancelar() {
     setCancelando(true)
     try {
-      const res = await fetch(apiUrl(`/api/)producao/ordens/${ordem.id}`, {
+      const res = await fetch(apiUrl(`/api/producao/ordens/${ordem.id}`), {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ planning_status: 'CANCELED', motivo: motivoCancel || undefined }),
@@ -147,7 +147,7 @@ export function OrdemListaCard({ ordem, onAtualizado, onCancelado }: Props) {
   async function reverter() {
     setRevertendo(true)
     try {
-      const res = await fetch(apiUrl(`/api/)producao/ordens/${ordem.id}`, {
+      const res = await fetch(apiUrl(`/api/producao/ordens/${ordem.id}`), {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ planning_status: 'BACKLOG' }),

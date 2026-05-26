@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 import { apiUrl } from '@/lib/api'
 
 import { useEffect, useState, useMemo, useCallback } from 'react'
@@ -47,7 +47,7 @@ export function HistoricoContainer({ etapa = 'tanque' }: { etapa?: string } = {}
   const carregarOrdens = useCallback(async () => {
     setCarregando(true)
     try {
-      const res = await fetch(apiUrl(`/api/)historico/producoes?etapa=${etapa}`)
+      const res = await fetch(apiUrl(`/api/historico/producoes?etapa=${etapa}`))
       if (res.ok) {
         const data = await res.json()
         setOrdens(Array.isArray(data) ? data : [])
@@ -67,7 +67,7 @@ export function HistoricoContainer({ etapa = 'tanque' }: { etapa?: string } = {}
     if (auditLogs[ordemId]) return
     setAuditCarregando((prev) => ({ ...prev, [ordemId]: true }))
     try {
-      const res = await fetch(apiUrl(`/api/)historico/audit-log?ordem_id=${ordemId}`)
+      const res = await fetch(apiUrl(`/api/historico/audit-log?ordem_id=${ordemId}`))
       if (res.ok) {
         const data = await res.json()
         setAuditLogs((prev) => ({ ...prev, [ordemId]: Array.isArray(data) ? data : [] }))

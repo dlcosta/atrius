@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 import { apiUrl } from '@/lib/api'
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { format, addDays, subDays } from 'date-fns'
@@ -80,7 +80,7 @@ export default function PlannerPage() {
       const dataStr = format(dia, 'yyyy-MM-dd')
       const [mRes, oRes, pRes, operadoresRes] = await Promise.all([
         fetch(apiUrl('/api/maquinas')),
-        fetch(apiUrl(`/api/)ordens?data=${dataStr}`),
+        fetch(apiUrl(`/api/ordens?data=${dataStr}`)),
         fetch(apiUrl('/api/produtos')),
         fetch(apiUrl('/api/operadores?ativos=1')),
       ])

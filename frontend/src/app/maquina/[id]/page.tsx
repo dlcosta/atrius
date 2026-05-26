@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 import { apiUrl } from '@/lib/api'
 import { useEffect, useState, useCallback } from 'react'
 import { useParams } from 'next/navigation'
@@ -20,7 +20,7 @@ export default function MaquinaPage() {
 
     try {
       const hoje = format(new Date(), 'yyyy-MM-dd')
-      const res = await fetch(apiUrl(`/api/)ordens?data=${hoje}`)
+      const res = await fetch(apiUrl(`/api/ordens?data=${hoje}`))
       if (!res.ok) return
 
       const data: Ordem[] = await res.json()

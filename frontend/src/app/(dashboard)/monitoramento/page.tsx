@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 import { apiUrl } from '@/lib/api'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -263,9 +263,9 @@ export default function MonitoramentoPage() {
       setErro('')
       const [mRes, hojeRes, periodoRes, eventosRes] = await Promise.all([
         fetch(apiUrl('/api/maquinas')),
-        fetch(apiUrl(`/api/)ordens?data=${hojeYmd}`),
-        fetch(apiUrl(`/api/)ordens?inicio=${periodStart}&fim=${periodEnd}`),
-        fetch(apiUrl(`/api/)monitoramento/eventos?inicio=${periodStart}&fim=${periodEnd}`),
+        fetch(apiUrl(`/api/ordens?data=${hojeYmd}`)),
+        fetch(apiUrl(`/api/ordens?inicio=${periodStart}&fim=${periodEnd}`)),
+        fetch(apiUrl(`/api/monitoramento/eventos?inicio=${periodStart}&fim=${periodEnd}`)),
       ])
 
       const [mData, hojeData, periodoData, eventosData] = await Promise.all([

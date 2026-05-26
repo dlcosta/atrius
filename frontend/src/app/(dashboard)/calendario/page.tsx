@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 import { apiUrl } from '@/lib/api'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -1850,7 +1850,7 @@ function TanqueDetailModal({
   useEffect(() => {
     setLoading(true)
     setErro(false)
-    fetch(apiUrl(`/api/)producao/ordens/${ordemId}`)
+    fetch(apiUrl(`/api/producao/ordens/${ordemId}`))
       .then((r) => {
         if (!r.ok) throw new Error('not ok')
         return r.json()
@@ -2208,7 +2208,7 @@ export default function CalendarioPage() {
         fetch(apiUrl('/api/maquinas')).then((r) => r.json()),
         fetch(apiUrl('/api/tanques')).then((r) => r.json()),
         fetch(apiUrl('/api/turnos')).then((r) => r.json()),
-        fetch(apiUrl(`/api/)ordens?inicio=${inicioYmd}&fim=${fimYmd}`).then((r) => r.json()),
+        fetch(apiUrl(`/api/ordens?inicio=${inicioYmd}&fim=${fimYmd}`)).then((r) => r.json()),
         fetch(apiUrl('/api/produtos')).then((r) => r.json()),
       ])
 
@@ -2543,11 +2543,11 @@ export default function CalendarioPage() {
     const isTanque = ordem?.etapa === 'tanque' || resourceTab === 'tanque'
 
     if (isTanque) {
-      const agendRes = await fetch(apiUrl(`/api/)producao/agendamentos?ordem_id=${ordemId}`)
+      const agendRes = await fetch(apiUrl(`/api/producao/agendamentos?ordem_id=${ordemId}`))
       if (agendRes.ok) {
         const agendamento = await agendRes.json()
         if (agendamento?.id) {
-          const deleteRes = await fetch(apiUrl(`/api/)producao/agendamentos?id=${agendamento.id}`, { method: 'DELETE' })
+          const deleteRes = await fetch(apiUrl(`/api/producao/agendamentos?id=${agendamento.id}`), { method: 'DELETE' })
           if (!deleteRes.ok) {
             const data = await deleteRes.json().catch(() => ({}))
             setMensagem(data.error ?? 'Erro ao remover agendamento do tanque.')
