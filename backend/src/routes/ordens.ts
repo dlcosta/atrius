@@ -490,7 +490,45 @@ router.patch('/', async (req: Request, res: Response) => {
   const { data: ordemData, error: ordemError } = await supabase
     .from('ordens').select('*').eq('id', id).maybeSingle()
   if (ordemError) return res.status(400).json({ error: mensagemErroOrdem(ordemError.message) })
-  if (!ordemData) return res.status(404).json({ error: 'Ordem nao encontrada' })
+
+  if (!ordemData) {
+    // Fallback: check new flow tables and apply a simplified update
+    const { data: novoTanque } = await supabase.from('ordens_tanque_novo_fluxo').select('id').eq('id', id).maybeSingle()
+    const novoFluxoTable = novoTanque
+      ? ('ordens_tanque_novo_fluxo' as const)
+      : ((await supabase.from('ordens_envase_novo_fluxo').select('id').eq('id', id).maybeSingle()).data
+          ? ('ordens_envase_novo_fluxo' as const)
+          : null)
+
+    if (!novoFluxoTable) return res.status(404).json({ error: 'Ordem nao encontrada' })
+
+    const simpleUpdate: Record<string, unknown> = {}
+    if (inicio_agendado === null) {
+      simpleUpdate.inicio_agendado = null
+      simpleUpdate.fim_calculado = null
+      simpleUpdate.planning_status = 'BACKLOG'
+    } else {
+      if (inicio_agendado !== undefined) simpleUpdate.inicio_agendado = inicio_agendado
+      if (fim_calculado !== undefined) simpleUpdate.fim_calculado = fim_calculado || null
+      if (body.planning_status !== undefined) {
+        const ps = normalizarPlanningStatus(body.planning_status)
+        if (ps) simpleUpdate.planning_status = ps
+      }
+      if (body.maquina_id !== undefined) simpleUpdate.maquina_id = normalizarTexto(body.maquina_id)
+      if (body.tank_id !== undefined) simpleUpdate.tank_id = normalizarTexto(body.tank_id)
+      for (const key of ['color', 'notes', 'lote', 'tanque'] as const) {
+        if (metaUpdates[key] !== undefined) simpleUpdate[key] = metaUpdates[key]
+      }
+    }
+
+    if (Object.keys(simpleUpdate).length === 0) return res.status(422).json({ error: 'nenhuma alteracao enviada' })
+
+    const { data: updatedNovo, error: updateError } = await supabase
+      .from(novoFluxoTable).update(simpleUpdate).eq('id', id).select('*').single()
+    if (updateError) return res.status(400).json({ error: mensagemErroOrdem(updateError.message) })
+    const flowSource = novoFluxoTable === 'ordens_tanque_novo_fluxo' ? 'novo_fluxo_tanque' : 'novo_fluxo_envase'
+    return res.json({ ...updatedNovo, flow_source: flowSource })
+  }
 
   const etapa = normalizarEtapa(metaUpdates.etapa ?? ordemData.etapa, ordemData.produto_sku, ordemData.unidade)
   const originTankOrderId = normalizarTexto(metaUpdates.origin_tank_order_id ?? ordemData.origin_tank_order_id)

@@ -32,6 +32,15 @@ router.get('/ordens/:id', async (req: Request, res: Response) => {
     .single()
 
   if (error || !ordem) {
+    // Fallback: check new flow tables
+    const { data: novoTanque } = await supabase
+      .from('ordens_tanque_novo_fluxo').select('*').eq('id', id).maybeSingle()
+    if (novoTanque) return res.json({ ...novoTanque, flow_source: 'novo_fluxo_tanque', etapa: 'tanque' })
+
+    const { data: novoEnvase } = await supabase
+      .from('ordens_envase_novo_fluxo').select('*').eq('id', id).maybeSingle()
+    if (novoEnvase) return res.json({ ...novoEnvase, flow_source: 'novo_fluxo_envase', etapa: 'envase' })
+
     return res.status(404).json({ error: 'Ordem não encontrada' })
   }
 
