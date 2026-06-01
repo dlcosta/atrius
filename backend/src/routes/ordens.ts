@@ -934,12 +934,13 @@ router.post('/operacao', async (req: Request, res: Response) => {
       ...row,
       maquina_id: row.maquina_id ?? null,
       tank_id: row.tank_id ?? null,
-      inicio_operacao_em: operacao.inicio_operacao_em ?? null,
-      fim_operacao_em: operacao.fim_operacao_em ?? null,
-      pausado_em: operacao.pausado_em ?? null,
-      tempo_restante_pausado_seg: operacao.tempo_restante_pausado_seg ?? null,
+      // Coluna direta tem prioridade; JSON serve de fallback para registros antigos
+      inicio_operacao_em: row.inicio_operacao_em ?? operacao.inicio_operacao_em ?? null,
+      fim_operacao_em: row.fim_operacao_em ?? operacao.fim_operacao_em ?? null,
+      pausado_em: row.pausado_em ?? operacao.pausado_em ?? null,
+      tempo_restante_pausado_seg: row.tempo_restante_pausado_seg ?? operacao.tempo_restante_pausado_seg ?? null,
       operador_id: operacao.operador_id ?? null,
-      operador_nome: operacao.operador_nome ?? null,
+      operador_nome: row.operador_nome ?? operacao.operador_nome ?? null,
       observacao_pausa: operacao.observacao_pausa ?? null,
       origin_tank_order_id: row.origin_tank_order_id ?? null,
       origin_tank_source: row.origin_tank_source ?? null,
@@ -968,7 +969,7 @@ router.post('/operacao', async (req: Request, res: Response) => {
   async function loadNewTankOrder(ordemId: string) {
     const { data } = await supabase
       .from('ordens_tanque_novo_fluxo')
-      .select('id, numero_externo, etapa, produto_sku, tank_id, status, planning_status, inicio_agendado, fim_calculado, quantidade, unidade, lote, total_duration_minutes, notes')
+      .select('id, numero_externo, etapa, produto_sku, tank_id, status, planning_status, inicio_agendado, fim_calculado, quantidade, unidade, lote, total_duration_minutes, inicio_operacao_em, fim_operacao_em, pausado_em, tempo_restante_pausado_seg, operador_nome, notes')
       .eq('id', ordemId).maybeSingle()
     if (!data) return null
     return hydrateOperationalState({ ...(data as any), maquina_id: null, origin_tank_order_id: null })
@@ -977,7 +978,7 @@ router.post('/operacao', async (req: Request, res: Response) => {
   async function loadNewEnvaseOrder(ordemId: string) {
     const { data } = await supabase
       .from('ordens_envase_novo_fluxo')
-      .select('id, numero_externo, etapa, produto_sku, maquina_id, status, planning_status, inicio_agendado, fim_calculado, quantidade, unidade, lote, total_duration_minutes, origin_tank_order_id, origin_tank_source, notes')
+      .select('id, numero_externo, etapa, produto_sku, maquina_id, status, planning_status, inicio_agendado, fim_calculado, quantidade, unidade, lote, total_duration_minutes, origin_tank_order_id, origin_tank_source, inicio_operacao_em, fim_operacao_em, pausado_em, tempo_restante_pausado_seg, operador_nome, notes')
       .eq('id', ordemId).maybeSingle()
     if (!data) return null
     return hydrateOperationalState({ ...(data as any), tank_id: null })
@@ -1058,6 +1059,13 @@ router.post('/operacao', async (req: Request, res: Response) => {
         status: updates.status,
         planning_status: updates.planning_status,
         fim_calculado: updates.fim_calculado ?? resolution.ordem.fim_calculado,
+        // Grava nas colunas diretas para consistência com o banco e com o monitoramento
+        inicio_operacao_em: compatOperacao.inicio_operacao_em,
+        fim_operacao_em: compatOperacao.fim_operacao_em,
+        pausado_em: compatOperacao.pausado_em,
+        tempo_restante_pausado_seg: compatOperacao.tempo_restante_pausado_seg,
+        operador_nome: compatOperacao.operador_nome,
+        // notes mantido como fallback e para campos sem coluna (operador_id, observacao_pausa)
         notes: mergeCompatNotes(resolution.ordem.notes, compatOperacao),
       }
       const { data, error } = await supabase.from(resolution.table).update(compatUpdates).eq('id', resolution.ordem.id).select('*').single()
@@ -1077,9 +1085,18 @@ router.post('/operacao', async (req: Request, res: Response) => {
     return { error: null, data }
   }
 
-  async function registrarEventoLegado(ordem: any, tipo: string, timestamp: string, operadorNome: string) {
-    await supabase.from('eventos_timer').insert({ ordem_id: ordem.id, maquina_id: ordem.maquina_id, tipo, timestamp, operador_nome: operadorNome })
+  async function registrarEvento(ordem: any, tipo: string, timestamp: string, operadorNome: string) {
+    await supabase.from('eventos_timer').insert({
+      ordem_id: ordem.id,
+      maquina_id: ordem.maquina_id ?? null,
+      tipo,
+      timestamp,
+      operador_nome: operadorNome,
+    })
   }
+
+  // Alias para compatibilidade — novos usos devem chamar registrarEvento
+  const registrarEventoLegado = registrarEvento
 
   async function liberarEnvasesAguardando(resolution: { ordem: any; source: FlowSource }) {
     if (resolution.ordem.etapa !== 'tanque') return
@@ -1189,7 +1206,7 @@ router.post('/operacao', async (req: Request, res: Response) => {
       fim_calculado: fimPrevistoIso,
     })
     if (error) return res.status(400).json({ error })
-    if (resolution.isLegacy) await registrarEventoLegado(ordem, 'inicio', inicioRealIso, resolvedOperadorNome)
+    await registrarEvento(ordem, 'inicio', inicioRealIso, resolvedOperadorNome)
     return res.json({ ...data, flow_source: resolution.source })
   }
 
@@ -1212,7 +1229,7 @@ router.post('/operacao', async (req: Request, res: Response) => {
       pausado_em: agoraIso, tempo_restante_pausado_seg: remainingSeconds, observacao_pausa: observacaoPausa,
     })
     if (error) return res.status(400).json({ error })
-    if (resolution.isLegacy) await registrarEventoLegado(ordem, 'pausa', agoraIso, resolvedOperadorNome)
+    await registrarEvento(ordem, 'pausa', agoraIso, resolvedOperadorNome)
     return res.json({ ...data, flow_source: resolution.source })
   }
 
@@ -1241,7 +1258,7 @@ router.post('/operacao', async (req: Request, res: Response) => {
       fim_calculado: new Date(new Date(agoraIso).getTime() + remainingSeconds * 1000).toISOString(),
     })
     if (error) return res.status(400).json({ error })
-    if (resolution.isLegacy) await registrarEventoLegado(ordem, 'retomada', agoraIso, resolvedOperadorNome)
+    await registrarEvento(ordem, 'retomada', agoraIso, resolvedOperadorNome)
     return res.json({ ...data, flow_source: resolution.source })
   }
 
@@ -1253,7 +1270,7 @@ router.post('/operacao', async (req: Request, res: Response) => {
     fim_operacao_em: agoraIso, pausado_em: null, tempo_restante_pausado_seg: null, fim_calculado: agoraIso,
   })
   if (error) return res.status(400).json({ error })
-  if (resolution.isLegacy) await registrarEventoLegado(ordem, 'conclusao', agoraIso, resolvedOperadorNome)
+  await registrarEvento(ordem, 'conclusao', agoraIso, resolvedOperadorNome)
   await liberarEnvasesAguardando(resolution)
   return res.json({ ...data, flow_source: resolution.source })
 })

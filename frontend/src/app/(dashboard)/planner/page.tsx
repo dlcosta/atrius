@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useMemo } from 'react'
 import { format, addDays, subDays } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
-import type { Maquina, Operador, Ordem, Produto } from '@/types'
+import type { Maquina, Operador, Ordem, Produto, Tanque } from '@/types'
 import { NovaOrdemForm } from '@/components/planner/NovaOrdemForm'
 import { OperacaoDashboard } from '@/components/planner/OperacaoDashboard'
 import { OperacaoTvPanel } from '@/components/planner/OperacaoTvPanel'
@@ -62,9 +62,11 @@ function getRecursoKey(ordem: Ordem): string | null {
 export default function PlannerPage() {
   const [dia, setDia] = useState<Date>(() => new Date())
   const [maquinas, setMaquinas] = useState<Maquina[]>([])
+  const [tanques, setTanques] = useState<Tanque[]>([])
   const [operadores, setOperadores] = useState<Operador[]>([])
   const [ordens, setOrdens] = useState<Ordem[]>([])
   const [produtos, setProdutos] = useState<Produto[]>([])
+  const [agoraMs, setAgoraMs] = useState<number>(Date.now())
   const [sincronizando, setSincronizando] = useState(false)
   const [mensagem, setMensagem] = useState('')
   const [novaOrdemAberta, setNovaOrdemAberta] = useState(false)
@@ -78,15 +80,17 @@ export default function PlannerPage() {
   const carregarDados = useCallback(async () => {
     try {
       const dataStr = format(dia, 'yyyy-MM-dd')
-      const [mRes, oRes, pRes, operadoresRes] = await Promise.all([
+      const [mRes, tRes, oRes, pRes, operadoresRes] = await Promise.all([
         fetch(apiUrl('/api/maquinas')),
+        fetch(apiUrl('/api/tanques?ativos=1')),
         fetch(apiUrl(`/api/ordens?data=${dataStr}`)),
         fetch(apiUrl('/api/produtos')),
         fetch(apiUrl('/api/operadores?ativos=1')),
       ])
 
-      const [m, o, p, operadoresData] = await Promise.all([
+      const [m, t, o, p, operadoresData] = await Promise.all([
         mRes.json(),
+        tRes.json(),
         oRes.json(),
         pRes.json(),
         operadoresRes.json(),
@@ -98,6 +102,7 @@ export default function PlannerPage() {
       if (!operadoresRes.ok) throw new Error(operadoresData?.error ?? 'Erro ao carregar operadores')
 
       setMaquinas(Array.isArray(m) ? m : [])
+      setTanques(Array.isArray(t) ? t : [])
       setOrdens(Array.isArray(o) ? o : [])
       setProdutos(Array.isArray(p) ? p : [])
       setOperadores(Array.isArray(operadoresData) ? operadoresData : [])
@@ -113,6 +118,11 @@ export default function PlannerPage() {
   useEffect(() => {
     carregarDados()
   }, [carregarDados])
+
+  useEffect(() => {
+    const clock = setInterval(() => setAgoraMs(Date.now()), 1000)
+    return () => clearInterval(clock)
+  }, [])
 
   useEffect(() => {
     try {
@@ -283,32 +293,49 @@ export default function PlannerPage() {
   }
 
   return (
-    <div className="flex h-full flex-col overflow-hidden">
-      <div className="relative z-10 space-y-4 border-b border-[#E4E7EC] bg-white p-4">
-        <div className="flex items-start gap-4">
-          <div>
-            <h1 className="text-[22px] font-semibold leading-tight text-[#111827]">Painel de Controle Atrius</h1>
-            <p className="mt-1 text-[13px] text-[#9CA3AF]">Monitoramento e Gestão de Produção em Tempo Real</p>
+    <div className="flex h-full flex-col overflow-hidden bg-[#F7F8FA]">
+      {/* ── Header ─────────────────────────────────────────────────────── */}
+      <div className="relative z-10 border-b border-[#E4E7EC] bg-white px-5 py-4">
+
+        {/* Linha 1: título + relógio + botões */}
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex-1 min-w-0">
+            <h1 className="text-[20px] font-bold leading-tight text-[#111827]">
+              Painel de Operação
+            </h1>
+            <p className="mt-0.5 text-[12px] text-[#9CA3AF]">
+              Gerencie ordens ao vivo — selecione o operador em cada recurso antes de iniciar.
+            </p>
           </div>
 
-          <div className="ml-auto flex items-center gap-2">
+          {/* Relógio ao vivo */}
+          <div className="flex items-center gap-2 rounded-[10px] border border-[#E4E7EC] bg-[#F7F8FA] px-3 py-2">
+            <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-500" />
+            <span className="font-mono text-[15px] font-semibold text-[#111827]">
+              {format(new Date(agoraMs), 'HH:mm:ss', { locale: ptBR })}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2">
             <button
               onClick={() => setIsExpanded(true)}
-              className="h-9 rounded-[8px] border border-[#CDD2DA] bg-white px-4 text-sm font-medium text-[#4B5563] hover:border-[#2563EB] hover:text-[#2563EB]"
+              className="h-9 rounded-[8px] border border-[#CDD2DA] bg-white px-4 text-[13px] font-medium text-[#4B5563] hover:border-[#2563EB] hover:text-[#2563EB]"
             >
-              Expandir Painel
+              Modo TV
             </button>
             <button
               onClick={sincronizar}
               disabled={sincronizando}
-              className="h-9 rounded-[8px] bg-[#2563EB] px-4 text-sm font-medium text-white hover:bg-[#1D4ED8] disabled:opacity-50"
+              className="h-9 rounded-[8px] bg-[#2563EB] px-4 text-[13px] font-medium text-white hover:bg-[#1D4ED8] disabled:opacity-50"
             >
-              {sincronizando ? 'Sincronizando...' : 'Sincronizar API'}
+              {sincronizando ? 'Sincronizando...' : 'Sincronizar'}
             </button>
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
+        {/* Linha 2: data + turno + operadores */}
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          {/* Navegação de data */}
           <div className="flex items-center rounded-[8px] border border-[#E4E7EC] bg-white p-1">
             <button
               onClick={() => setDia((d) => subDays(d, 1))}
@@ -317,7 +344,7 @@ export default function PlannerPage() {
             >
               <ChevronLeft size={16} />
             </button>
-            <span className="w-56 px-2 text-center text-sm font-medium text-[#111827]">
+            <span className="w-52 px-2 text-center text-[14px] font-semibold text-[#111827]">
               {format(dia, "EEEE, dd 'de' MMMM", { locale: ptBR })}
             </span>
             <button
@@ -331,19 +358,18 @@ export default function PlannerPage() {
 
           <button
             onClick={() => setDia(new Date())}
-            className="h-8 rounded-[8px] border border-[#2563EB] bg-white px-3 text-sm font-medium text-[#2563EB] hover:bg-[#EFF6FF]"
+            className="h-9 rounded-[8px] border border-[#2563EB] bg-white px-4 text-[13px] font-semibold text-[#2563EB] hover:bg-[#EFF6FF]"
           >
             Hoje
           </button>
-        </div>
 
-        <div className="flex flex-wrap items-end gap-3 rounded-[8px] bg-[#F0F2F5] p-3">
-          <div className="flex flex-col gap-1">
-            <label className="text-[11px] font-semibold uppercase tracking-wide text-[#4B5563]">Turno</label>
+          {/* Turno */}
+          <div className="flex items-center gap-2">
+            <label className="text-[12px] font-semibold text-[#4B5563]">Turno:</label>
             <select
               value={turnoSelecionado}
               onChange={(e) => aplicarPresetTurno(e.target.value)}
-              className="h-9 min-w-52 rounded-[8px] border-0 bg-white px-3 text-sm text-[#111827]"
+              className="h-9 min-w-48 rounded-[8px] border border-[#E4E7EC] bg-white px-3 text-[13px] text-[#111827]"
             >
               {TURNOS_PRESET.map((turno) => (
                 <option key={turno.id} value={turno.id}>
@@ -354,71 +380,64 @@ export default function PlannerPage() {
             </select>
           </div>
 
-          <div className="flex flex-col gap-1">
-            <label className="text-[11px] font-semibold uppercase tracking-wide text-[#4B5563]">Início</label>
-            <input
-              type="time"
-              step={3600}
-              value={horaParaInput(janela.startHour)}
-              onChange={(e) => {
-                const hora = inputParaHora(e.target.value, janela.startHour)
-                const normalizada = sanitizarJanelaProducao({ ...janela, startHour: hora })
-                setJanela(normalizada)
-                setTurnoSelecionado(detectarPreset(normalizada))
-              }}
-              className="h-9 rounded-[8px] border-0 bg-white px-3 text-sm text-[#111827]"
-            />
-          </div>
+          {/* Hora início/fim (turno personalizado) */}
+          {turnoSelecionado === 'custom' && (
+            <div className="flex items-center gap-2">
+              <input
+                type="time"
+                step={3600}
+                value={horaParaInput(janela.startHour)}
+                onChange={(e) => {
+                  const hora = inputParaHora(e.target.value, janela.startHour)
+                  const normalizada = sanitizarJanelaProducao({ ...janela, startHour: hora })
+                  setJanela(normalizada)
+                  setTurnoSelecionado(detectarPreset(normalizada))
+                }}
+                className="h-9 rounded-[8px] border border-[#E4E7EC] bg-white px-3 text-[13px] text-[#111827]"
+              />
+              <span className="text-[12px] text-[#9CA3AF]">até</span>
+              <input
+                type="time"
+                step={3600}
+                value={horaParaInput(janela.endHour % 24 === 0 ? 0 : janela.endHour)}
+                onChange={(e) => {
+                  const hora = inputParaHora(e.target.value, janela.endHour)
+                  const normalizada = sanitizarJanelaProducao({ ...janela, endHour: hora === 0 ? 24 : hora })
+                  setJanela(normalizada)
+                  setTurnoSelecionado(detectarPreset(normalizada))
+                }}
+                className="h-9 rounded-[8px] border border-[#E4E7EC] bg-white px-3 text-[13px] text-[#111827]"
+              />
+            </div>
+          )}
 
-          <div className="flex flex-col gap-1">
-            <label className="text-[11px] font-semibold uppercase tracking-wide text-[#4B5563]">Fim</label>
-            <input
-              type="time"
-              step={3600}
-              value={horaParaInput(janela.endHour % 24 === 0 ? 0 : janela.endHour)}
-              onChange={(e) => {
-                const hora = inputParaHora(e.target.value, janela.endHour)
-                const normalizada = sanitizarJanelaProducao({ ...janela, endHour: hora === 0 ? 24 : hora })
-                setJanela(normalizada)
-                setTurnoSelecionado(detectarPreset(normalizada))
-              }}
-              className="h-9 rounded-[8px] border-0 bg-white px-3 text-sm text-[#111827]"
-            />
-          </div>
-
-          <span className="inline-flex h-9 items-center rounded-[12px] bg-[#EFF6FF] px-3 text-xs font-medium text-[#2563EB]">
-            Janela ativa: {horaParaInput(janela.startHour)} - {horaParaInput(janela.endHour % 24 === 0 ? 0 : janela.endHour)}
-          </span>
-
-          <span className="inline-flex h-9 items-center rounded-[12px] bg-white px-3 text-xs font-medium text-[#475467]">
-            Operadores ativos: {operadores.length}
-          </span>
-
-          <span className="inline-flex h-9 items-center rounded-[12px] bg-white px-3 text-xs text-[#667085]">
-            Selecione o operador diretamente em cada máquina ou tanque antes de iniciar, pausar, retomar ou concluir.
+          {/* Operadores ativos */}
+          <span className="ml-auto rounded-full bg-[#F0F2F5] px-3 py-1.5 text-[12px] font-medium text-[#475467]">
+            {operadores.length} operador{operadores.length !== 1 ? 'es' : ''} disponível{operadores.length !== 1 ? 'eis' : ''}
           </span>
         </div>
 
-        <div className="flex flex-wrap gap-3 border-t border-[#E4E7EC] pt-4">
-          <div className="min-w-32 rounded-[8px] border border-[#E4E7EC] bg-white p-4">
-            <span className="block text-[10px] uppercase tracking-[0.08em] text-[#9CA3AF]">TOTAL</span>
-            <span className="mt-2 block font-mono text-4xl font-semibold leading-none text-[#111827]">{resumo.total}</span>
+        {/* Linha 3: KPIs */}
+        <div className="mt-4 grid grid-cols-2 gap-2 border-t border-[#E4E7EC] pt-4 sm:grid-cols-3 lg:grid-cols-5">
+          <div className="rounded-[10px] border border-[#E4E7EC] bg-white px-4 py-3">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#9CA3AF]">Total do dia</div>
+            <div className="mt-1.5 font-mono text-[28px] font-bold leading-none text-[#111827]">{resumo.total}</div>
           </div>
-          <div className="min-w-32 rounded-[8px] border border-[#E4E7EC] bg-white p-4">
-            <span className="block text-[10px] uppercase tracking-[0.08em] text-[#9CA3AF]">TANQUE</span>
-            <span className="mt-2 block font-mono text-4xl font-semibold leading-none text-[#2563EB]">{resumo.tanque}</span>
+          <div className="rounded-[10px] border border-[#E4E7EC] bg-white px-4 py-3">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#9CA3AF]">Tanques</div>
+            <div className="mt-1.5 font-mono text-[28px] font-bold leading-none text-[#2563EB]">{resumo.tanque}</div>
           </div>
-          <div className="min-w-32 rounded-[8px] border border-[#E4E7EC] bg-white p-4">
-            <span className="block text-[10px] uppercase tracking-[0.08em] text-[#9CA3AF]">ENVASE</span>
-            <span className="mt-2 block font-mono text-4xl font-semibold leading-none text-[#2563EB]">{resumo.envase}</span>
+          <div className="rounded-[10px] border border-[#E4E7EC] bg-white px-4 py-3">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#9CA3AF]">Envase</div>
+            <div className="mt-1.5 font-mono text-[28px] font-bold leading-none text-[#2563EB]">{resumo.envase}</div>
           </div>
-          <div className="min-w-32 rounded-[8px] border border-[#E4E7EC] bg-white p-4">
-            <span className="block text-[10px] uppercase tracking-[0.08em] text-[#9CA3AF]">AGENDADAS</span>
-            <span className="mt-2 block font-mono text-4xl font-semibold leading-none text-[#16A34A]">{resumo.agendadas}</span>
+          <div className="rounded-[10px] border border-[#E4E7EC] bg-[#F0FDF4] px-4 py-3">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#9CA3AF]">Agendadas</div>
+            <div className="mt-1.5 font-mono text-[28px] font-bold leading-none text-[#16A34A]">{resumo.agendadas}</div>
           </div>
-          <div className="min-w-32 rounded-[8px] border border-[#E4E7EC] bg-white p-4">
-            <span className="block text-[10px] uppercase tracking-[0.08em] text-[#9CA3AF]">CONCLUÍDAS</span>
-            <span className="mt-2 block font-mono text-4xl font-semibold leading-none text-[#16A34A]">{resumo.concluidas}</span>
+          <div className="rounded-[10px] border border-[#E4E7EC] bg-[#F0FDF4] px-4 py-3">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#9CA3AF]">Concluídas</div>
+            <div className="mt-1.5 font-mono text-[28px] font-bold leading-none text-[#16A34A]">{resumo.concluidas}</div>
           </div>
         </div>
       </div>
@@ -467,10 +486,12 @@ export default function PlannerPage() {
         ) : (
           <OperacaoDashboard
             maquinas={maquinas}
+            tanques={tanques}
             operadores={operadores}
             ordens={ordens.filter((o) => o.inicio_agendado !== null)}
             executandoOrdemId={executandoOrdemId}
             operadorPorRecurso={operadorPorRecurso}
+            agoraMs={agoraMs}
             onSelecionarOperador={selecionarOperadorParaRecurso}
             onAcao={solicitarAcaoOperacao}
           />

@@ -10,16 +10,12 @@ import {
   LayoutDashboard,
   ChevronLeft,
   ChevronRight,
-  FlaskConical,
-  Droplets,
 } from 'lucide-react'
 
 const navItems = [
   { name: 'Dashboard', href: '/planner', icon: LayoutDashboard },
   { name: 'Calendário', href: '/calendario', icon: Calendar },
   { name: 'Monitoramento', href: '/monitoramento', icon: BarChart3 },
-  { name: 'Ordem de Produção - Tanques', href: '/ordem-producao-tanques', icon: Droplets },
-  { name: 'Ordem de Produção - Envase', href: '/ordem-producao-envase', icon: FlaskConical },
   { name: 'Administração', href: '/admin', icon: Settings },
 ]
 

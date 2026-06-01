@@ -264,17 +264,20 @@ export function calcularPausasNoPeriodo(
 ) {
   const byMachine = new Map<string, number>()
   const byOperator = new Map<string, { pauseEvents: number; pauseMinutes: number }>()
+
+  // Agrupa por maquina_id quando disponível, caso contrário por ordem_id
+  // Isso garante que ordens de tanque (maquina_id=null) também sejam contabilizadas
   const grouped = new Map<string, EventoMonitoramento[]>()
 
   for (const evento of eventos) {
-    if (!evento.maquina_id) continue
-    const key = evento.maquina_id
+    const key = evento.maquina_id ?? evento.ordem_id
+    if (!key) continue
     const lista = grouped.get(key) ?? []
     lista.push(evento)
     grouped.set(key, lista)
   }
 
-  for (const [machineId, lista] of grouped.entries()) {
+  for (const [resourceKey, lista] of grouped.entries()) {
     const ordenados = [...lista].sort((a, b) => {
       const aMs = toMs(a.timestamp) ?? 0
       const bMs = toMs(b.timestamp) ?? 0
@@ -305,7 +308,10 @@ export function calcularPausasNoPeriodo(
       if ((evento.tipo === 'retomada' || evento.tipo === 'conclusao') && pausaAtiva) {
         const minutes = clampMinutes(pausaAtiva.startMs, eventoMs, rangeStartMs, rangeEndMs)
         if (minutes > 0) {
-          byMachine.set(machineId, (byMachine.get(machineId) ?? 0) + minutes)
+          // Só incrementa byMachine se a chave for um maquina_id real
+          if (evento.maquina_id) {
+            byMachine.set(evento.maquina_id, (byMachine.get(evento.maquina_id) ?? 0) + minutes)
+          }
           if (pausaAtiva.operatorName) {
             const atual = byOperator.get(pausaAtiva.operatorName) ?? { pauseEvents: 0, pauseMinutes: 0 }
             atual.pauseMinutes += minutes
@@ -319,7 +325,11 @@ export function calcularPausasNoPeriodo(
     if (pausaAtiva) {
       const minutes = clampMinutes(pausaAtiva.startMs, Math.min(rangeEndMs, agoraMs), rangeStartMs, rangeEndMs)
       if (minutes > 0) {
-        byMachine.set(machineId, (byMachine.get(machineId) ?? 0) + minutes)
+        // Só incrementa byMachine se a chave for um maquina_id real
+        const primeroEvento = lista.find((e) => e.maquina_id)
+        if (primeroEvento?.maquina_id) {
+          byMachine.set(primeroEvento.maquina_id, (byMachine.get(primeroEvento.maquina_id) ?? 0) + minutes)
+        }
         if (pausaAtiva.operatorName) {
           const atual = byOperator.get(pausaAtiva.operatorName) ?? { pauseEvents: 0, pauseMinutes: 0 }
           atual.pauseMinutes += minutes

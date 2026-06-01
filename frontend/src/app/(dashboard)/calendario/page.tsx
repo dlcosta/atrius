@@ -20,6 +20,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock,
+  Droplets,
+  FlaskConical,
   Maximize2,
   Package,
   Plus,
@@ -30,6 +32,7 @@ import {
   ZoomIn,
   ZoomOut,
 } from 'lucide-react'
+import { CadastroRapidoForm } from '@/components/calendario/CadastroRapidoForm'
 import type { Maquina, Ordem, Produto, Tanque, Turno } from '@/types'
 import type { OrdemBacklogItem } from '@/app/api/backlog/route'
 import type { OrdemBacklogEnvaseItem } from '@/app/api/backlog/envase/route'
@@ -2167,6 +2170,7 @@ export default function CalendarioPage() {
   const [tanqueDetailOrdemId, setTanqueDetailOrdemId] = useState<string | null>(null)
   const [resourceTab, setResourceTab] = useState<'tanque' | 'envase'>('envase')
   const [selectedMachineId, setSelectedMachineId] = useState<string | null>(null)
+  const [sidebarMode, setSidebarMode] = useState<'backlog' | 'form'>('backlog')
   const rowRefs = useRef<Record<string, HTMLDivElement | null>>({})
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }))
@@ -2584,60 +2588,66 @@ export default function CalendarioPage() {
         <header className="border-b border-[#E4E7EC] bg-white px-4 py-3">
           <div className="flex flex-wrap items-center gap-3">
             <div>
-              <h1 className="text-[22px] font-semibold text-[#111827]">Calendario de Producao</h1>
-              <p className="text-[13px] text-[#9CA3AF]">Separacao operacional por Tanques e Envase</p>
+              <h1 className="text-[22px] font-semibold text-[#111827]">Calendário de Produção</h1>
+              <p className="text-[13px] text-[#9CA3AF]">
+                {format(diaBase, "MMMM 'de' yyyy", { locale: ptBR })} — use o painel lateral para criar ordens
+              </p>
             </div>
 
             <div className="ml-auto flex flex-wrap items-center gap-2">
               <button
                 onClick={() => setDiaBase((d) => (viewMode === 'dia' ? subDays(d, 1) : subDays(d, 7)))}
-                className="grid h-9 w-9 place-items-center rounded-[8px] border border-[#E4E7EC] text-[#4B5563] hover:bg-[#F7F8FA]"
-                title="Periodo anterior"
+                className="grid h-9 w-9 place-items-center rounded-[8px] border border-[#E4E7EC] bg-white text-[#4B5563] hover:bg-[#F7F8FA]"
+                title="Período anterior"
               >
                 <ChevronLeft size={18} />
               </button>
               <button
                 onClick={() => setDiaBase(new Date())}
-                className="h-9 rounded-[8px] border border-[#2563EB] bg-white px-3 text-sm font-medium text-[#2563EB] hover:bg-[#EFF6FF]"
+                className="h-9 rounded-[8px] border border-[#2563EB] bg-white px-4 text-sm font-semibold text-[#2563EB] hover:bg-[#EFF6FF]"
               >
                 Hoje
               </button>
               <button
                 onClick={() => setDiaBase((d) => (viewMode === 'dia' ? addDays(d, 1) : addDays(d, 7)))}
-                className="grid h-9 w-9 place-items-center rounded-[8px] border border-[#E4E7EC] text-[#4B5563] hover:bg-[#F7F8FA]"
-                title="Proximo periodo"
+                className="grid h-9 w-9 place-items-center rounded-[8px] border border-[#E4E7EC] bg-white text-[#4B5563] hover:bg-[#F7F8FA]"
+                title="Próximo período"
               >
                 <ChevronRight size={18} />
               </button>
 
-              <div className="min-w-56 text-center text-sm font-medium text-[#111827]">{periodoLabel}</div>
+              <span className="hidden min-w-48 text-center text-[15px] font-semibold text-[#111827] sm:block">
+                {periodoLabel}
+              </span>
 
               <div className="flex rounded-[8px] border border-[#E4E7EC] bg-[#F0F2F5] p-1">
                 {(['semana', 'dia'] as ViewMode[]).map((mode) => (
                   <button
                     key={mode}
                     onClick={() => setViewMode(mode)}
-                    className={`h-7 rounded-[6px] px-3 text-xs font-medium uppercase ${
-                      viewMode === mode ? 'bg-white text-[#2563EB] shadow-[var(--shadow-sm)]' : 'text-[#9CA3AF]'
+                    className={`h-8 rounded-[6px] px-4 text-[13px] font-semibold uppercase ${
+                      viewMode === mode
+                        ? 'bg-white text-[#2563EB] shadow-[var(--shadow-sm)]'
+                        : 'text-[#9CA3AF] hover:text-[#4B5563]'
                     }`}
                   >
-                    {mode}
+                    {mode === 'semana' ? 'Semana' : 'Dia'}
                   </button>
                 ))}
               </div>
             </div>
           </div>
 
-          <div className="mt-3 flex flex-wrap items-center gap-2 rounded-[8px] bg-[#F0F2F5] p-3">
-            <label className="text-xs font-semibold uppercase text-[#4B5563]">Inicio</label>
+          <div className="mt-3 flex flex-wrap items-center gap-2 rounded-[8px] bg-[#F0F2F5] px-3 py-2">
+            <span className="text-[11px] font-semibold uppercase tracking-wide text-[#6B7280]">Horário</span>
             <input
               type="time"
               step={3600}
               value={horaParaInput(janela.startHour)}
               onChange={(e) => setJanela((j) => sanitizarJanelaProducao({ ...j, startHour: inputParaHora(e.target.value, j.startHour) }))}
-              className="h-8 rounded-[6px] border-0 bg-white px-2 text-sm text-[#111827]"
+              className="h-7 rounded-[6px] border-0 bg-white px-2 text-[13px] text-[#111827]"
             />
-            <label className="text-xs font-semibold uppercase text-[#4B5563]">Fim</label>
+            <span className="text-[11px] text-[#9CA3AF]">até</span>
             <input
               type="time"
               step={3600}
@@ -2646,13 +2656,13 @@ export default function CalendarioPage() {
                 const hora = inputParaHora(e.target.value, janela.endHour)
                 setJanela((j) => sanitizarJanelaProducao({ ...j, endHour: hora === 0 ? 24 : hora }))
               }}
-              className="h-8 rounded-[6px] border-0 bg-white px-2 text-sm text-[#111827]"
+              className="h-7 rounded-[6px] border-0 bg-white px-2 text-[13px] text-[#111827]"
             />
-            <label className="text-xs font-semibold uppercase text-[#4B5563]">Snap</label>
+            <span className="text-[11px] font-semibold uppercase tracking-wide text-[#6B7280]">Snap</span>
             <select
               value={janela.snapMinutes}
               onChange={(e) => setJanela((j) => sanitizarJanelaProducao({ ...j, snapMinutes: Number(e.target.value) }))}
-              className="h-8 rounded-[6px] border-0 bg-white px-2 text-sm text-[#111827]"
+              className="h-7 rounded-[6px] border-0 bg-white px-2 text-[13px] text-[#111827]"
             >
               {SNAP_OPTIONS.map((snap) => (
                 <option key={snap} value={snap}>
@@ -2661,43 +2671,80 @@ export default function CalendarioPage() {
               ))}
             </select>
 
-            <div className="ml-auto flex items-center gap-1 rounded-[8px] border border-[#E4E7EC] bg-white p-1">
+            <div className="ml-auto flex items-center gap-1 rounded-[6px] border border-[#E4E7EC] bg-white p-0.5">
               <button
                 onClick={() => setZoomIndex((i) => Math.max(0, i - 1))}
-                className="grid h-7 w-7 place-items-center rounded-[6px] text-[#4B5563] hover:bg-[#F0F2F5]"
+                className="grid h-6 w-6 place-items-center rounded-[4px] text-[#4B5563] hover:bg-[#F0F2F5]"
                 title="Reduzir zoom"
               >
-                <ZoomOut size={15} />
+                <ZoomOut size={14} />
               </button>
-              <span className="w-20 text-center text-xs font-medium text-[#4B5563]">{zoom.label}</span>
+              <span className="w-16 text-center text-[12px] font-medium text-[#4B5563]">{zoom.label}</span>
               <button
                 onClick={() => setZoomIndex((i) => Math.min(ZOOM_OPTIONS.length - 1, i + 1))}
-                className="grid h-7 w-7 place-items-center rounded-[6px] text-[#4B5563] hover:bg-[#F0F2F5]"
+                className="grid h-6 w-6 place-items-center rounded-[4px] text-[#4B5563] hover:bg-[#F0F2F5]"
                 title="Aumentar zoom"
               >
-                <ZoomIn size={15} />
+                <ZoomIn size={14} />
               </button>
             </div>
           </div>
         </header>
 
-        {mensagem && <div className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800">{mensagem}</div>}
+        {mensagem && (
+          <div className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800">{mensagem}</div>
+        )}
 
         <main className="flex min-h-0 flex-1 gap-3 p-3">
           <aside className="flex w-80 shrink-0 flex-col overflow-hidden rounded-[12px] border border-[#E4E7EC] bg-white">
-            <div className="flex items-center justify-between border-b border-[#E4E7EC] px-3 py-2">
-              <span className="text-[11px] font-semibold uppercase tracking-wide text-[#9CA3AF]">
-                {resourceTab === 'tanque' ? 'Tanques' : 'Envase'}
-              </span>
-              <button
-                onClick={() => setNovaOrdemAberta(true)}
-                className="grid h-7 w-7 place-items-center rounded-full bg-[#2563EB] text-white hover:bg-[#1D4ED8]"
-                title="Nova ordem de produção"
-              >
-                <Plus size={16} />
-              </button>
-            </div>
-            {resourceTab === 'tanque' ? (
+            {/* Cabeçalho da sidebar — tabs de recurso + botão nova ordem */}
+            {sidebarMode === 'backlog' && (
+              <div className="shrink-0 border-b border-[#E4E7EC] p-3">
+                {/* Tabs Tanques | Envase */}
+                <div className="flex rounded-[10px] border border-[#E4E7EC] bg-[#F0F2F5] p-1">
+                  {([
+                    { id: 'tanque', label: 'Tanques', Icon: Droplets },
+                    { id: 'envase', label: 'Envase', Icon: FlaskConical },
+                  ] as const).map(({ id, label, Icon }) => (
+                    <button
+                      key={id}
+                      onClick={() => { setResourceTab(id); setSidebarMode('backlog') }}
+                      className={`flex flex-1 items-center justify-center gap-1.5 rounded-[8px] py-2 text-[13px] font-semibold transition-all ${
+                        resourceTab === id
+                          ? 'bg-white text-[#2563EB] shadow-[var(--shadow-sm)]'
+                          : 'text-[#6B7280] hover:text-[#111827]'
+                      }`}
+                    >
+                      <Icon size={15} />
+                      {label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Botão Nova Ordem */}
+                <button
+                  onClick={() => setSidebarMode('form')}
+                  className={`mt-2.5 flex w-full items-center justify-center gap-2 rounded-[10px] py-2.5 text-[13px] font-semibold text-white transition-colors ${
+                    resourceTab === 'tanque'
+                      ? 'bg-[#2563EB] hover:bg-[#1D4ED8]'
+                      : 'bg-[#16A34A] hover:bg-[#15803D]'
+                  }`}
+                >
+                  <Plus size={16} />
+                  Nova Ordem de {resourceTab === 'tanque' ? 'Tanque' : 'Envase'}
+                </button>
+              </div>
+            )}
+
+            {/* Conteúdo: formulário ou backlog */}
+            {sidebarMode === 'form' ? (
+              <CadastroRapidoForm
+                etapa={resourceTab}
+                produtos={produtos}
+                onSalvo={() => { setSidebarMode('backlog'); carregarTudo() }}
+                onFechar={() => setSidebarMode('backlog')}
+              />
+            ) : resourceTab === 'tanque' ? (
               <BacklogTanques ordens={ordensBacklogTanque} loading={backlogLoading} />
             ) : (
               <BacklogEnvase ordens={ordensBacklogEnvase} loading={backlogEnvaseLoading} />
