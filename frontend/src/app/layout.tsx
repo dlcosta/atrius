@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import './globals.css'
+import { ToastViewport } from '@/components/ui/ToastViewport'
 
 export const metadata: Metadata = {
   title: 'Atrius Planner',
@@ -9,7 +10,10 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="pt-BR">
-      <body className="antialiased">{children}</body>
+      <body className="antialiased">
+        {children}
+        <ToastViewport />
+      </body>
     </html>
   )
 }

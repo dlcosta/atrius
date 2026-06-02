@@ -74,7 +74,7 @@ export function DemandaList({ itensIniciais, tanques }: Props) {
     return (
       <div className="text-center py-16 text-slate-400">
         <Calendar size={40} className="mx-auto mb-3 opacity-40" />
-        <p className="text-sm font-medium">Nenhum item pendente de produÃ§Ã£o</p>
+        <p className="text-sm font-medium">Nenhum item pendente de produção</p>
       </div>
     )
   }
@@ -83,7 +83,7 @@ export function DemandaList({ itensIniciais, tanques }: Props) {
     <div>
       {/* Toolbar */}
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-xl font-bold text-slate-900">Demanda de ProduÃ§Ã£o</h1>
+        <h1 className="text-xl font-bold text-slate-900">Demanda de Produção</h1>
         <label className="flex items-center gap-2 cursor-pointer">
           <input
             type="checkbox"

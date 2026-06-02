@@ -239,7 +239,7 @@ export function TanqueSelector({
           <div className="p-6 space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
-              <label className="text-xs font-semibold text-slate-600 block mb-1">Data de producao</label>
+              <label className="text-xs font-semibold text-slate-600 block mb-1">Data de produção</label>
               <input
                 type="date"
                 value={diaExecucao}
@@ -252,7 +252,7 @@ export function TanqueSelector({
             </div>
 
             <div>
-              <label className="text-xs font-semibold text-slate-600 block mb-1">Turno de producao</label>
+              <label className="text-xs font-semibold text-slate-600 block mb-1">Turno de produção</label>
               {turnos.length === 0 ? (
                 <p className="text-sm text-amber-600 py-2">Nenhum turno cadastrado. Cadastre turnos na aba Cadastros.</p>
               ) : (
@@ -352,7 +352,7 @@ export function TanqueSelector({
 
           {/* Seletor de tanque */}
           <div>
-            <h3 className="text-sm font-semibold text-slate-900 mb-3">Escolher tanque para esta producao</h3>
+            <h3 className="text-sm font-semibold text-slate-900 mb-3">Escolher tanque para esta produção</h3>
             {tanques.length === 0 ? (
               <p className="text-sm text-amber-600">Nenhum tanque cadastrado. Cadastre tanques na aba Cadastros.</p>
             ) : (
@@ -511,7 +511,7 @@ export function TanqueSelector({
         {/* Lista de itens */}
         <div className="px-6 py-4 max-h-96 overflow-y-auto space-y-3">
           <div className="flex items-center justify-between gap-3 text-sm font-semibold text-slate-700 mb-3">
-            <span>Itens disponiveis ({itensDaCategoria.length})</span>
+            <span>Itens disponíveis ({itensDaCategoria.length})</span>
             <label className="flex items-center gap-2 text-xs font-semibold text-slate-600 cursor-pointer select-none">
               <input
                 type="checkbox"

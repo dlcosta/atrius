@@ -12,8 +12,10 @@ import {
   Package,
   Search,
   Sparkles,
+  Trash2,
   Wrench,
 } from 'lucide-react'
+import { apiUrl } from '@/lib/api'
 import type { OrdemBacklogItem } from '@/app/api/backlog/route'
 
 type FiltroOrdem = 'pendentes' | 'maior_volume' | 'menor_volume' | 'data_proxima'
@@ -21,6 +23,7 @@ type FiltroOrdem = 'pendentes' | 'maior_volume' | 'menor_volume' | 'data_proxima
 type Props = {
   ordens: OrdemBacklogItem[]
   loading?: boolean
+  onDeletado?: () => void
 }
 
 function formatarDuracao(minutos: number | null): string {
@@ -55,10 +58,34 @@ function normalizarBusca(v: string): string {
   return v.trim().toLowerCase()
 }
 
-function DraggableCard({ ordem }: { ordem: OrdemBacklogItem }) {
+function DraggableCard({ ordem, onDeletado }: { ordem: OrdemBacklogItem; onDeletado?: () => void }) {
   const atrasado = isAtrasado(ordem.data_prevista)
   const urgente = isUrgente(ordem.data_prevista)
   const alerta = atrasado || urgente
+  const [deletando, setDeletando] = useState(false)
+
+  async function handleDeletar(e: React.MouseEvent) {
+    e.stopPropagation()
+    if (!confirm(`Cancelar a ordem "${ordem.tanque ?? ordem.numero_externo}"? Esta ação não pode ser desfeita.`)) return
+    setDeletando(true)
+    try {
+      const res = await fetch(apiUrl('/api/ordens'), {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: ordem.id, planning_status: 'CANCELED' }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        alert(data.error ?? 'Erro ao cancelar ordem.')
+        return
+      }
+      onDeletado?.()
+    } catch {
+      alert('Erro de conexão ao cancelar ordem.')
+    } finally {
+      setDeletando(false)
+    }
+  }
 
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: `backlog:${ordem.id}`,
@@ -69,6 +96,7 @@ function DraggableCard({ ordem }: { ordem: OrdemBacklogItem }) {
     ordem.tank_volume_liters && ordem.tank_volume_liters > 0
       ? Math.min(100, Math.round((ordem.quantidade / ordem.tank_volume_liters) * 100))
       : null
+  const preparacaoMin = Number(ordem.setup_time_minutes ?? 0) + Number(ordem.cleaning_time_minutes ?? 0)
 
   return (
     <div
@@ -117,6 +145,20 @@ function DraggableCard({ ordem }: { ordem: OrdemBacklogItem }) {
             </span>
           </div>
         </div>
+
+        {/* Botão deletar — aparece ao hover, stopPropagation para não ativar o drag */}
+        {onDeletado && (
+          <button
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={handleDeletar}
+            disabled={deletando}
+            title="Cancelar ordem"
+            className="mt-1.5 flex w-full items-center justify-center gap-1.5 rounded-[6px] border border-red-200 bg-red-50 py-1 text-[11px] font-medium text-red-600 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <Trash2 size={11} />
+            {deletando ? 'Cancelando…' : 'Cancelar ordem'}
+          </button>
+        )}
       </div>
 
       {/* Volume */}
@@ -150,20 +192,20 @@ function DraggableCard({ ordem }: { ordem: OrdemBacklogItem }) {
       <div className="mt-2 grid grid-cols-3 gap-1 px-3">
         <div className="rounded-[6px] bg-[#F7F8FA] px-2 py-1 text-center">
           <div className="flex items-center justify-center gap-0.5 text-[10px] font-medium uppercase text-[#9CA3AF]">
-            <Sparkles size={9} />
-            Prod
+            <Wrench size={9} />
+            Preparo
           </div>
           <div className="font-mono text-[11px] font-semibold text-[#111827]">
-            {formatarDuracao(ordem.production_time_minutes)}
+            {formatarDuracao(preparacaoMin)}
           </div>
         </div>
         <div className="rounded-[6px] bg-[#F7F8FA] px-2 py-1 text-center">
           <div className="flex items-center justify-center gap-0.5 text-[10px] font-medium uppercase text-[#9CA3AF]">
-            <Wrench size={9} />
-            Limpeza
+            <Sparkles size={9} />
+            Produção
           </div>
           <div className="font-mono text-[11px] font-semibold text-[#111827]">
-            {formatarDuracao(ordem.cleaning_time_minutes)}
+            {formatarDuracao(ordem.production_time_minutes)}
           </div>
         </div>
         <div className="rounded-[6px] bg-[#EFF6FF] px-2 py-1 text-center">
@@ -227,7 +269,7 @@ function DraggableCard({ ordem }: { ordem: OrdemBacklogItem }) {
   )
 }
 
-export function BacklogTanques({ ordens, loading }: Props) {
+export function BacklogTanques({ ordens, loading, onDeletado }: Props) {
   const [busca, setBusca] = useState('')
   const [filtro, setFiltro] = useState<FiltroOrdem>('pendentes')
 
@@ -268,7 +310,7 @@ export function BacklogTanques({ ordens, loading }: Props) {
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <Layers size={16} className="text-[#2563EB]" />
-            <span className="text-sm font-semibold text-[#111827]">Backlog dos Tanques</span>
+            <span className="text-sm font-semibold text-[#111827]">Para agendar - Tanques</span>
             <span className="grid h-5 min-w-5 place-items-center rounded-full bg-[#2563EB] px-1 text-[10px] font-medium text-white">
               {ordens.length}
             </span>
@@ -338,18 +380,18 @@ export function BacklogTanques({ ordens, loading }: Props) {
           <div className="flex flex-col items-center justify-center gap-2 rounded-[12px] border border-dashed border-[#E4E7EC] p-8 text-center">
             <Layers size={20} className="text-[#9CA3AF]" />
             <div className="text-[13px] font-medium text-[#4B5563]">
-              {busca ? 'Nenhuma ordem encontrada' : 'Backlog vazio'}
+              {busca ? 'Nenhuma ordem encontrada' : 'Nada para agendar'}
             </div>
             <div className="text-[11px] text-[#9CA3AF]">
               {busca
                 ? 'Tente outro termo de busca'
-                : 'Crie ordens em Ordem de Produção - Tanques para preencher o backlog'}
+                : 'Crie ordens em Ordem de Produção - Tanques para preencher a fila de agendamento'}
             </div>
           </div>
         ) : (
           <div className="space-y-2">
             {ordensFiltradas.map((ordem) => (
-              <DraggableCard key={ordem.id} ordem={ordem} />
+              <DraggableCard key={ordem.id} ordem={ordem} onDeletado={onDeletado} />
             ))}
           </div>
         )}

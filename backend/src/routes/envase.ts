@@ -7,6 +7,7 @@ import {
   hasScheduleConflict,
   VOLUME_BALANCE_TOLERANCE_LITERS,
 } from '../lib/planning/production'
+import { isScheduleStartInPast, SCHEDULE_IN_PAST_ERROR } from '../lib/planning/schedule'
 import type { Ordem, PlanningStatus } from '../types'
 
 const router = Router()
@@ -245,6 +246,9 @@ router.post('/cadastro', async (req: Request, res: Response) => {
   const startAt = new Date(String(body.inicio_agendado))
   if (!Number.isFinite(startAt.getTime())) {
     return res.status(422).json({ error: 'inicio_agendado invalido' })
+  }
+  if (isScheduleStartInPast(startAt)) {
+    return res.status(422).json({ error: SCHEDULE_IN_PAST_ERROR })
   }
 
   const productionTimeMinutes = Math.round(Number(body.production_time_minutes))

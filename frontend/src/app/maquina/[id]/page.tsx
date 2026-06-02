@@ -69,7 +69,7 @@ export default function MaquinaPage() {
   }
 
   if (!maquina) {
-    return <div className="flex items-center justify-center min-h-screen bg-slate-950 text-red-400">Maquina nao encontrada.</div>
+    return <div className="flex items-center justify-center min-h-screen bg-slate-950 text-red-400">Máquina não encontrada.</div>
   }
 
   return <TimerDisplay ordens={ordens} nomeMaquina={maquina.nome} />

@@ -14,7 +14,17 @@ import {
   VOLUME_BALANCE_TOLERANCE_LITERS,
 } from '../lib/planning/production'
 import { calcularDuracao, calcularFim } from '../lib/planning/engine'
+import { isScheduleStartInPast, SCHEDULE_IN_PAST_ERROR } from '../lib/planning/schedule'
 import { buscarOperadorPorId } from '../lib/operators/store'
+import {
+  parseCompatNotes,
+  mergeCompatNotes,
+  buildIniciarUpdate,
+  buildPausarUpdate,
+  buildRetomarUpdate,
+  buildFinalizarUpdate,
+} from '../lib/ordens/operacao'
+import { isDateInRange, isDateOnlyInRange } from '../lib/ordens/filtro-data'
 import type { EtapaOrdem, FlowSource, Maquina, Ordem, PlanningStatus, Produto, Tanque } from '../types'
 import { SupabaseClient } from '@supabase/supabase-js'
 
@@ -85,30 +95,8 @@ function statusPlanejamentoPadrao(statusOperacao: string | null | undefined, ini
   return 'BACKLOG'
 }
 
-function isDateInRange(dataIso: string | null | undefined, inicioMs: number, fimMs: number): boolean {
-  if (!dataIso) return false
-  const t = new Date(dataIso).getTime()
-  return Number.isFinite(t) && t >= inicioMs && t <= fimMs
-}
-
-function isDateOnlyInRange(dataYmd: string | null | undefined, inicioYmd: string, fimYmd: string): boolean {
-  if (!dataYmd) return false
-  return dataYmd >= inicioYmd && dataYmd <= fimYmd
-}
-
 function isCanceled(planningStatus: PlanningStatus | null, status: string | null | undefined): boolean {
   return planningStatus === 'CANCELED' || status === 'cancelada'
-}
-
-function parseCompatNotes(notes: string | null | undefined): any {
-  if (!notes) return {}
-  try {
-    const parsed = JSON.parse(notes)
-    if (parsed && typeof parsed === 'object') return parsed
-  } catch {
-    return { legacy_text: notes }
-  }
-  return {}
 }
 
 async function carregarVolumeTanque(supabase: SupabaseClient, tankId: string | null): Promise<number | null> {
@@ -119,33 +107,52 @@ async function carregarVolumeTanque(supabase: SupabaseClient, tankId: string | n
 
 async function carregarOrigemTanque(supabase: SupabaseClient, originTankOrderId: string | null): Promise<any | null> {
   if (!originTankOrderId) return null
-  const { data, error } = await supabase
+  const { data } = await supabase
     .from('ordens')
     .select('id, etapa, quantidade, produto_sku, lote, planning_status, status')
     .eq('id', originTankOrderId)
     .maybeSingle()
-  if (error || !data) return null
-  return data
+  if (data) return data
+
+  // Fallback: novo fluxo
+  const { data: novoFluxo } = await supabase
+    .from('ordens_tanque_novo_fluxo')
+    .select('id, quantidade, produto_sku, lote, planning_status, status')
+    .eq('id', originTankOrderId)
+    .maybeSingle()
+  if (novoFluxo) return { ...novoFluxo, etapa: 'tanque' }
+  return null
 }
 
 async function somarLitrosEnvaseDaOrigem(supabase: SupabaseClient, originTankOrderId: string, excludeOrderId?: string) {
-  let query = supabase
+  let queryLegacy = supabase
     .from('ordens')
     .select('id, quantidade, planning_status, status')
     .eq('etapa', 'envase')
     .eq('origin_tank_order_id', originTankOrderId)
     .neq('status', 'cancelada')
 
-  if (excludeOrderId) query = query.neq('id', excludeOrderId)
+  let queryNovo = supabase
+    .from('ordens_envase_novo_fluxo')
+    .select('id, quantidade, planning_status, status')
+    .eq('origin_tank_order_id', originTankOrderId)
+    .neq('status', 'cancelada')
 
-  const { data, error } = await query
+  if (excludeOrderId) {
+    queryLegacy = queryLegacy.neq('id', excludeOrderId)
+    queryNovo = queryNovo.neq('id', excludeOrderId)
+  }
+
+  const [{ data: legacyData, error }, { data: novoData }] = await Promise.all([queryLegacy, queryNovo])
   if (error) return 0
 
-  return ((data as any[]) ?? []).reduce((acc: number, row: any) => {
-    const planningStatus = normalizarPlanningStatus(row.planning_status)
-    if (isCanceled(planningStatus, row.status)) return acc
-    return acc + Number(row.quantidade || 0)
-  }, 0)
+  const somarRows = (rows: any[] | null) =>
+    ((rows as any[]) ?? []).reduce((acc: number, row: any) => {
+      if (isCanceled(normalizarPlanningStatus(row.planning_status), row.status)) return acc
+      return acc + Number(row.quantidade || 0)
+    }, 0)
+
+  return somarRows(legacyData) + somarRows(novoData)
 }
 
 async function calcularBalanceamentoTanque(supabase: SupabaseClient, originTankOrderId: string, currentFillingLiters = 0, excludeOrderId?: string) {
@@ -225,7 +232,11 @@ router.get('/', async (req: Request, res: Response) => {
       `and(data_prevista.gte.${inicioParam},data_prevista.lte.${fimParam}),and(inicio_agendado.gte.${inicioParam}T00:00:00.000Z,inicio_agendado.lte.${fimParam}T23:59:59.999Z),and(fim_calculado.gte.${inicioParam}T00:00:00.000Z,fim_calculado.lte.${fimParam}T23:59:59.999Z),inicio_agendado.is.null`
     )
   } else if (data && !dias) {
-    query = query.or(`data_prevista.eq.${data},inicio_agendado.is.null`)
+    query = query.or(
+      `data_prevista.eq.${data},` +
+      `and(inicio_agendado.gte.${data}T00:00:00.000Z,inicio_agendado.lte.${data}T23:59:59.999Z),` +
+      `inicio_agendado.is.null`
+    )
   }
 
   const { data: ordens, error } = await query
@@ -254,7 +265,10 @@ router.get('/', async (req: Request, res: Response) => {
     queryTanquesNovo = queryTanquesNovo.or(rangeFilter)
     queryEnvasesNovo = queryEnvasesNovo.or(rangeFilter)
   } else if (data && !dias) {
-    const sameDayFilter = `data_prevista.eq.${data},inicio_agendado.is.null`
+    const sameDayFilter =
+      `data_prevista.eq.${data},` +
+      `and(inicio_agendado.gte.${data}T00:00:00.000Z,inicio_agendado.lte.${data}T23:59:59.999Z),` +
+      `inicio_agendado.is.null`
     queryTanquesNovo = queryTanquesNovo.or(sameDayFilter)
     queryEnvasesNovo = queryEnvasesNovo.or(sameDayFilter)
   }
@@ -292,6 +306,7 @@ router.get('/', async (req: Request, res: Response) => {
         pausado_em: ordem.pausado_em ?? operacao.pausado_em ?? null,
         tempo_restante_pausado_seg: ordem.tempo_restante_pausado_seg ?? operacao.tempo_restante_pausado_seg ?? null,
         operador_nome: ordem.operador_nome ?? operacao.operador_nome ?? null,
+        fim_estimado: operacao.fim_estimado ?? null,
         etapa: 'tanque',
         calc_mode: 'LITERS_MASTER',
         flow_source: 'novo_fluxo_tanque',
@@ -310,6 +325,7 @@ router.get('/', async (req: Request, res: Response) => {
         pausado_em: ordem.pausado_em ?? operacao.pausado_em ?? null,
         tempo_restante_pausado_seg: ordem.tempo_restante_pausado_seg ?? operacao.tempo_restante_pausado_seg ?? null,
         operador_nome: ordem.operador_nome ?? operacao.operador_nome ?? null,
+        fim_estimado: operacao.fim_estimado ?? null,
         etapa: 'envase',
         flow_source: 'novo_fluxo_envase',
         produto: ordem.produto_sku ? produtosMap.get(ordem.produto_sku) ?? undefined : undefined,
@@ -424,6 +440,7 @@ router.get('/', async (req: Request, res: Response) => {
       operador_id: ordem.operador_id ?? operacaoCompat.operador_id ?? null,
       operador_nome: ordem.operador_nome ?? operacaoCompat.operador_nome ?? null,
       observacao_pausa: ordem.observacao_pausa ?? operacaoCompat.observacao_pausa ?? null,
+      fim_estimado: ordem.fim_estimado ?? operacaoCompat.fim_estimado ?? null,
       quantidade_referencia_litros: volumePorOrdem[ordem.id] ?? Number(ordem.quantidade),
     }
 
@@ -508,7 +525,10 @@ router.patch('/', async (req: Request, res: Response) => {
       simpleUpdate.fim_calculado = null
       simpleUpdate.planning_status = 'BACKLOG'
     } else {
-      if (inicio_agendado !== undefined) simpleUpdate.inicio_agendado = inicio_agendado
+      if (inicio_agendado !== undefined) {
+        simpleUpdate.inicio_agendado = inicio_agendado
+        simpleUpdate.data_prevista = inicio_agendado.slice(0, 10)
+      }
       if (fim_calculado !== undefined) simpleUpdate.fim_calculado = fim_calculado || null
       if (body.planning_status !== undefined) {
         const ps = normalizarPlanningStatus(body.planning_status)
@@ -619,6 +639,7 @@ router.patch('/', async (req: Request, res: Response) => {
 
   const inicio = new Date(inicio_agendado)
   if (!Number.isFinite(inicio.getTime())) return res.status(422).json({ error: 'inicio_agendado invalido' })
+  if (isScheduleStartInPast(inicio)) return res.status(422).json({ error: SCHEDULE_IN_PAST_ERROR })
 
   const totalDurationMinutes = Math.max(1, calculateTotalDuration({ setupTimeMinutes, productionTimeMinutes, cleaningTimeMinutes }))
   const fimManual = typeof fim_calculado === 'string' ? new Date(fim_calculado) : null
@@ -743,6 +764,9 @@ router.post('/', async (req: Request, res: Response) => {
   if (startAt && !Number.isFinite(startAt.getTime())) {
     return res.status(422).json({ error: 'plannedStartAt invalido' })
   }
+  if (startAt && isScheduleStartInPast(startAt)) {
+    return res.status(422).json({ error: SCHEDULE_IN_PAST_ERROR })
+  }
 
   if (startAt && etapa === 'tanque' && !tankId) {
     return res.status(422).json({ error: 'tank_id e obrigatorio para producao em tanque agendada' })
@@ -818,7 +842,12 @@ router.post('/', async (req: Request, res: Response) => {
 router.get('/tanques-origem', async (_req: Request, res: Response) => {
   const supabase = createClient()
 
-  const [{ data: tankOrders, error: tankError }, { data: fillingOrders, error: fillingError }] = await Promise.all([
+  const [
+    { data: tankOrders, error: tankError },
+    { data: fillingOrders, error: fillingError },
+    { data: novoFluxoTanques, error: novoFluxoTanqueError },
+    { data: novoFluxoEnvases, error: novoFluxoEnvaseError },
+  ] = await Promise.all([
     supabase
       .from('ordens')
       .select('id, numero_externo, produto_sku, lote, quantidade, data_prevista, planning_status, status')
@@ -830,20 +859,36 @@ router.get('/tanques-origem', async (_req: Request, res: Response) => {
       .eq('etapa', 'envase')
       .not('origin_tank_order_id', 'is', null)
       .neq('status', 'cancelada'),
+    supabase
+      .from('ordens_tanque_novo_fluxo')
+      .select('id, numero_externo, produto_sku, lote, quantidade, data_prevista, planning_status, status')
+      .neq('status', 'cancelada'),
+    supabase
+      .from('ordens_envase_novo_fluxo')
+      .select('id, origin_tank_order_id, quantidade, planning_status, status')
+      .not('origin_tank_order_id', 'is', null)
+      .neq('status', 'cancelada'),
   ])
 
   if (tankError) return res.status(500).json({ error: tankError.message })
   if (fillingError) return res.status(500).json({ error: fillingError.message })
+  if (novoFluxoTanqueError) return res.status(500).json({ error: novoFluxoTanqueError.message })
+  if (novoFluxoEnvaseError) return res.status(500).json({ error: novoFluxoEnvaseError.message })
 
   const filledByOrigin = new Map<string, number>()
-  for (const row of (fillingOrders as any[]) ?? []) {
+  for (const row of [...((fillingOrders as any[]) ?? []), ...((novoFluxoEnvases as any[]) ?? [])]) {
     if (!row.origin_tank_order_id) continue
     if (isCanceled(normalizarPlanningStatus(row.planning_status), row.status)) continue
     const current = filledByOrigin.get(row.origin_tank_order_id) ?? 0
     filledByOrigin.set(row.origin_tank_order_id, current + Number(row.quantidade || 0))
   }
 
-  const eligible = ((tankOrders as any[]) ?? [])
+  const allTanks = [
+    ...((tankOrders as any[]) ?? []).map((t: any) => ({ ...t, flow_source: 'legado' })),
+    ...((novoFluxoTanques as any[]) ?? []).map((t: any) => ({ ...t, flow_source: 'novo_fluxo_tanque' })),
+  ]
+
+  const eligible = allTanks
     .filter((order) => !isCanceled(normalizarPlanningStatus(order.planning_status), order.status))
     .map((order) => {
       const litrosTanque = Number(order.quantidade || 0)
@@ -864,6 +909,7 @@ router.get('/tanques-origem', async (_req: Request, res: Response) => {
         balance_status: balance.status,
         planning_status: order.planning_status ?? null,
         data_prevista: order.data_prevista,
+        flow_source: order.flow_source,
       }
     })
     .filter((item) => item.saldo_litros > VOLUME_BALANCE_TOLERANCE_LITERS)
@@ -922,10 +968,6 @@ router.post('/operacao', async (req: Request, res: Response) => {
     return diff > 0 ? diff : null
   }
 
-  function mergeCompatNotes(notes: string | null | undefined, operacao: any): string {
-    const atual = parseCompatNotes(notes)
-    return JSON.stringify({ ...atual, operacao: { ...(atual.operacao ?? {}), ...operacao } })
-  }
 
   function hydrateOperationalState(row: any): any {
     const compat = parseCompatNotes(row.notes)
@@ -942,6 +984,7 @@ router.post('/operacao', async (req: Request, res: Response) => {
       operador_id: operacao.operador_id ?? null,
       operador_nome: row.operador_nome ?? operacao.operador_nome ?? null,
       observacao_pausa: operacao.observacao_pausa ?? null,
+      fim_estimado: operacao.fim_estimado ?? null,
       origin_tank_order_id: row.origin_tank_order_id ?? null,
       origin_tank_source: row.origin_tank_source ?? null,
       produto: null,
@@ -949,38 +992,51 @@ router.post('/operacao', async (req: Request, res: Response) => {
   }
 
   async function loadLegacyOrder(ordemId: string) {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('ordens')
-      .select('id, numero_externo, etapa, produto_sku, maquina_id, tank_id, status, planning_status, inicio_operacao_em, fim_operacao_em, inicio_agendado, fim_calculado, pausado_em, tempo_restante_pausado_seg, operador_nome, quantidade, unidade, lote, total_duration_minutes, origin_tank_order_id, notes, produto:produtos(volume_base, tempos_maquinas)')
+      .select('*')
       .eq('id', ordemId)
       .maybeSingle()
-    if (!data) return null
+    if (error || !data) return null
     const raw = data as any
     const compat = parseCompatNotes(raw.notes)
     const operacao = compat.operacao ?? {}
+
+    // Load product data separately to avoid FK-join failures
+    let produto: any = null
+    if (raw.produto_sku) {
+      const { data: prodData } = await supabase
+        .from('produtos')
+        .select('volume_base, tempos_maquinas')
+        .eq('sku', raw.produto_sku)
+        .maybeSingle()
+      produto = prodData ?? null
+    }
+
     return {
       ...raw,
       operador_id: operacao.operador_id ?? null,
       observacao_pausa: operacao.observacao_pausa ?? null,
-      produto: Array.isArray(raw.produto) ? (raw.produto[0] ?? null) : (raw.produto ?? null),
+      fim_estimado: operacao.fim_estimado ?? null,
+      produto,
     }
   }
 
   async function loadNewTankOrder(ordemId: string) {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('ordens_tanque_novo_fluxo')
-      .select('id, numero_externo, etapa, produto_sku, tank_id, status, planning_status, inicio_agendado, fim_calculado, quantidade, unidade, lote, total_duration_minutes, inicio_operacao_em, fim_operacao_em, pausado_em, tempo_restante_pausado_seg, operador_nome, notes')
+      .select('*')
       .eq('id', ordemId).maybeSingle()
-    if (!data) return null
+    if (error || !data) return null
     return hydrateOperationalState({ ...(data as any), maquina_id: null, origin_tank_order_id: null })
   }
 
   async function loadNewEnvaseOrder(ordemId: string) {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('ordens_envase_novo_fluxo')
-      .select('id, numero_externo, etapa, produto_sku, maquina_id, status, planning_status, inicio_agendado, fim_calculado, quantidade, unidade, lote, total_duration_minutes, origin_tank_order_id, origin_tank_source, inicio_operacao_em, fim_operacao_em, pausado_em, tempo_restante_pausado_seg, operador_nome, notes')
+      .select('*')
       .eq('id', ordemId).maybeSingle()
-    if (!data) return null
+    if (error || !data) return null
     return hydrateOperationalState({ ...(data as any), tank_id: null })
   }
 
@@ -1052,13 +1108,17 @@ router.post('/operacao', async (req: Request, res: Response) => {
       operador_id: typeof updates.operador_id === 'string' ? updates.operador_id : updates.operador_id === null ? null : resolution.ordem.operador_id ?? null,
       operador_nome: typeof updates.operador_nome === 'string' ? updates.operador_nome : resolution.ordem.operador_nome ?? null,
       observacao_pausa: typeof updates.observacao_pausa === 'string' ? updates.observacao_pausa : updates.observacao_pausa === null ? null : resolution.ordem.observacao_pausa ?? null,
+      // Fim estimado operacional (timer ao vivo). Vive apenas no JSON `notes`, fora das
+      // colunas de agendamento — empurrado a cada retomada de pausa.
+      fim_estimado: typeof updates.fim_estimado === 'string' ? updates.fim_estimado : updates.fim_estimado === null ? null : resolution.ordem.fim_estimado ?? null,
     }
 
     if (!resolution.isLegacy) {
       const compatUpdates: Record<string, unknown> = {
         status: updates.status,
         planning_status: updates.planning_status,
-        fim_calculado: updates.fim_calculado ?? resolution.ordem.fim_calculado,
+        // Janela de agendamento (inicio_agendado/fim_calculado) NUNCA e tocada pela operacao —
+        // preserva "Inicio previsto", "Fim previsto" planejado e a posicao no calendario.
         // Grava nas colunas diretas para consistência com o banco e com o monitoramento
         inicio_operacao_em: compatOperacao.inicio_operacao_em,
         fim_operacao_em: compatOperacao.fim_operacao_em,
@@ -1079,6 +1139,8 @@ router.post('/operacao', async (req: Request, res: Response) => {
     const legacyUpdates: Record<string, unknown> = { ...updates }
     delete legacyUpdates.operador_id
     delete legacyUpdates.observacao_pausa
+    // fim_estimado nao e coluna de `ordens`; persiste apenas via notes (mergeCompatNotes)
+    delete legacyUpdates.fim_estimado
     legacyUpdates.notes = mergeCompatNotes(resolution.ordem.notes, compatOperacao)
     const { data, error } = await supabase.from(resolution.table).update(legacyUpdates).eq('id', resolution.ordem.id).select('*').single()
     if (error || !data) return { error: error?.message ?? 'Erro ao atualizar ordem', data: null }
@@ -1181,7 +1243,8 @@ router.post('/operacao', async (req: Request, res: Response) => {
     return res.status(409).json({ error: 'A ordem precisa estar vinculada a um recurso para iniciar a producao.' })
   }
 
-  const agoraIso = new Date().toISOString()
+  const agora = new Date()
+  const agoraIso = agora.toISOString()
 
   if (acao === 'iniciar') {
     if (isPaused(ordem.status, ordem.planning_status)) {
@@ -1195,18 +1258,13 @@ router.post('/operacao', async (req: Request, res: Response) => {
     const durationMinutes = resolution.isLegacy
       ? await calcularDuracaoPlanejadaMinLegado(ordem)
       : Math.max(1, Number(ordem.total_duration_minutes || 1))
-    const inicioRealIso = agoraIso
-    const fimPrevistoIso = calcularFim(new Date(inicioRealIso), durationMinutes).toISOString()
 
-    const { data, error } = await updateOrder(resolution, {
-      status: 'produzindo', planning_status: 'IN_PRODUCTION',
-      operador_id: resolvedOperadorId, operador_nome: resolvedOperadorNome,
-      inicio_operacao_em: ordem.inicio_operacao_em ?? inicioRealIso,
-      fim_operacao_em: null, pausado_em: null, tempo_restante_pausado_seg: null, observacao_pausa: null,
-      fim_calculado: fimPrevistoIso,
-    })
+    const { data, error } = await updateOrder(resolution, buildIniciarUpdate({
+      ordem, durationMinutes, now: agora,
+      operadorId: resolvedOperadorId, operadorNome: resolvedOperadorNome,
+    }))
     if (error) return res.status(400).json({ error })
-    await registrarEvento(ordem, 'inicio', inicioRealIso, resolvedOperadorNome)
+    await registrarEvento(ordem, 'inicio', agoraIso, resolvedOperadorNome)
     return res.json({ ...data, flow_source: resolution.source })
   }
 
@@ -1214,20 +1272,12 @@ router.post('/operacao', async (req: Request, res: Response) => {
     if (!isInProduction(ordem.status, ordem.planning_status)) {
       return res.status(409).json({ error: 'Somente ordens em andamento podem ser pausadas.' })
     }
-    const remainingSeconds = Math.max(0, (() => {
-      if (ordem.tempo_restante_pausado_seg && ordem.tempo_restante_pausado_seg > 0) return ordem.tempo_restante_pausado_seg
-      if (ordem.fim_calculado) {
-        const diff = Math.ceil((new Date(ordem.fim_calculado).getTime() - new Date(agoraIso).getTime()) / 1000)
-        if (Number.isFinite(diff) && diff > 0) return diff
-      }
-      return Math.max(1, Number(ordem.total_duration_minutes || 1)) * 60
-    })())
 
-    const { data, error } = await updateOrder(resolution, {
-      status: 'pausada', planning_status: 'PAUSED',
-      operador_id: resolvedOperadorId, operador_nome: resolvedOperadorNome,
-      pausado_em: agoraIso, tempo_restante_pausado_seg: remainingSeconds, observacao_pausa: observacaoPausa,
-    })
+    const { data, error } = await updateOrder(resolution, buildPausarUpdate({
+      ordem, now: agora,
+      operadorId: resolvedOperadorId, operadorNome: resolvedOperadorNome,
+      observacaoPausa,
+    }))
     if (error) return res.status(400).json({ error })
     await registrarEvento(ordem, 'pausa', agoraIso, resolvedOperadorNome)
     return res.json({ ...data, flow_source: resolution.source })
@@ -1242,33 +1292,21 @@ router.post('/operacao', async (req: Request, res: Response) => {
     const conflito = await hasOperationalConflictOnResource(resourceType, resourceId, ordem.id, resolution.source)
     if (conflito) return res.status(409).json({ error: 'Ja existe outra ordem em andamento ou pausada nesse recurso.' })
 
-    const remainingSeconds = Math.max(60, (() => {
-      if (ordem.tempo_restante_pausado_seg && ordem.tempo_restante_pausado_seg > 0) return ordem.tempo_restante_pausado_seg
-      if (ordem.fim_calculado) {
-        const diff = Math.ceil((new Date(ordem.fim_calculado).getTime() - new Date(agoraIso).getTime()) / 1000)
-        if (Number.isFinite(diff) && diff > 0) return diff
-      }
-      return Math.max(1, Number(ordem.total_duration_minutes || 1)) * 60
-    })())
-
-    const { data, error } = await updateOrder(resolution, {
-      status: 'produzindo', planning_status: 'IN_PRODUCTION',
-      operador_id: resolvedOperadorId, operador_nome: resolvedOperadorNome,
-      pausado_em: null, tempo_restante_pausado_seg: null,
-      fim_calculado: new Date(new Date(agoraIso).getTime() + remainingSeconds * 1000).toISOString(),
-    })
+    const { data, error } = await updateOrder(resolution, buildRetomarUpdate({
+      ordem, now: agora,
+      operadorId: resolvedOperadorId, operadorNome: resolvedOperadorNome,
+    }))
     if (error) return res.status(400).json({ error })
     await registrarEvento(ordem, 'retomada', agoraIso, resolvedOperadorNome)
     return res.json({ ...data, flow_source: resolution.source })
   }
 
-  // finalizar
-  const { data, error } = await updateOrder(resolution, {
-    status: 'concluida', planning_status: 'COMPLETED',
-    operador_id: resolvedOperadorId, operador_nome: resolvedOperadorNome,
-    inicio_operacao_em: ordem.inicio_operacao_em ?? agoraIso,
-    fim_operacao_em: agoraIso, pausado_em: null, tempo_restante_pausado_seg: null, fim_calculado: agoraIso,
-  })
+  // finalizar — registra o fim real (fim_operacao_em). fim_calculado permanece o planejado,
+  // permitindo o calculo de atraso (real x planejado) no monitoramento.
+  const { data, error } = await updateOrder(resolution, buildFinalizarUpdate({
+    ordem, now: agora,
+    operadorId: resolvedOperadorId, operadorNome: resolvedOperadorNome,
+  }))
   if (error) return res.status(400).json({ error })
   await registrarEvento(ordem, 'conclusao', agoraIso, resolvedOperadorNome)
   await liberarEnvasesAguardando(resolution)

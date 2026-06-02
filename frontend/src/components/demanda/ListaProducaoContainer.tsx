@@ -14,15 +14,15 @@ type Ordenacao = 'recente' | 'antigo' | 'status' | 'nome'
 const METRICAS = [
   { status: 'BACKLOG' as PlanningStatus,       label: 'Backlog',      cor: 'bg-slate-50  border-slate-200  text-slate-600',  icone: Clock },
   { status: 'SCHEDULED' as PlanningStatus,     label: 'Agendadas',    cor: 'bg-blue-50   border-blue-200   text-blue-700',   icone: Calendar },
-  { status: 'IN_PRODUCTION' as PlanningStatus, label: 'Em ProduÃ§Ã£o',  cor: 'bg-amber-50  border-amber-200  text-amber-700',  icone: Zap },
-  { status: 'COMPLETED' as PlanningStatus,     label: 'ConcluÃ­das',   cor: 'bg-emerald-50 border-emerald-200 text-emerald-700', icone: CheckCircle2 },
+  { status: 'IN_PRODUCTION' as PlanningStatus, label: 'Em Produção',  cor: 'bg-amber-50  border-amber-200  text-amber-700',  icone: Zap },
+  { status: 'COMPLETED' as PlanningStatus,     label: 'Concluídas',   cor: 'bg-emerald-50 border-emerald-200 text-emerald-700', icone: CheckCircle2 },
   { status: 'CANCELED' as PlanningStatus,      label: 'Canceladas',   cor: 'bg-red-50    border-red-200    text-red-600',    icone: XCircle },
 ]
 
 const STATUS_LABELS: Partial<Record<PlanningStatus, string>> = {
   BACKLOG: 'Backlog', WAITING_TANK: 'Ag. Tanque', READY_TO_SCHEDULE: 'Pronto p/ Agendar',
-  SCHEDULED: 'Agendadas', IN_PRODUCTION: 'Em ProduÃ§Ã£o',
-  COMPLETED: 'ConcluÃ­das', CANCELED: 'Canceladas',
+  SCHEDULED: 'Agendadas', IN_PRODUCTION: 'Em Produção',
+  COMPLETED: 'Concluídas', CANCELED: 'Canceladas',
 }
 
 STATUS_LABELS.PAUSED = 'Pausadas'
@@ -74,7 +74,7 @@ export function ListaProducaoContainer({ etapa = 'tanque' }: { etapa?: string } 
   const ordensFiltradas = useMemo(() => {
     let lista = [...ordens]
 
-    // Esconder concluÃ­das e canceladas por padrÃ£o
+    // Esconder concluídas e canceladas por padrão
     if (!mostrarInativos && filtroStatus.length === 0) {
       lista = lista.filter((o) => STATUS_ATIVOS.includes((o.planning_status ?? 'BACKLOG') as PlanningStatus))
     } else if (filtroStatus.length > 0) {
@@ -125,10 +125,10 @@ export function ListaProducaoContainer({ etapa = 'tanque' }: { etapa?: string } 
 
   return (
     <div className="space-y-5">
-      {/* CabeÃ§alho */}
+      {/* Cabeçalho */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h2 className="text-xl font-bold text-slate-900">Lista de ProduÃ§Ã£o</h2>
+          <h2 className="text-xl font-bold text-slate-900">Lista de Produção</h2>
           <p className="text-sm text-slate-500 mt-0.5">Gerencie e edite as ordens do pipeline</p>
         </div>
         <button
@@ -141,7 +141,7 @@ export function ListaProducaoContainer({ etapa = 'tanque' }: { etapa?: string } 
         </button>
       </div>
 
-      {/* Cards de mÃ©tricas */}
+      {/* Cards de métricas */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
         {METRICAS.map(({ status, label, cor, icone: Icone }) => {
           const count = contagens[status] ?? 0
@@ -194,11 +194,11 @@ export function ListaProducaoContainer({ etapa = 'tanque' }: { etapa?: string } 
             </div>
           )}
           {filtroStatus.length === 0 && (
-            <span className="text-xs text-slate-400">Clique nas mÃ©tricas para filtrar</span>
+            <span className="text-xs text-slate-400">Clique nas métricas para filtrar</span>
           )}
         </div>
 
-        {/* OrdenaÃ§Ã£o */}
+        {/* Ordenação */}
         <div className="flex items-center gap-1">
           <ArrowUpDown size={14} className="text-slate-400 shrink-0" />
           <select
@@ -239,7 +239,7 @@ export function ListaProducaoContainer({ etapa = 'tanque' }: { etapa?: string } 
             }`}
           >
             <EyeOff size={13} />
-            {mostrarInativos ? 'Ocultar concluÃ­das/canceladas' : 'Mostrar todas'}
+            {mostrarInativos ? 'Ocultar concluídas/canceladas' : 'Mostrar todas'}
           </button>
         )}
       </div>
@@ -266,7 +266,7 @@ export function ListaProducaoContainer({ etapa = 'tanque' }: { etapa?: string } 
           <p className="text-sm text-slate-400 mt-1">
             {busca || filtroStatus.length > 0
               ? 'Tente ajustar os filtros'
-              : 'Crie uma demanda para comeÃ§ar'}
+              : 'Crie uma demanda para começar'}
           </p>
         </div>
       ) : (

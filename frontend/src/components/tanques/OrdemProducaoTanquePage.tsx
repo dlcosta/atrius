@@ -4,11 +4,13 @@ import { apiUrl } from '@/lib/api'
 import { useEffect, useMemo, useState } from 'react'
 import { format } from 'date-fns'
 import type { Ordem, Produto, Tanque } from '@/types'
+import { toast } from '@/lib/ui/toast'
 import {
   calculateProductionEndTime,
   calculateTotalDuration,
   hasScheduleConflict,
 } from '@/lib/planning/production'
+import { validateScheduleStart } from '@/lib/planning/schedule'
 
 type Props = {
   produtos: Produto[]
@@ -33,8 +35,6 @@ export function OrdemProducaoTanquePage({ produtos }: Props) {
   const [cor, setCor] = useState('#5B9BD5')
   const [dataProducao, setDataProducao] = useState(() => format(new Date(), 'yyyy-MM-dd'))
   const [horaInicio, setHoraInicio] = useState('07:30')
-  const [erro, setErro] = useState('')
-  const [sucesso, setSucesso] = useState('')
   const [salvando, setSalvando] = useState(false)
 
   useEffect(() => {
@@ -150,17 +150,21 @@ export function OrdemProducaoTanquePage({ produtos }: Props) {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    setErro('')
-    setSucesso('')
 
     if (hasPreviewConflict) {
-      setErro('Esse tanque já possui uma ordem agendada nesse intervalo.')
+      toast.error('Esse tanque ja possui uma ordem agendada nesse intervalo.')
+      return
+    }
+
+    const startAt = new Date(`${dataProducao}T${horaInicio}:00`)
+    const startAtError = validateScheduleStart(startAt)
+    if (startAtError) {
+      toast.error(startAtError)
       return
     }
 
     setSalvando(true)
-
-    const startAtIso = new Date(`${dataProducao}T${horaInicio}:00`).toISOString()
+    const startAtIso = startAt.toISOString()
 
     try {
       const payload = {
@@ -196,18 +200,18 @@ export function OrdemProducaoTanquePage({ produtos }: Props) {
 
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
-        setErro(data.error ?? 'Erro ao criar ordem')
+        toast.error(data.error ?? 'Erro ao criar ordem')
         return
       }
 
-      setSucesso(`Ordem de tanque criada com sucesso${data?.numero_externo ? `: ${data.numero_externo}` : '.'}`)
+      toast.success(`Ordem de tanque criada com sucesso${data?.numero_externo ? `: ${data.numero_externo}` : '.'}`)
       setOrdensDoDia((atual) => {
         if (!data || typeof data !== 'object') return atual
         return [...atual, data as Ordem]
       })
       resetForm()
     } catch {
-      setErro('Erro de rede')
+      toast.error('Erro de rede')
     } finally {
       setSalvando(false)
     }
@@ -461,15 +465,10 @@ export function OrdemProducaoTanquePage({ produtos }: Props) {
             )}
           </div>
 
-          {erro && <p className="text-sm font-medium text-[#DC2626]">{erro}</p>}
-          {sucesso && <p className="text-sm font-medium text-[#16A34A]">{sucesso}</p>}
-
           <div className="flex justify-end gap-3 pt-2">
             <button
               type="button"
               onClick={() => {
-                setErro('')
-                setSucesso('')
                 resetForm()
               }}
               className="rounded-[8px] border border-[#CDD2DA] bg-white px-4 py-2 text-sm font-medium text-[#4B5563] hover:bg-[#F7F8FA]"

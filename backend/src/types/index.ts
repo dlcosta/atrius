@@ -101,6 +101,7 @@ export type Ordem = {
   data_prevista: string | null
   inicio_agendado: string | null
   fim_calculado: string | null
+  fim_estimado?: string | null
   inicio_operacao_em?: string | null
   fim_operacao_em?: string | null
   pausado_em?: string | null

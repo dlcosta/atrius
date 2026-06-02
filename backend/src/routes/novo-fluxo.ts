@@ -8,6 +8,7 @@ import {
   validateTankCapacity,
   VOLUME_BALANCE_TOLERANCE_LITERS,
 } from '../lib/planning/production'
+import { isScheduleStartInPast, SCHEDULE_IN_PAST_ERROR } from '../lib/planning/schedule'
 import type { Ordem } from '../types'
 
 const router = Router()
@@ -79,6 +80,7 @@ router.post('/tanques', async (req: Request, res: Response) => {
 
   const startAt = new Date(body.inicio_agendado)
   if (!Number.isFinite(startAt.getTime())) return res.status(422).json({ error: 'inicio_agendado invalido' })
+  if (isScheduleStartInPast(startAt)) return res.status(422).json({ error: SCHEDULE_IN_PAST_ERROR })
 
   const { data: produto } = await supabase
     .from('produtos')
@@ -408,6 +410,7 @@ router.post('/envase', async (req: Request, res: Response) => {
 
   const startAt = new Date(String(body.inicio_agendado))
   if (!Number.isFinite(startAt.getTime())) return res.status(422).json({ error: 'inicio_agendado invalido' })
+  if (isScheduleStartInPast(startAt)) return res.status(422).json({ error: SCHEDULE_IN_PAST_ERROR })
 
   const productionTimeMinutes = Math.max(1, Math.round(Number(body.production_time_minutes)))
   const cleaningTimeMinutes = Math.max(0, Math.round(Number(body.cleaning_time_minutes)))

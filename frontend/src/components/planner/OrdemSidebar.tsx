@@ -23,7 +23,7 @@ export function OrdemSidebar({ ordens, onNovaOrdem }: Props) {
       <div className="bg-slate-100 border-b-2 border-slate-200 px-5 py-4 flex items-center justify-between">
         <div>
           <h3 className="text-sm font-black text-slate-700 uppercase tracking-tighter">Não agendadas</h3>
-          <p className="text-xs text-slate-500 mt-0.5 font-bold">{ordens.length} ordens no backlog</p>
+          <p className="text-xs text-slate-500 mt-0.5 font-bold">{ordens.length} ordens para agendar</p>
         </div>
         <button
           onClick={onNovaOrdem}
@@ -36,7 +36,7 @@ export function OrdemSidebar({ ordens, onNovaOrdem }: Props) {
 
       <div className="overflow-y-auto max-h-[calc(100vh-220px)] divide-y divide-slate-100">
         {ordens.length === 0 ? (
-          <p className="text-xs text-slate-400 text-center py-10">Todas as ordens estao agendadas</p>
+          <p className="text-xs text-slate-400 text-center py-10">Todas as ordens estão agendadas</p>
         ) : (
           ordens.map((ordem) => (
             <div

@@ -21,15 +21,15 @@ type MetricaStatus = {
 const METRICAS_CONFIG: MetricaStatus[] = [
   { status: 'BACKLOG',       label: 'Backlog',      cor: 'bg-slate-50  border-slate-200  text-slate-600',  icone: Clock },
   { status: 'SCHEDULED',     label: 'Agendadas',    cor: 'bg-blue-50   border-blue-200   text-blue-700',   icone: Calendar },
-  { status: 'IN_PRODUCTION', label: 'Em ProduÃ§Ã£o',  cor: 'bg-amber-50  border-amber-200  text-amber-700',  icone: Zap },
-  { status: 'COMPLETED',     label: 'ConcluÃ­das',   cor: 'bg-emerald-50 border-emerald-200 text-emerald-700', icone: CheckCircle2 },
+  { status: 'IN_PRODUCTION', label: 'Em Produção',  cor: 'bg-amber-50  border-amber-200  text-amber-700',  icone: Zap },
+  { status: 'COMPLETED',     label: 'Concluídas',   cor: 'bg-emerald-50 border-emerald-200 text-emerald-700', icone: CheckCircle2 },
   { status: 'CANCELED',      label: 'Canceladas',   cor: 'bg-red-50    border-red-200    text-red-600',    icone: XCircle },
 ]
 
 const STATUS_LABELS: Partial<Record<PlanningStatus, string>> = {
   BACKLOG: 'Backlog', WAITING_TANK: 'Ag. Tanque', READY_TO_SCHEDULE: 'Pronto p/ Agendar',
-  SCHEDULED: 'Agendadas', IN_PRODUCTION: 'Em ProduÃ§Ã£o',
-  COMPLETED: 'ConcluÃ­das', CANCELED: 'Canceladas',
+  SCHEDULED: 'Agendadas', IN_PRODUCTION: 'Em Produção',
+  COMPLETED: 'Concluídas', CANCELED: 'Canceladas',
 }
 
 STATUS_LABELS.PAUSED = 'Pausadas'
@@ -103,7 +103,7 @@ export function HistoricoContainer({ etapa = 'tanque' }: { etapa?: string } = {}
     return map
   }, [ordens])
 
-  // Filtro + ordenaÃ§Ã£o
+  // Filtro + ordenação
   const ordensFiltradas = useMemo(() => {
     let lista = [...ordens]
 
@@ -141,10 +141,10 @@ export function HistoricoContainer({ etapa = 'tanque' }: { etapa?: string } = {}
 
   return (
     <div className="space-y-5">
-      {/* CabeÃ§alho */}
+      {/* Cabeçalho */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h2 className="text-xl font-bold text-slate-900">HistÃ³rico de ProduÃ§Ãµes</h2>
+          <h2 className="text-xl font-bold text-slate-900">Histórico de Produções</h2>
           <p className="text-sm text-slate-500 mt-0.5">Rastreabilidade e auditoria operacional completa</p>
         </div>
         <button
@@ -157,7 +157,7 @@ export function HistoricoContainer({ etapa = 'tanque' }: { etapa?: string } = {}
         </button>
       </div>
 
-      {/* Cards de mÃ©tricas */}
+      {/* Cards de métricas */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
         {METRICAS_CONFIG.map(({ status, label, cor, icone: Icone }) => {
           const count = contagens[status] ?? 0
@@ -210,11 +210,11 @@ export function HistoricoContainer({ etapa = 'tanque' }: { etapa?: string } = {}
             </div>
           )}
           {filtroStatus.length === 0 && (
-            <span className="text-xs text-slate-400">Clique nas mÃ©tricas para filtrar</span>
+            <span className="text-xs text-slate-400">Clique nas métricas para filtrar</span>
           )}
         </div>
 
-        {/* OrdenaÃ§Ã£o */}
+        {/* Ordenação */}
         <div className="flex items-center gap-1">
           <ArrowUpDown size={14} className="text-slate-400 shrink-0" />
           <select
@@ -263,9 +263,9 @@ export function HistoricoContainer({ etapa = 'tanque' }: { etapa?: string } = {}
       ) : ordensFiltradas.length === 0 ? (
         <div className="bg-white rounded-xl border border-slate-200 p-10 text-center">
           <CheckCircle2 size={40} className="mx-auto text-slate-200 mb-3" />
-          <p className="font-semibold text-slate-500">Nenhuma produÃ§Ã£o encontrada</p>
+          <p className="font-semibold text-slate-500">Nenhuma produção encontrada</p>
           <p className="text-sm text-slate-400 mt-1">
-            {busca || filtroStatus.length > 0 ? 'Tente ajustar os filtros' : 'Crie uma demanda para comeÃ§ar'}
+            {busca || filtroStatus.length > 0 ? 'Tente ajustar os filtros' : 'Crie uma demanda para começar'}
           </p>
         </div>
       ) : (

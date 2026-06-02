@@ -4,11 +4,13 @@ import { apiUrl } from '@/lib/api'
 import { useEffect, useMemo, useState } from 'react'
 import { format } from 'date-fns'
 import type { Maquina, Ordem, Produto } from '@/types'
+import { toast } from '@/lib/ui/toast'
 import {
   calculateProductionEndTime,
   calculateTotalDuration,
   hasScheduleConflict,
 } from '@/lib/planning/production'
+import { validateScheduleStart } from '@/lib/planning/schedule'
 import { normalizarEmbalagem } from '@/lib/envase/normalizar-embalagem'
 
 type Props = {
@@ -78,8 +80,6 @@ export function OrdemProducaoEnvasePage({ maquinas, produtos }: Props) {
   const [quantidadeUnidadesAvulsas, setQuantidadeUnidadesAvulsas] = useState('0')
   const [preparationTimeMinutes, setPreparationTimeMinutes] = useState('20')
   const [productionTimeMinutes, setProductionTimeMinutes] = useState('60')
-  const [erro, setErro] = useState('')
-  const [sucesso, setSucesso] = useState('')
   const [salvando, setSalvando] = useState(false)
 
   useEffect(() => {
@@ -144,9 +144,9 @@ export function OrdemProducaoEnvasePage({ maquinas, produtos }: Props) {
 
   const totalDurationMinutes = useMemo(() => {
     return calculateTotalDuration({
-      setupTimeMinutes: 0,
+      setupTimeMinutes: Number(preparationTimeMinutes || 0),
       productionTimeMinutes: Number(productionTimeMinutes || 0),
-      cleaningTimeMinutes: Number(preparationTimeMinutes || 0),
+      cleaningTimeMinutes: 0,
     })
   }, [productionTimeMinutes, preparationTimeMinutes])
 
@@ -251,20 +251,25 @@ export function OrdemProducaoEnvasePage({ maquinas, produtos }: Props) {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    setErro('')
-    setSucesso('')
 
     if (conversionError) {
-      setErro(conversionError)
+      toast.error(conversionError)
       return
     }
 
     if (hasPreviewConflict) {
-      setErro('Essa máquina já possui uma ordem agendada nesse intervalo.')
+      toast.error('Essa máquina já possui uma ordem agendada nesse intervalo.')
       return
     }
 
     if (!produtoSelecionado || !origemSelecionada) return
+
+    const startAt = new Date(`${dataProducao}T${horaInicio}:00`)
+    const startAtError = validateScheduleStart(startAt)
+    if (startAtError) {
+      toast.error(startAtError)
+      return
+    }
 
     setSalvando(true)
     try {
@@ -277,7 +282,7 @@ export function OrdemProducaoEnvasePage({ maquinas, produtos }: Props) {
           origin_tank_source: origemSelecionada.source,
           maquina_id: maquinaId,
           data_prevista: dataProducao,
-          inicio_agendado: new Date(`${dataProducao}T${horaInicio}:00`).toISOString(),
+          inicio_agendado: startAt.toISOString(),
           nome_produto: produtoSelecionado.produto.nome,
           embalagem_label: produtoSelecionado.embalagemLabel,
           package_volume_liters: produtoSelecionado.litrosPorUnidade,
@@ -286,22 +291,23 @@ export function OrdemProducaoEnvasePage({ maquinas, produtos }: Props) {
           quantidade_unidades_avulsas: produtoSelecionado.unidadesPorCaixa > 1 ? quantidadeUnidadesAvulsasNumero : totalUnidades,
           total_unidades: totalUnidades,
           total_litros: totalLitros,
+          setup_time_minutes: Number(preparationTimeMinutes || 0),
           production_time_minutes: Number(productionTimeMinutes || 0),
-          cleaning_time_minutes: Number(preparationTimeMinutes || 0),
+          cleaning_time_minutes: 0,
         }),
       })
 
       const data = await response.json().catch(() => ({}))
       if (!response.ok) {
-        setErro(data.error ?? 'Erro ao criar ordem de envase')
+        toast.error(data.error ?? 'Erro ao criar ordem de envase')
         return
       }
 
-      setSucesso(`Ordem de envase criada com sucesso${data?.numero_externo ? `: ${data.numero_externo}` : '.'}`)
+      toast.success(`Ordem de envase criada com sucesso${data?.numero_externo ? `: ${data.numero_externo}` : '.'}`)
       await refreshOriginsAndAgenda()
       resetForm()
     } catch {
-      setErro('Erro de rede ao criar ordem de envase')
+      toast.error('Erro de rede ao criar ordem de envase')
     } finally {
       setSalvando(false)
     }
@@ -572,15 +578,10 @@ export function OrdemProducaoEnvasePage({ maquinas, produtos }: Props) {
             )}
           </div>
 
-          {erro && <p className="text-sm font-medium text-[#DC2626]">{erro}</p>}
-          {sucesso && <p className="text-sm font-medium text-[#16A34A]">{sucesso}</p>}
-
           <div className="flex justify-end gap-3 pt-2">
             <button
               type="button"
               onClick={() => {
-                setErro('')
-                setSucesso('')
                 resetForm()
               }}
               className="rounded-[8px] border border-[#CDD2DA] bg-white px-4 py-2 text-sm font-medium text-[#4B5563] hover:bg-[#F7F8FA]"

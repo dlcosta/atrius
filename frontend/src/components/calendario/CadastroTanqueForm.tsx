@@ -2,9 +2,11 @@
 import { apiUrl } from '@/lib/api'
 import { useEffect, useMemo, useState } from 'react'
 import { format } from 'date-fns'
-import { CheckCircle, AlertCircle, Droplets, RefreshCw, ClipboardList, Plus } from 'lucide-react'
+import { CheckCircle, Droplets, RefreshCw, ClipboardList, Plus } from 'lucide-react'
 import type { Produto, Tanque } from '@/types'
 import { calculateTotalDuration } from '@/lib/planning/production'
+import { validateScheduleStart } from '@/lib/planning/schedule'
+import { toast } from '@/lib/ui/toast'
 import { ListaOrdens } from './ListaOrdens'
 
 type Props = {
@@ -70,13 +72,11 @@ export function CadastroTanqueForm({ produtos, onSalvo }: Props) {
   const [liters, setLiters] = useState('3800')
   const [setupTimeMinutes, setSetupTimeMinutes] = useState('10')
   const [productionTimeMinutes, setProductionTimeMinutes] = useState('60')
-  const [cleaningTimeMinutes, setCleaningTimeMinutes] = useState('20')
   const [lote, setLote] = useState('')
   const [notes, setNotes] = useState('')
   const [dataProducao, setDataProducao] = useState(format(new Date(), 'yyyy-MM-dd'))
   const [usarHoraInicio, setUsarHoraInicio] = useState(false)
   const [horaInicio, setHoraInicio] = useState('07:30')
-  const [erro, setErro] = useState('')
   const [sucesso, setSucesso] = useState(false)
   const [salvando, setSalvando] = useState(false)
 
@@ -92,9 +92,9 @@ export function CadastroTanqueForm({ produtos, onSalvo }: Props) {
       calculateTotalDuration({
         setupTimeMinutes: Number(setupTimeMinutes || 0),
         productionTimeMinutes: Number(productionTimeMinutes || 0),
-        cleaningTimeMinutes: Number(cleaningTimeMinutes || 0),
+        cleaningTimeMinutes: 0,
       }),
-    [setupTimeMinutes, productionTimeMinutes, cleaningTimeMinutes],
+    [setupTimeMinutes, productionTimeMinutes],
   )
 
   const selectedProduct = produtos.find((p) => p.sku === produtoSku) ?? null
@@ -102,11 +102,15 @@ export function CadastroTanqueForm({ produtos, onSalvo }: Props) {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    setErro('')
+    const startAt = usarHoraInicio ? new Date(`${dataProducao}T${horaInicio}:00`) : null
+    const startAtError = startAt ? validateScheduleStart(startAt) : null
+    if (startAtError) {
+      toast.error(startAtError)
+      return
+    }
+
     setSalvando(true)
-    const startAtIso = usarHoraInicio
-      ? new Date(`${dataProducao}T${horaInicio}:00`).toISOString()
-      : null
+    const startAtIso = startAt?.toISOString() ?? null
 
     try {
       const res = await fetch(apiUrl('/api/ordens'), {
@@ -126,7 +130,7 @@ export function CadastroTanqueForm({ produtos, onSalvo }: Props) {
           origin_tank_order_id: null,
           setup_time_minutes: Number(setupTimeMinutes),
           production_time_minutes: Number(productionTimeMinutes),
-          cleaning_time_minutes: Number(cleaningTimeMinutes),
+          cleaning_time_minutes: 0,
           package_volume_liters: null,
           units_per_box: 1,
           inicio_agendado: startAtIso,
@@ -139,13 +143,13 @@ export function CadastroTanqueForm({ produtos, onSalvo }: Props) {
 
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
-        setErro(data.error ?? 'Erro ao criar ordem. Tente novamente.')
+        toast.error(data.error ?? 'Erro ao criar ordem. Tente novamente.')
       } else {
         setSucesso(true)
         onSalvo?.()
       }
     } catch {
-      setErro('Erro de conexão. Verifique sua internet e tente novamente.')
+      toast.error('Erro de conexão. Verifique sua internet e tente novamente.')
     }
 
     setSalvando(false)
@@ -158,7 +162,6 @@ export function CadastroTanqueForm({ produtos, onSalvo }: Props) {
     setLiters('3800')
     setLote('')
     setNotes('')
-    setErro('')
     setUsarHoraInicio(false)
   }
 
@@ -213,8 +216,7 @@ export function CadastroTanqueForm({ produtos, onSalvo }: Props) {
           </div>
           <h2 className="mb-3 text-2xl font-bold text-[#111827]">Ordem cadastrada com sucesso!</h2>
           <p className="mb-10 max-w-sm text-center text-[15px] text-[#6B7280]">
-            A ordem de produção do tanque foi criada. Ela já aparece no backlog do calendário para
-            ser agendada.
+            A ordem de produção do tanque foi criada e já aparece em Para agendar no calendário.
           </p>
           <div className="flex gap-3">
             <button
@@ -252,14 +254,6 @@ export function CadastroTanqueForm({ produtos, onSalvo }: Props) {
             <p className="mt-1 text-[15px] text-[#6B7280]">Preencha os dados para cadastrar a produção</p>
           </div>
         </div>
-
-        {erro && (
-          <div className="mb-6 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-4">
-            <AlertCircle size={22} className="mt-0.5 shrink-0 text-red-500" />
-            <p className="text-[15px] text-red-700">{erro}</p>
-          </div>
-        )}
-
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Produto */}
           <Campo label="Produto" obrigatorio>
@@ -340,12 +334,12 @@ export function CadastroTanqueForm({ produtos, onSalvo }: Props) {
           {/* Tempos */}
           <div className="rounded-xl border border-[#E4E7EC] bg-[#F7F8FA] p-5">
             <h3 className="mb-1 text-[15px] font-semibold text-[#111827]">
-              Tempos de produção (minutos)
+              Tempos (minutos)
             </h3>
             <p className="mb-4 text-[13px] text-[#6B7280]">
-              Informe quanto tempo cada etapa do processo leva.
+              A preparação já inclui ajustes, setup e limpeza. Depois informe apenas o tempo de produção.
             </p>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 gap-4">
               {[
                 {
                   label: 'Preparação',
@@ -358,12 +352,6 @@ export function CadastroTanqueForm({ produtos, onSalvo }: Props) {
                   value: productionTimeMinutes,
                   onChange: setProductionTimeMinutes,
                   min: 1,
-                },
-                {
-                  label: 'Limpeza',
-                  value: cleaningTimeMinutes,
-                  onChange: setCleaningTimeMinutes,
-                  min: 0,
                 },
               ].map(({ label, value, onChange, min }) => (
                 <div key={label}>
@@ -416,7 +404,7 @@ export function CadastroTanqueForm({ produtos, onSalvo }: Props) {
                 <p className="mt-0.5 text-[13px] text-[#6B7280]">
                   {usarHoraInicio
                     ? 'A ordem será agendada no horário que você definir abaixo.'
-                    : 'A ordem ficará no backlog aguardando ser agendada no calendário.'}
+                    : 'A ordem ficará em "Para agendar" aguardando horário no calendário.'}
                 </p>
               </div>
             </div>

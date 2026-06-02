@@ -3,7 +3,6 @@ import {
   calcularDuracao,
   calcularFim,
   detectarConflito,
-  gerarBlocoLimpeza,
   ordenarPorInicio,
   ordemParaBlocos,
 } from '@/lib/planning/engine'
@@ -81,22 +80,6 @@ describe('detectarConflito', () => {
   })
 })
 
-describe('gerarBlocoLimpeza', () => {
-  it('gera bloco de limpeza apos o fim da producao', () => {
-    const bloco = gerarBlocoLimpeza(ordemBase, produto)
-    expect(bloco).not.toBeNull()
-    expect(bloco!.tipo).toBe('limpeza')
-    expect(bloco!.inicio.toISOString()).toBe('2026-04-06T08:40:00.000Z')
-    expect(bloco!.fim.toISOString()).toBe('2026-04-06T09:10:00.000Z')
-    expect(bloco!.ordemId).toBe('o1')
-  })
-
-  it('retorna null se tempo de limpeza for 0', () => {
-    const produtoSemLimpeza = { ...produto, tempo_limpeza_min: 0 }
-    expect(gerarBlocoLimpeza(ordemBase, produtoSemLimpeza)).toBeNull()
-  })
-})
-
 describe('ordenarPorInicio', () => {
   it('ordena ordens por inicio_agendado ascendente', () => {
     const ordens: Ordem[] = [
@@ -112,12 +95,13 @@ describe('ordenarPorInicio', () => {
 })
 
 describe('ordemParaBlocos', () => {
-  it('retorna setup, producao e limpeza', () => {
+  it('retorna preparacao unificada e producao', () => {
     const blocos = ordemParaBlocos(ordemBase)
-    expect(blocos).toHaveLength(3)
+    expect(blocos).toHaveLength(2)
     expect(blocos[0].tipo).toBe('setup')
+    expect(blocos[0].produto).toBe('Preparação - Desinfetante 5L Marine')
+    expect(blocos[0].duracao_min).toBe(70)
     expect(blocos[1].tipo).toBe('producao')
-    expect(blocos[2].tipo).toBe('limpeza')
   })
 
   it('retorna vazio se ordem nao tiver maquina', () => {

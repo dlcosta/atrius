@@ -12,16 +12,16 @@ import {
   User,
 } from 'lucide-react'
 import type { Maquina, Operador, Ordem, Tanque } from '@/types'
+import {
+  type ResourceGroup,
+  montarGrupos,
+  getRecursoKey,
+  formatarRestante,
+  formatarDecorrido,
+  calcularProgresso,
+} from '@/lib/planner/agrupamento'
 
 type AcaoOperacao = 'iniciar' | 'pausar' | 'retomar' | 'finalizar'
-
-type ResourceGroup = {
-  id: string
-  nome: string
-  tipo: 'maquina' | 'tanque'
-  capacidadeLitros?: number
-  ordens: Ordem[]
-}
 
 type Props = {
   maquinas: Maquina[]
@@ -35,42 +35,6 @@ type Props = {
   onAcao: (ordem: Ordem, acao: AcaoOperacao) => Promise<void>
 }
 
-function pad(n: number) {
-  return String(n).padStart(2, '0')
-}
-
-function segParaRelogio(totalSeg: number): string {
-  const s = totalSeg % 60
-  const m = Math.floor((totalSeg % 3600) / 60)
-  const h = Math.floor(totalSeg / 3600)
-  return `${pad(h)}:${pad(m)}:${pad(s)}`
-}
-
-function formatarRestante(ordem: Ordem, agoraMs: number): string {
-  if (ordem.status === 'pausada' && ordem.tempo_restante_pausado_seg) {
-    return segParaRelogio(Math.max(0, ordem.tempo_restante_pausado_seg))
-  }
-  if (!ordem.fim_calculado) return '--:--:--'
-  const ms = Math.max(0, new Date(ordem.fim_calculado).getTime() - agoraMs)
-  return segParaRelogio(Math.floor(ms / 1000))
-}
-
-function formatarDecorrido(ordem: Ordem, agoraMs: number): string {
-  if (!ordem.inicio_operacao_em) return '--:--:--'
-  const ms = Math.max(0, agoraMs - new Date(ordem.inicio_operacao_em).getTime())
-  return segParaRelogio(Math.floor(ms / 1000))
-}
-
-function calcularProgresso(ordem: Ordem, agoraMs: number): number {
-  const inicioStr = ordem.inicio_operacao_em ?? ordem.inicio_agendado
-  if (!inicioStr || !ordem.fim_calculado) return 0
-  const inicio = new Date(inicioStr).getTime()
-  const fim = new Date(ordem.fim_calculado).getTime()
-  const total = fim - inicio
-  if (total <= 0) return 0
-  return Math.min(100, Math.max(0, ((agoraMs - inicio) / total) * 100))
-}
-
 function formatarHora(dataIso: string | null | undefined): string {
   if (!dataIso) return '--:--'
   return format(new Date(dataIso), 'HH:mm', { locale: ptBR })
@@ -82,70 +46,6 @@ function labelStatus(ordem: Ordem): string {
   if (ordem.status === 'concluida') return 'Concluída'
   if (ordem.planning_status === 'WAITING_TANK') return 'Aguard. tanque'
   return 'Programada'
-}
-
-function getRecursoKey(tipo: 'maquina' | 'tanque', id: string) {
-  return tipo === 'maquina' ? `machine:${id}` : `tank:${id}`
-}
-
-function ordenarOrdens(ordens: Ordem[]): Ordem[] {
-  return [...ordens].sort((a, b) => {
-    const aT = a.inicio_agendado ? new Date(a.inicio_agendado).getTime() : Number.MAX_SAFE_INTEGER
-    const bT = b.inicio_agendado ? new Date(b.inicio_agendado).getTime() : Number.MAX_SAFE_INTEGER
-    return aT - bT
-  })
-}
-
-function montarGrupos(maquinas: Maquina[], tanques: Tanque[], ordens: Ordem[]): ResourceGroup[] {
-  const gruposMaquina = maquinas
-    .filter((m) => m.ativa)
-    .map((m) => ({
-      id: m.id,
-      nome: m.nome,
-      tipo: 'maquina' as const,
-      ordens: ordenarOrdens(ordens.filter((o) => o.maquina_id === m.id && o.inicio_agendado)),
-    }))
-
-  const tanqueIdsConhecidos = new Set(tanques.map((t) => t.id))
-
-  const gruposTanque = tanques
-    .filter((t) => t.ativo)
-    .map((t) => ({
-      id: t.id,
-      nome: t.nome,
-      tipo: 'tanque' as const,
-      capacidadeLitros: t.volume_liters,
-      ordens: ordenarOrdens(
-        ordens.filter(
-          (o) =>
-            o.etapa === 'tanque' &&
-            o.inicio_agendado &&
-            (o.tank_id === t.id || o.tanque === t.nome),
-        ),
-      ),
-    }))
-
-  // Tanques órfãos (ordens sem tank_id conhecido)
-  const mapExtras = new Map<string, ResourceGroup>()
-  ordens
-    .filter(
-      (o) =>
-        o.etapa === 'tanque' &&
-        o.inicio_agendado &&
-        (!o.tank_id || !tanqueIdsConhecidos.has(o.tank_id)),
-    )
-    .forEach((o, i) => {
-      const key = o.tank_id ?? o.tanque ?? `extra-${i}`
-      const nome = o.tanque_ref?.nome ?? o.tanque ?? `Tanque ${i + 1}`
-      if (!mapExtras.has(key)) mapExtras.set(key, { id: key, nome, tipo: 'tanque', ordens: [] })
-      mapExtras.get(key)!.ordens.push(o)
-    })
-  const gruposExtras = Array.from(mapExtras.values()).map((g) => ({
-    ...g,
-    ordens: ordenarOrdens(g.ordens),
-  }))
-
-  return [...gruposMaquina, ...gruposTanque, ...gruposExtras]
 }
 
 // ─── Resource Card ───────────────────────────────────────────────────────────
@@ -329,7 +229,7 @@ function ResourceCard({
                 <span className="font-semibold">
                   {Math.round(calcularProgresso(ordemAtiva, agoraMs))}%
                 </span>
-                <span>Prev.: {formatarHora(ordemAtiva.fim_calculado)}</span>
+                <span>Prev.: {formatarHora(ordemAtiva.fim_estimado ?? ordemAtiva.fim_calculado)}</span>
               </div>
               <div className="h-2 w-full overflow-hidden rounded-full bg-white/60">
                 <div

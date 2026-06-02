@@ -29,6 +29,7 @@ import {
   obterTempoProducaoMin,
   type EventoMonitoramento,
 } from '@/lib/monitoring/indicadores'
+import { mesmoDia, pertenceAoDia } from '@/lib/planning/datas-ordem'
 
 const REFRESH_MS = 15000
 
@@ -68,20 +69,6 @@ function formatarDataHora(dataIso: string | null | undefined): string {
 function formatarHora(dataIso: string | null | undefined): string {
   if (!dataIso) return '--:--'
   return format(new Date(dataIso), 'HH:mm')
-}
-
-function mesmoDia(dataIso: string | null | undefined, diaYmd: string): boolean {
-  if (!dataIso) return false
-  return format(new Date(dataIso), 'yyyy-MM-dd') === diaYmd
-}
-
-function pertenceAoDia(ordem: Ordem, diaYmd: string) {
-  return (
-    ordem.data_prevista === diaYmd ||
-    mesmoDia(ordem.inicio_agendado, diaYmd) ||
-    mesmoDia(ordem.inicio_operacao_em, diaYmd) ||
-    mesmoDia(ordem.fim_operacao_em, diaYmd)
-  )
 }
 
 function statusLabel(ordem: Ordem | null): string {
@@ -756,7 +743,7 @@ export default function MonitoramentoPage() {
                     <span className="font-medium text-slate-900">{formatarMinutos(maquina.idleMinutes)}</span>
                   </div>
                   <div className="flex items-center justify-between gap-3">
-                    <span>Desvio medio</span>
+                    <span>Desvio médio</span>
                     <span className="font-medium text-slate-900">{formatarMinutos(maquina.averageDelayMinutes)}</span>
                   </div>
                 </div>

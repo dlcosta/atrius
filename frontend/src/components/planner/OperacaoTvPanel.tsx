@@ -57,8 +57,9 @@ function calcularSegundosRestantes(ordem: Ordem, agoraMs: number): number | null
     return ordem.tempo_restante_pausado_seg
   }
 
-  if (!ordem.fim_calculado) return null
-  return Math.max(0, Math.floor((new Date(ordem.fim_calculado).getTime() - agoraMs) / 1000))
+  const fimAlvo = ordem.fim_estimado ?? ordem.fim_calculado
+  if (!fimAlvo) return null
+  return Math.max(0, Math.floor((new Date(fimAlvo).getTime() - agoraMs) / 1000))
 }
 
 function statusRecurso(ordens: Ordem[]) {
@@ -189,7 +190,7 @@ function CardOrdem({
         </div>
         <div className="rounded-[12px] bg-[#F8FAFC] px-3 py-2">
           <div className="text-[11px] uppercase tracking-wide text-[#8896A8]">Fim previsto</div>
-          <div className="mt-1 font-semibold text-[#0F1623]">{formatarHora(ordem.fim_calculado)}</div>
+          <div className="mt-1 font-semibold text-[#0F1623]">{formatarHora(ordem.fim_estimado ?? ordem.fim_calculado)}</div>
         </div>
         <div className="rounded-[12px] bg-[#F8FAFC] px-3 py-2">
           <div className="text-[11px] uppercase tracking-wide text-[#8896A8]">Operador</div>

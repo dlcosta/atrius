@@ -63,7 +63,7 @@ export function gerarBlocoLimpeza(ordem: Ordem, produto: Produto): BlocoGantt | 
     ordemId: ordem.id,
     tipo: 'limpeza',
     maquinaId: ordem.maquina_id,
-    produto: `Limpeza - ${produto.nome}`,
+    produto: `Preparação - ${produto.nome}`,
     cor: '#FDE68A',
     inicio,
     fim,
@@ -72,7 +72,7 @@ export function gerarBlocoLimpeza(ordem: Ordem, produto: Produto): BlocoGantt | 
   }
 }
 
-/** Converte uma ordem em blocos para o Gantt (setup + producao + limpeza) */
+/** Converte uma ordem em blocos para o Gantt (preparacao + producao) */
 export function ordemParaBlocos(ordem: Ordem): BlocoGantt[] {
   const inicioBaseIso = ordem.inicio_operacao_em ?? ordem.inicio_agendado
   if (!inicioBaseIso || !ordem.fim_calculado || !ordem.produto || !ordem.maquina_id) return []
@@ -80,7 +80,7 @@ export function ordemParaBlocos(ordem: Ordem): BlocoGantt[] {
   const blocos: BlocoGantt[] = []
 
   const tempos = ordem.produto.tempos_maquinas?.[ordem.maquina_id]
-  const setupMin = tempos?.setup ?? 0
+  const setupMin = (tempos?.setup ?? 0) + (ordem.produto.tempo_limpeza_min ?? 0)
   const prodMin = tempos?.producao ?? 0
   const volumeReferencia =
     ordem.quantidade_referencia_litros ??
@@ -96,7 +96,7 @@ export function ordemParaBlocos(ordem: Ordem): BlocoGantt[] {
       ordemId: ordem.id,
       tipo: 'setup',
       maquinaId: ordem.maquina_id,
-      produto: `Setup - ${ordem.produto.nome}`,
+      produto: `Preparação - ${ordem.produto.nome}`,
       cor: '#E5E7EB',
       inicio: inicioAtual,
       fim: fimSetup,
@@ -119,9 +119,6 @@ export function ordemParaBlocos(ordem: Ordem): BlocoGantt[] {
     tanque: ordem.tanque,
     planning_status: ordem.planning_status ?? null,
   })
-
-  const blocoLimpeza = gerarBlocoLimpeza(ordem, ordem.produto)
-  if (blocoLimpeza) blocos.push(blocoLimpeza)
 
   return blocos
 }

@@ -101,6 +101,7 @@ export type Ordem = {
   data_prevista: string | null
   inicio_agendado: string | null  // ISO string
   fim_calculado: string | null    // ISO string
+  fim_estimado?: string | null     // ISO string — fim estimado operacional (timer ao vivo)
   inicio_operacao_em?: string | null
   fim_operacao_em?: string | null
   pausado_em?: string | null

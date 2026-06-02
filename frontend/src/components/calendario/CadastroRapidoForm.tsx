@@ -7,13 +7,13 @@ import {
   ChevronLeft,
   ChevronDown,
   ChevronUp,
-  AlertCircle,
 } from 'lucide-react'
 import type { Maquina, Produto, Tanque } from '@/types'
 import {
   calculateEstimatedBoxes,
   calculateTotalDuration,
 } from '@/lib/planning/production'
+import { toast } from '@/lib/ui/toast'
 
 type TankOriginOption = {
   id: string
@@ -53,10 +53,8 @@ export function CadastroRapidoForm({ etapa, produtos, onSalvo, onFechar }: Props
   const [unitsPerBox, setUnitsPerBox] = useState('4')
   const [setupTimeMinutes, setSetupTimeMinutes] = useState('10')
   const [productionTimeMinutes, setProductionTimeMinutes] = useState('60')
-  const [cleaningTimeMinutes, setCleaningTimeMinutes] = useState('20')
 
   const [mostrarAvancado, setMostrarAvancado] = useState(false)
-  const [erro, setErro] = useState('')
   const [sucesso, setSucesso] = useState(false)
   const [salvando, setSalvando] = useState(false)
   const [carregando, setCarregando] = useState(true)
@@ -117,14 +115,13 @@ export function CadastroRapidoForm({ etapa, produtos, onSalvo, onFechar }: Props
       calculateTotalDuration({
         setupTimeMinutes: Number(setupTimeMinutes || 0),
         productionTimeMinutes: Number(productionTimeMinutes || 0),
-        cleaningTimeMinutes: Number(cleaningTimeMinutes || 0),
+        cleaningTimeMinutes: 0,
       }),
-    [setupTimeMinutes, productionTimeMinutes, cleaningTimeMinutes],
+    [setupTimeMinutes, productionTimeMinutes],
   )
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    setErro('')
     setSalvando(true)
 
     try {
@@ -144,7 +141,7 @@ export function CadastroRapidoForm({ etapa, produtos, onSalvo, onFechar }: Props
               origin_tank_order_id: null,
               setup_time_minutes: Number(setupTimeMinutes),
               production_time_minutes: Number(productionTimeMinutes),
-              cleaning_time_minutes: Number(cleaningTimeMinutes),
+              cleaning_time_minutes: 0,
               package_volume_liters: null,
               units_per_box: 1,
               inicio_agendado: null,
@@ -167,7 +164,7 @@ export function CadastroRapidoForm({ etapa, produtos, onSalvo, onFechar }: Props
               origin_tank_order_id: originTankOrderId || null,
               setup_time_minutes: Number(setupTimeMinutes),
               production_time_minutes: Number(productionTimeMinutes),
-              cleaning_time_minutes: Number(cleaningTimeMinutes),
+              cleaning_time_minutes: 0,
               package_volume_liters: packageVolumeNum || null,
               units_per_box: unitsPerBoxNum || 1,
               inicio_agendado: null,
@@ -185,7 +182,7 @@ export function CadastroRapidoForm({ etapa, produtos, onSalvo, onFechar }: Props
 
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
-        setErro(data.error ?? 'Erro ao criar ordem. Tente novamente.')
+        toast.error(data.error ?? 'Erro ao criar ordem. Tente novamente.')
       } else {
         setSucesso(true)
         setTimeout(() => {
@@ -194,7 +191,7 @@ export function CadastroRapidoForm({ etapa, produtos, onSalvo, onFechar }: Props
         }, 2000)
       }
     } catch {
-      setErro('Erro de conexão. Tente novamente.')
+      toast.error('Erro de conexão. Tente novamente.')
     }
 
     setSalvando(false)
@@ -208,7 +205,7 @@ export function CadastroRapidoForm({ etapa, produtos, onSalvo, onFechar }: Props
         </div>
         <p className="text-[15px] font-semibold text-[#111827]">Ordem cadastrada!</p>
         <p className="text-center text-[13px] text-[#6B7280]">
-          Ela aparecerá no backlog em instantes.
+          Ela aparecerá em Para agendar em instantes.
         </p>
       </div>
     )
@@ -237,13 +234,6 @@ export function CadastroRapidoForm({ etapa, produtos, onSalvo, onFechar }: Props
           <p className="py-8 text-center text-[13px] text-[#9CA3AF]">Carregando...</p>
         ) : (
           <>
-            {erro && (
-              <div className="mb-4 flex items-start gap-2 rounded-[10px] border border-red-200 bg-red-50 px-3 py-2.5">
-                <AlertCircle size={16} className="mt-0.5 shrink-0 text-red-500" />
-                <p className="text-[13px] text-red-700">{erro}</p>
-              </div>
-            )}
-
             <form onSubmit={handleSubmit} className="space-y-4">
               {/* ── TANQUE ── */}
               {etapa === 'tanque' && (
@@ -470,15 +460,17 @@ export function CadastroRapidoForm({ etapa, produtos, onSalvo, onFechar }: Props
                     <p className="mb-2 text-[12px] font-semibold uppercase tracking-wide text-[#9CA3AF]">
                       Tempos (minutos)
                     </p>
-                    <div className="grid grid-cols-3 gap-2">
+                    <p className="mb-2 text-[12px] text-[#6B7280]">
+                      Preparação inclui setup, ajustes e limpeza.
+                    </p>
+                    <div className="grid grid-cols-2 gap-2">
                       {[
-                        { label: 'Prep.', value: setupTimeMinutes, set: setSetupTimeMinutes },
+                        { label: 'Preparação', value: setupTimeMinutes, set: setSetupTimeMinutes },
                         {
-                          label: etapa === 'envase' ? 'Envase' : 'Prod.',
+                          label: etapa === 'envase' ? 'Envase' : 'Produção',
                           value: productionTimeMinutes,
                           set: setProductionTimeMinutes,
                         },
-                        { label: 'Limp.', value: cleaningTimeMinutes, set: setCleaningTimeMinutes },
                       ].map(({ label, value, set }) => (
                         <div key={label}>
                           <label className="mb-1 block text-[12px] text-[#4B5563]">{label}</label>

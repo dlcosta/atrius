@@ -8,6 +8,7 @@ import type { Maquina, Operador, Ordem, Produto, Tanque } from '@/types'
 import { NovaOrdemForm } from '@/components/planner/NovaOrdemForm'
 import { OperacaoDashboard } from '@/components/planner/OperacaoDashboard'
 import { OperacaoTvPanel } from '@/components/planner/OperacaoTvPanel'
+import { toast } from '@/lib/ui/toast'
 import {
   DEFAULT_JANELA_PRODUCAO,
   JanelaProducao,
@@ -67,8 +68,6 @@ export default function PlannerPage() {
   const [ordens, setOrdens] = useState<Ordem[]>([])
   const [produtos, setProdutos] = useState<Produto[]>([])
   const [agoraMs, setAgoraMs] = useState<number>(Date.now())
-  const [sincronizando, setSincronizando] = useState(false)
-  const [mensagem, setMensagem] = useState('')
   const [novaOrdemAberta, setNovaOrdemAberta] = useState(false)
   const [executandoOrdemId, setExecutandoOrdemId] = useState<string | null>(null)
   const [operadorPorRecurso, setOperadorPorRecurso] = useState<OperadorPorRecurso>({})
@@ -108,10 +107,10 @@ export default function PlannerPage() {
       setOperadores(Array.isArray(operadoresData) ? operadoresData : [])
 
       if (o?.error) {
-        setMensagem(o.error)
+        toast.error(o.error)
       }
     } catch {
-      setMensagem('Erro ao carregar dados. Verifique a conexão.')
+      toast.error('Erro ao carregar dados. Verifique a conexão.')
     }
   }, [dia])
 
@@ -180,27 +179,6 @@ export default function PlannerPage() {
     atualizarJanela({ startHour: preset.startHour, endHour: preset.endHour })
   }
 
-  async function sincronizar() {
-    setSincronizando(true)
-    setMensagem('')
-
-    try {
-      const res = await fetch(apiUrl('/api/sincronizar'), { method: 'POST' })
-      const data = await res.json()
-
-      if (res.ok) {
-        setMensagem(`Sincronizado: ${data.importadas} ordens importadas, ${data.erros} erros.`)
-        await carregarDados()
-      } else {
-        setMensagem(data.error ?? 'Erro na sincronização com a API externa.')
-      }
-    } catch {
-      setMensagem('Erro de rede ao sincronizar.')
-    }
-
-    setSincronizando(false)
-  }
-
   function selecionarOperadorParaRecurso(recursoKey: string, operadorId: string) {
     setOperadorPorRecurso((atual) => ({
       ...atual,
@@ -224,12 +202,11 @@ export default function PlannerPage() {
   ) {
     const operador = obterOperadorSelecionado(ordem)
     if (!operador) {
-      setMensagem('Selecione um operador para esse recurso antes de registrar a operação.')
+      toast.warning('Selecione um operador para esse recurso antes de registrar a operação.')
       return
     }
 
     setExecutandoOrdemId(ordem.id)
-    setMensagem('')
     try {
       const res = await fetch(apiUrl('/api/ordens/operacao'), {
         method: 'POST',
@@ -246,7 +223,7 @@ export default function PlannerPage() {
 
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
-        setMensagem(data.error ?? 'Não foi possível registrar a operação.')
+        toast.error(data.error ?? 'Não foi possível registrar a operação.')
       } else {
         const mensagens: Record<typeof acao, string> = {
           iniciar: 'Operação iniciada com sucesso.',
@@ -254,10 +231,10 @@ export default function PlannerPage() {
           retomar: 'Operação retomada com sucesso.',
           finalizar: 'Operação finalizada com sucesso.',
         }
-        setMensagem(mensagens[acao])
+        toast.success(mensagens[acao])
       }
     } catch {
-      setMensagem('Erro de rede ao registrar operação.')
+      toast.error('Erro de rede ao registrar operação.')
     } finally {
       setExecutandoOrdemId(null)
     }
@@ -267,7 +244,7 @@ export default function PlannerPage() {
 
   async function solicitarAcaoOperacao(ordem: Ordem, acao: AcaoOperacao) {
     if (!obterOperadorSelecionado(ordem)) {
-      setMensagem('Selecione um operador para esse recurso antes de registrar a operação.')
+      toast.warning('Selecione um operador para esse recurso antes de registrar a operação.')
       return
     }
 
@@ -284,7 +261,7 @@ export default function PlannerPage() {
 
     const observacao = pausaAberta.observacao.trim()
     if (!observacao) {
-      setMensagem('Informe a observação da pausa antes de continuar.')
+      toast.warning('Informe a observação da pausa antes de continuar.')
       return
     }
 
@@ -322,13 +299,6 @@ export default function PlannerPage() {
               className="h-9 rounded-[8px] border border-[#CDD2DA] bg-white px-4 text-[13px] font-medium text-[#4B5563] hover:border-[#2563EB] hover:text-[#2563EB]"
             >
               Modo TV
-            </button>
-            <button
-              onClick={sincronizar}
-              disabled={sincronizando}
-              className="h-9 rounded-[8px] bg-[#2563EB] px-4 text-[13px] font-medium text-white hover:bg-[#1D4ED8] disabled:opacity-50"
-            >
-              {sincronizando ? 'Sincronizando...' : 'Sincronizar'}
             </button>
           </div>
         </div>
@@ -441,11 +411,6 @@ export default function PlannerPage() {
           </div>
         </div>
       </div>
-
-      {mensagem && (
-        <div className="border-b border-amber-200 bg-amber-50 px-6 py-2 text-sm text-amber-800">{mensagem}</div>
-      )}
-
       {novaOrdemAberta && (
         <NovaOrdemForm
           produtos={produtos}

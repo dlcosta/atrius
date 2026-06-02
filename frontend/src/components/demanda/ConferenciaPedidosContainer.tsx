@@ -333,7 +333,7 @@ function PedidoCard({
           <div className="space-y-2">
             {itensMostrados.length === 0 ? (
               <p className="text-xs text-slate-400 italic text-center py-3">
-                Nenhum item com status "{STATUS_CFG[filtroAtivo as StatusConferencia]?.label}"
+                Nenhum item com status &quot;{STATUS_CFG[filtroAtivo as StatusConferencia]?.label}&quot;
               </p>
             ) : (
               itensMostrados.map((item) => (

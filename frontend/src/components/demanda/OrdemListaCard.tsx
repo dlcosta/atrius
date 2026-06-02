@@ -40,8 +40,8 @@ const STATUS_CONFIG: Partial<Record<PlanningStatus, StatusConfig>> = {
   WAITING_TANK:       { label: 'Ag. Tanque',        badge: 'bg-purple-100 text-purple-700 border border-purple-200',    icone: Clock,        dot: 'bg-purple-500' },
   READY_TO_SCHEDULE:  { label: 'Pronto p/ Agendar', badge: 'bg-teal-100 text-teal-700 border border-teal-200',          icone: Calendar,     dot: 'bg-teal-500' },
   SCHEDULED:          { label: 'Agendada',          badge: 'bg-blue-100 text-blue-700 border border-blue-200',          icone: Calendar,     dot: 'bg-blue-500' },
-  IN_PRODUCTION:      { label: 'Em ProduÃ§Ã£o',       badge: 'bg-amber-100 text-amber-700 border border-amber-200',       icone: Zap,          dot: 'bg-amber-500' },
-  COMPLETED:          { label: 'ConcluÃ­da',         badge: 'bg-emerald-100 text-emerald-700 border border-emerald-200', icone: CheckCircle2, dot: 'bg-emerald-500' },
+  IN_PRODUCTION:      { label: 'Em Produção',       badge: 'bg-amber-100 text-amber-700 border border-amber-200',       icone: Zap,          dot: 'bg-amber-500' },
+  COMPLETED:          { label: 'Concluída',         badge: 'bg-emerald-100 text-emerald-700 border border-emerald-200', icone: CheckCircle2, dot: 'bg-emerald-500' },
   CANCELED:           { label: 'Cancelada',         badge: 'bg-red-100 text-red-600 border border-red-200',             icone: XCircle,      dot: 'bg-red-500' },
 }
 
@@ -53,14 +53,14 @@ STATUS_CONFIG.PAUSED = {
 }
 
 function fmtMin(m: number | null | undefined): string {
-  if (!m) return 'â€”'
+  if (!m) return '�'
   const h = Math.floor(m / 60)
   const min = m % 60
   return h > 0 ? `${h}h${min > 0 ? String(min).padStart(2, '0') : ''}` : `${min}min`
 }
 
 function fmtData(iso: string | null | undefined): string {
-  if (!iso) return 'â€”'
+  if (!iso) return '�'
   try { return format(parseISO(iso), 'dd/MM/yyyy', { locale: ptBR }) } catch { return iso }
 }
 
@@ -176,7 +176,7 @@ export function OrdemListaCard({ ordem, onAtualizado, onCancelado }: Props) {
       expandido ? 'border-blue-300 shadow-md' : 'border-slate-200 hover:border-slate-300 hover:shadow'
     } ${isCancelada ? 'opacity-60' : ''}`}>
 
-      {/* CabeÃ§alho */}
+      {/* Cabeçalho */}
       <div className="p-4">
         <div className="flex items-start gap-3">
           <div className={`w-2.5 h-2.5 rounded-full mt-1.5 shrink-0 ${cfg.dot}`} />
@@ -202,20 +202,20 @@ export function OrdemListaCard({ ordem, onAtualizado, onCancelado }: Props) {
                 </span>
               )}
               {tankNome && (
-                <><span className="text-slate-300">â€¢</span><span>{tankNome}</span></>
+                <><span className="text-slate-300">⬢</span><span>{tankNome}</span></>
               )}
               {turnoNome && (
-                <><span className="text-slate-300">â€¢</span><span>{turnoNome}</span></>
+                <><span className="text-slate-300">⬢</span><span>{turnoNome}</span></>
               )}
               {dataAgendamento && (
-                <><span className="text-slate-300">â€¢</span><span>{fmtData(dataAgendamento)}</span></>
+                <><span className="text-slate-300">⬢</span><span>{fmtData(dataAgendamento)}</span></>
               )}
               {!dataAgendamento && ordem.data_prevista && (
-                <><span className="text-slate-300">â€¢</span><span className="text-slate-400">{fmtData(ordem.data_prevista)}</span></>
+                <><span className="text-slate-300">⬢</span><span className="text-slate-400">{fmtData(ordem.data_prevista)}</span></>
               )}
             </div>
 
-            {/* Linha 3: mÃ©tricas + aÃ§Ãµes */}
+            {/* Linha 3: métricas + ações */}
             <div className="flex items-center justify-between mt-3 pt-2 border-t border-slate-100">
               <div className="flex items-center gap-3 text-xs text-slate-500">
                 <span className="flex items-center gap-1">
@@ -270,14 +270,14 @@ export function OrdemListaCard({ ordem, onAtualizado, onCancelado }: Props) {
         </div>
       </div>
 
-      {/* ConfirmaÃ§Ã£o de cancelamento (inline) */}
+      {/* Confirmação de cancelamento (inline) */}
       {confirmCancel && (
         <div className="border-t border-red-100 bg-red-50 p-4">
           <div className="flex items-start gap-3">
             <AlertTriangle size={16} className="text-red-500 mt-0.5 shrink-0" />
             <div className="flex-1">
               <p className="text-sm font-semibold text-red-700">Cancelar esta ordem?</p>
-              <p className="text-xs text-red-500 mt-0.5">Esta aÃ§Ã£o pode ser registrada no histÃ³rico de auditoria.</p>
+              <p className="text-xs text-red-500 mt-0.5">Esta ação pode ser registrada no histórico de auditoria.</p>
               <input
                 type="text"
                 placeholder="Motivo (opcional)"
@@ -305,7 +305,7 @@ export function OrdemListaCard({ ordem, onAtualizado, onCancelado }: Props) {
         </div>
       )}
 
-      {/* Painel de ediÃ§Ã£o */}
+      {/* Painel de edição */}
       {expandido && podeEditar && (
         <div className="border-t border-slate-100 bg-slate-50 p-5">
           <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wide mb-4 flex items-center gap-1.5">
@@ -336,10 +336,10 @@ export function OrdemListaCard({ ordem, onAtualizado, onCancelado }: Props) {
               />
             </div>
 
-            {/* Tempo de produÃ§Ã£o */}
+            {/* Tempo de produção */}
             <div>
               <label className="block text-xs font-semibold text-slate-600 mb-1">
-                Tempo de produÃ§Ã£o (min)
+                Tempo de produção (min)
               </label>
               <input
                 type="number"
@@ -381,13 +381,13 @@ export function OrdemListaCard({ ordem, onAtualizado, onCancelado }: Props) {
             {/* Motivo */}
             <div className="sm:col-span-2">
               <label className="block text-xs font-semibold text-slate-600 mb-1">
-                Motivo da ediÃ§Ã£o <span className="font-normal text-slate-400">(opcional)</span>
+                Motivo da edição <span className="font-normal text-slate-400">(opcional)</span>
               </label>
               <input
                 type="text"
                 value={motivo}
                 onChange={(e) => setMotivo(e.target.value)}
-                placeholder="Registrado no histÃ³rico de auditoria"
+                placeholder="Registrado no histórico de auditoria"
                 className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
@@ -406,7 +406,7 @@ export function OrdemListaCard({ ordem, onAtualizado, onCancelado }: Props) {
               className="flex items-center gap-2 bg-blue-600 text-white text-sm font-semibold px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
             >
               <Save size={14} />
-              {salvando ? 'Salvando...' : 'Salvar alteraÃ§Ãµes'}
+              {salvando ? 'Salvando...' : 'Salvar alterações'}
             </button>
             <button
               onClick={resetarEdicao}

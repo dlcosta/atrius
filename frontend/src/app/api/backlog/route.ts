@@ -8,6 +8,7 @@ export type OrdemBacklogItem = {
   data_prevista: string | null
   planning_status: string
   etapa: string
+  setup_time_minutes: number | null
   production_time_minutes: number | null
   cleaning_time_minutes: number | null
   total_duration_minutes: number | null

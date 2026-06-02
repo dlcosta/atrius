@@ -96,7 +96,7 @@ function StatusTanqueBadge({ status, nome }: { status: string | null; nome: stri
 
   return (
     <span className="flex items-center gap-1 rounded-full bg-[#F0F2F5] px-1.5 py-0.5 text-[10px] font-medium text-[#6B7280]">
-      {nome ?? 'Tanque'}: Backlog
+      {nome ?? 'Tanque'}: Para agendar
     </span>
   )
 }
@@ -120,6 +120,7 @@ function DraggableCard({ ordem }: { ordem: OrdemBacklogEnvaseItem }) {
     : aguardandoTanque
     ? '#7C3AED'
     : '#10B981'
+  const preparacaoMin = Number(ordem.setup_time_minutes ?? 0) + Number(ordem.cleaning_time_minutes ?? 0)
 
   return (
     <div
@@ -228,20 +229,20 @@ function DraggableCard({ ordem }: { ordem: OrdemBacklogEnvaseItem }) {
       <div className="mt-2 grid grid-cols-3 gap-1 px-3">
         <div className="rounded-[6px] bg-[#F7F8FA] px-2 py-1 text-center">
           <div className="flex items-center justify-center gap-0.5 text-[10px] font-medium uppercase text-[#9CA3AF]">
-            <Sparkles size={9} />
-            Prod
+            <Wrench size={9} />
+            Preparo
           </div>
           <div className="font-mono text-[11px] font-semibold text-[#111827]">
-            {formatarDuracao(ordem.production_time_minutes)}
+            {formatarDuracao(preparacaoMin)}
           </div>
         </div>
         <div className="rounded-[6px] bg-[#F7F8FA] px-2 py-1 text-center">
           <div className="flex items-center justify-center gap-0.5 text-[10px] font-medium uppercase text-[#9CA3AF]">
-            <Wrench size={9} />
-            Limpeza
+            <Sparkles size={9} />
+            Produção
           </div>
           <div className="font-mono text-[11px] font-semibold text-[#111827]">
-            {formatarDuracao(ordem.cleaning_time_minutes)}
+            {formatarDuracao(ordem.production_time_minutes)}
           </div>
         </div>
         <div className="rounded-[6px] bg-[#ECFDF5] px-2 py-1 text-center">
@@ -354,7 +355,7 @@ export function BacklogEnvase({ ordens, loading }: Props) {
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <FlaskConical size={16} className="text-[#10B981]" />
-            <span className="text-sm font-semibold text-[#111827]">Backlog de Envase</span>
+            <span className="text-sm font-semibold text-[#111827]">Para agendar - Envase</span>
             <span className="grid h-5 min-w-5 place-items-center rounded-full bg-[#10B981] px-1 text-[10px] font-medium text-white">
               {ordens.length}
             </span>
@@ -431,12 +432,12 @@ export function BacklogEnvase({ ordens, loading }: Props) {
           <div className="flex flex-col items-center justify-center gap-2 rounded-[12px] border border-dashed border-[#E4E7EC] p-8 text-center">
             <FlaskConical size={20} className="text-[#9CA3AF]" />
             <div className="text-[13px] font-medium text-[#4B5563]">
-              {busca ? 'Nenhuma ordem encontrada' : 'Backlog vazio'}
+              {busca ? 'Nenhuma ordem encontrada' : 'Nada para agendar'}
             </div>
             <div className="text-[11px] text-[#9CA3AF]">
               {busca
                 ? 'Tente outro termo de busca'
-                : 'Crie ordens em Ordem de Produção - Envase para preencher o backlog'}
+                : 'Crie ordens em Ordem de Produção - Envase para preencher a fila de agendamento'}
             </div>
           </div>
         ) : (

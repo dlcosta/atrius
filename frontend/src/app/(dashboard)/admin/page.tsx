@@ -2,12 +2,13 @@
 import { apiUrl } from '@/lib/api'
 
 import { useEffect, useState, useCallback } from 'react'
-import { Boxes, Cog, Package2, Sparkles, Users2, Waypoints, Waves } from 'lucide-react'
-import type { Produto, Maquina, Operador, Tanque } from '@/types'
+import { Boxes, Clock, Cog, Package2, Sparkles, Users2, Waypoints, Waves } from 'lucide-react'
+import type { Produto, Maquina, Operador, Tanque, Turno } from '@/types'
 import { ProdutoList } from '@/components/admin/ProdutoList'
 import { MaquinaList } from '@/components/admin/MaquinaList'
 import { OperadorList } from '@/components/admin/OperadorList'
 import { TanqueList } from '@/components/admin/TanqueList'
+import { TurnoList } from '@/components/admin/TurnoList'
 
 function SummaryCard({
   label,
@@ -50,36 +51,41 @@ export default function AdminPage() {
   const [maquinas, setMaquinas] = useState<Maquina[]>([])
   const [tanques, setTanques] = useState<Tanque[]>([])
   const [operadores, setOperadores] = useState<Operador[]>([])
+  const [turnos, setTurnos] = useState<Turno[]>([])
   const [erroCarga, setErroCarga] = useState<string | null>(null)
 
   const carregar = useCallback(async () => {
     setErroCarga(null)
 
     try {
-      const [pRes, mRes, tRes, oRes] = await Promise.all([
+      const [pRes, mRes, tRes, oRes, turRes] = await Promise.all([
         fetch(apiUrl('/api/produtos')),
         fetch(apiUrl('/api/maquinas')),
         fetch(apiUrl('/api/tanques')),
         fetch(apiUrl('/api/operadores')),
+        fetch(apiUrl('/api/turnos')),
       ])
 
-      const [p, m, t, o] = await Promise.all([pRes.json(), mRes.json(), tRes.json(), oRes.json()])
+      const [p, m, t, o, tur] = await Promise.all([pRes.json(), mRes.json(), tRes.json(), oRes.json(), turRes.json()])
 
       if (!pRes.ok) throw new Error(p?.error ?? 'Erro ao carregar produtos')
       if (!mRes.ok) throw new Error(m?.error ?? 'Erro ao carregar máquinas')
       if (!tRes.ok) throw new Error(t?.error ?? 'Erro ao carregar tanques')
       if (!oRes.ok) throw new Error(o?.error ?? 'Erro ao carregar operadores')
+      if (!turRes.ok) throw new Error(tur?.error ?? 'Erro ao carregar turnos')
 
       setProdutos(Array.isArray(p) ? p : [])
       setMaquinas(Array.isArray(m) ? m : [])
       setTanques(Array.isArray(t) ? t : [])
       setOperadores(Array.isArray(o) ? o : [])
+      setTurnos(Array.isArray(tur) ? tur : [])
     } catch (error) {
       setErroCarga(error instanceof Error ? error.message : 'Erro ao carregar cadastros')
       setProdutos([])
       setMaquinas([])
       setTanques([])
       setOperadores([])
+      setTurnos([])
     }
   }, [])
 
@@ -90,6 +96,7 @@ export default function AdminPage() {
   const maquinasAtivas = maquinas.filter((maquina) => maquina.ativa).length
   const tanquesAtivos = tanques.filter((tanque) => tanque.ativo).length
   const operadoresAtivos = operadores.filter((operador) => operador.ativo).length
+  const turnosAtivos = turnos.filter((t) => t.ativo).length
 
   return (
     <div className="flex h-full flex-col overflow-auto bg-[#F7F8FA]">
@@ -120,7 +127,10 @@ export default function AdminPage() {
                   3. Operadores
                 </span>
                 <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600">
-                  4. Produtos
+                  4. Turnos
+                </span>
+                <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600">
+                  5. Produtos
                 </span>
               </div>
             </div>
@@ -182,11 +192,18 @@ export default function AdminPage() {
             tone="amber"
           />
           <SummaryCard
+            label="Turnos"
+            value={turnos.length}
+            hint={`${turnosAtivos} ativos no calendário e painel operacional`}
+            icon={Clock}
+            tone="emerald"
+          />
+          <SummaryCard
             label="Produtos"
             value={produtos.length}
             hint="Base local de SKUs, nomes e cores"
             icon={Package2}
-            tone="emerald"
+            tone="blue"
           />
         </section>
 
@@ -251,6 +268,24 @@ export default function AdminPage() {
             <div>
               <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
                 Etapa 4
+              </div>
+              <h2 className="mt-1 text-xl font-semibold text-slate-950">Turnos de produção</h2>
+              <p className="mt-1 text-sm text-slate-500">
+                Configure os turnos que definem a grade horária do calendário e do painel operacional.
+              </p>
+            </div>
+            <div className="rounded-2xl bg-slate-100 p-3 text-slate-600">
+              <Clock size={18} />
+            </div>
+          </div>
+          <TurnoList turnos={turnos} onAtualizado={carregar} />
+        </section>
+
+        <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="mb-5 flex items-start justify-between gap-4">
+            <div>
+              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                Etapa 5
               </div>
               <h2 className="mt-1 text-xl font-semibold text-slate-950">Biblioteca de produtos</h2>
               <p className="mt-1 text-sm text-slate-500">

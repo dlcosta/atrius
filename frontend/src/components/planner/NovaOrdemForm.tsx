@@ -4,6 +4,7 @@ import { apiUrl } from '@/lib/api'
 import { useEffect, useMemo, useState } from 'react'
 import { format } from 'date-fns'
 import type { Maquina, Produto, Tanque } from '@/types'
+import { toast } from '@/lib/ui/toast'
 import {
   CalcMode,
   calculateEstimatedBoxes,
@@ -13,6 +14,7 @@ import {
   calculateTotalDuration,
   VOLUME_BALANCE_TOLERANCE_LITERS,
 } from '@/lib/planning/production'
+import { validateScheduleStart } from '@/lib/planning/schedule'
 
 type Props = {
   produtos: Produto[]
@@ -48,7 +50,6 @@ export function NovaOrdemForm({ produtos, dataInicial, onSalvo, onFechar }: Prop
   const [estimatedBoxesInput, setEstimatedBoxesInput] = useState('190')
   const [setupTimeMinutes, setSetupTimeMinutes] = useState('10')
   const [productionTimeMinutes, setProductionTimeMinutes] = useState('60')
-  const [cleaningTimeMinutes, setCleaningTimeMinutes] = useState('20')
   const [lote, setLote] = useState('')
   const [notes, setNotes] = useState('')
   const [tankId, setTankId] = useState('')
@@ -60,7 +61,6 @@ export function NovaOrdemForm({ produtos, dataInicial, onSalvo, onFechar }: Prop
   const [dataProducao, setDataProducao] = useState(format(dataInicial, 'yyyy-MM-dd'))
   const [usarHoraInicio, setUsarHoraInicio] = useState(false)
   const [horaInicio, setHoraInicio] = useState('07:30')
-  const [erro, setErro] = useState('')
   const [salvando, setSalvando] = useState(false)
 
   useEffect(() => {
@@ -108,9 +108,9 @@ export function NovaOrdemForm({ produtos, dataInicial, onSalvo, onFechar }: Prop
     return calculateTotalDuration({
       setupTimeMinutes: Number(setupTimeMinutes || 0),
       productionTimeMinutes: Number(productionTimeMinutes || 0),
-      cleaningTimeMinutes: Number(cleaningTimeMinutes || 0),
+      cleaningTimeMinutes: 0,
     })
-  }, [setupTimeMinutes, productionTimeMinutes, cleaningTimeMinutes])
+  }, [setupTimeMinutes, productionTimeMinutes])
 
   const boxVolumeLiters = useMemo(() => {
     return Number(packageVolumeLiters || 0) * Number(unitsPerBox || 0)
@@ -211,10 +211,16 @@ export function NovaOrdemForm({ produtos, dataInicial, onSalvo, onFechar }: Prop
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    setErro('')
+    const startAt = usarHoraInicio ? new Date(`${dataProducao}T${horaInicio}:00`) : null
+    const startAtError = startAt ? validateScheduleStart(startAt) : null
+    if (startAtError) {
+      toast.error(startAtError)
+      return
+    }
+
     setSalvando(true)
 
-    const startAtIso = usarHoraInicio ? new Date(`${dataProducao}T${horaInicio}:00`).toISOString() : null
+    const startAtIso = startAt?.toISOString() ?? null
     const selectedTank = tanques.find((item) => item.id === tankId)
 
     try {
@@ -232,7 +238,7 @@ export function NovaOrdemForm({ produtos, dataInicial, onSalvo, onFechar }: Prop
         origin_tank_order_id: etapa === 'envase' ? originTankOrderId || null : null,
         setup_time_minutes: Number(setupTimeMinutes),
         production_time_minutes: Number(productionTimeMinutes),
-        cleaning_time_minutes: Number(cleaningTimeMinutes),
+        cleaning_time_minutes: 0,
         package_volume_liters: etapa === 'envase' ? Number(packageVolumeLiters || 0) || null : null,
         units_per_box: etapa === 'envase' ? Number(unitsPerBox || 0) || 1 : 1,
         inicio_agendado: startAtIso,
@@ -250,12 +256,12 @@ export function NovaOrdemForm({ produtos, dataInicial, onSalvo, onFechar }: Prop
 
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
-        setErro(data.error ?? 'Erro ao criar ordem')
+        toast.error(data.error ?? 'Erro ao criar ordem')
       } else {
         onSalvo()
       }
     } catch {
-      setErro('Erro de rede')
+      toast.error('Erro de rede')
     }
 
     setSalvando(false)
@@ -376,7 +382,7 @@ export function NovaOrdemForm({ produtos, dataInicial, onSalvo, onFechar }: Prop
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
             <div>
               <label className="mb-1 block text-sm font-medium text-[#4B5563]">Litros</label>
               <input
@@ -391,16 +397,12 @@ export function NovaOrdemForm({ produtos, dataInicial, onSalvo, onFechar }: Prop
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-[#4B5563]">Setup (min)</label>
+              <label className="mb-1 block text-sm font-medium text-[#4B5563]">Preparação (min)</label>
               <input type="number" min={0} required value={setupTimeMinutes} onChange={(e) => setSetupTimeMinutes(e.target.value)} className="w-full rounded-[8px] border border-[#E4E7EC] bg-white px-3 py-2 text-sm text-[#111827]" />
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-[#4B5563]">Produção (min)</label>
               <input type="number" min={1} required value={productionTimeMinutes} onChange={(e) => setProductionTimeMinutes(e.target.value)} className="w-full rounded-[8px] border border-[#E4E7EC] bg-white px-3 py-2 text-sm text-[#111827]" />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-[#4B5563]">Limpeza (min)</label>
-              <input type="number" min={0} required value={cleaningTimeMinutes} onChange={(e) => setCleaningTimeMinutes(e.target.value)} className="w-full rounded-[8px] border border-[#E4E7EC] bg-white px-3 py-2 text-sm text-[#111827]" />
             </div>
           </div>
 
@@ -480,7 +482,7 @@ export function NovaOrdemForm({ produtos, dataInicial, onSalvo, onFechar }: Prop
           <div className="rounded-[8px] border border-[#E4E7EC] bg-[#F7F8FA] p-3">
             <label className="flex items-center gap-2 text-sm font-medium text-[#4B5563]">
               <input type="checkbox" checked={usarHoraInicio} onChange={(e) => setUsarHoraInicio(e.target.checked)} />
-              Informar hora de início no cadastro (se desmarcado, vai para backlog com data)
+              Informar hora de início no cadastro (se desmarcado, fica para agendar)
             </label>
             {usarHoraInicio && (
               <div className="mt-3">
@@ -525,8 +527,6 @@ export function NovaOrdemForm({ produtos, dataInicial, onSalvo, onFechar }: Prop
               )}
             </div>
           )}
-
-          {erro && <p className="text-sm font-medium text-[#DC2626]">{erro}</p>}
 
           <div className="flex justify-end gap-3 pt-2">
             <button type="button" onClick={onFechar} className="rounded-[8px] border border-[#CDD2DA] bg-white px-4 py-2 text-sm font-medium text-[#4B5563] hover:bg-[#F7F8FA]">

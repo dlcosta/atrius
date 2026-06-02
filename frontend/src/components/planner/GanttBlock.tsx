@@ -26,14 +26,14 @@ const TIPO_CONFIG = {
     stripedBg: false,
   },
   setup: {
-    label: 'Setup',
+    label: 'Preparação',
     textClass: 'text-slate-700',
     borderClass: 'border-slate-400/40',
     badgeClass: 'bg-white/40 text-slate-700',
     stripedBg: true,
   },
   limpeza: {
-    label: 'Limpeza',
+    label: 'Preparação',
     textClass: 'text-amber-900',
     borderClass: 'border-amber-600',
     badgeClass: 'bg-amber-100 text-amber-800',

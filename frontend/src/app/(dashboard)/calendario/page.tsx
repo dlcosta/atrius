@@ -36,6 +36,7 @@ import { CadastroRapidoForm } from '@/components/calendario/CadastroRapidoForm'
 import type { Maquina, Ordem, Produto, Tanque, Turno } from '@/types'
 import type { OrdemBacklogItem } from '@/app/api/backlog/route'
 import type { OrdemBacklogEnvaseItem } from '@/app/api/backlog/envase/route'
+import { toast } from '@/lib/ui/toast'
 import { BacklogTanques } from '@/components/calendario/BacklogTanques'
 import { BacklogEnvase } from '@/components/calendario/BacklogEnvase'
 import { NovaOrdemForm } from '@/components/planner/NovaOrdemForm'
@@ -47,6 +48,7 @@ import {
   formatarHora,
   sanitizarJanelaProducao,
 } from '@/lib/planning/gantt-layout'
+import { validateScheduleStart } from '@/lib/planning/schedule'
 
 type ViewMode = 'semana' | 'dia'
 type DragPayload =
@@ -71,7 +73,7 @@ const JANELA_STORAGE_KEY = 'atrius:planner:janela-producao'
 const SNAP_OPTIONS = [5, 15, 30, 60]
 const ZOOM_OPTIONS = [
   { id: 'compacto', label: 'Compacto', pxPerMinuteDay: 2.1, pxPerMinuteWeek: 0.42 },
-  { id: 'medio', label: 'Medio', pxPerMinuteDay: 3, pxPerMinuteWeek: 0.6 },
+  { id: 'medio', label: 'Médio', pxPerMinuteDay: 3, pxPerMinuteWeek: 0.6 },
   { id: 'amplo', label: 'Amplo', pxPerMinuteDay: 4.2, pxPerMinuteWeek: 0.84 },
 ]
 
@@ -362,7 +364,7 @@ function MachineRow({
         className={`sticky left-0 z-20 flex ${focusMode ? 'w-64' : 'w-52'} shrink-0 flex-col justify-center border-r px-4 text-left transition-colors ${
           selected ? 'border-blue-200 bg-blue-50' : 'border-slate-200 bg-slate-50 hover:bg-slate-100'
         }`}
-        title="Expandir configuracao da maquina"
+        title="Expandir configuração da máquina"
       >
         <div className="flex items-center justify-between gap-2">
           <div className="min-w-0">
@@ -554,12 +556,12 @@ function ScheduledEvent({
         width,
         background: `linear-gradient(90deg, ${color} 0 5px, white 5px)`,
       }}
-      title={`${ordemLabel(ordem)}\n${formatarHora(inicio)} - ${formatarHora(fim)}\nArraste para mover. Puxe as bordas para ajustar inicio/fim.`}
+      title={`${ordemLabel(ordem)}\n${formatarHora(inicio)} - ${formatarHora(fim)}\nArraste para mover. Puxe as bordas para ajustar início/fim.`}
     >
       <div
         className="absolute inset-y-0 left-0 z-10 w-2 cursor-ew-resize rounded-l-md bg-blue-500/0 transition group-hover:bg-blue-500/25"
         onPointerDown={(e) => handlePointerDown(e, 'resize-start')}
-        title="Ajustar inicio"
+        title="Ajustar início"
       />
       <div
         className="absolute inset-y-0 right-0 z-10 w-2 cursor-ew-resize rounded-r-md bg-blue-500/0 transition group-hover:bg-blue-500/25"
@@ -841,7 +843,7 @@ function MachineCalendarBoard({
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="rounded-[12px] border border-dashed border-[#E4E7EC] bg-white/90 px-8 py-6 text-center shadow-sm">
                 <CalendarClock size={20} className="mx-auto mb-2 text-[#CDD2DA]" />
-                <div className="text-[13px] font-medium text-[#9CA3AF]">Arraste uma ordem do backlog</div>
+                <div className="text-[13px] font-medium text-[#9CA3AF]">Arraste uma ordem da fila Para agendar</div>
                 <div className="text-[11px] text-[#CDD2DA]">para montar a agenda deste recurso</div>
               </div>
             </div>
@@ -1126,7 +1128,7 @@ function OrderConfigModal({
   ordem: Ordem
   maquinas: Maquina[]
   onClose: () => void
-  onSave: (ordem: Ordem, setupMin: number, producaoMin: number, limpezaMin: number) => Promise<void>
+  onSave: (ordem: Ordem, preparacaoMin: number, producaoMin: number) => Promise<void>
 }) {
   const produto = ordem.produto
   const maquinaId = ordem.maquina_id ?? maquinas.find((maquina) => maquina.ativa)?.id ?? ''
@@ -1135,10 +1137,10 @@ function OrderConfigModal({
   const inicio = ordem.inicio_agendado ? new Date(ordem.inicio_agendado) : null
   const fim = ordem.fim_calculado ? new Date(ordem.fim_calculado) : null
   const duracaoAtual = inicio && fim ? Math.max(0, (fim.getTime() - inicio.getTime()) / 60000) : 0
-  const producaoInicial = ordem.duracao_planejada_min ?? (duracaoAtual > 0 ? Math.max(1, duracaoAtual - Number(tempos.setup ?? 0)) : Number(tempos.producao ?? 60))
-  const [setupMin, setSetupMin] = useState(String(Number(tempos.setup ?? 0)))
+  const preparacaoInicial = Number(tempos.setup ?? 0) + Number(produto?.tempo_limpeza_min ?? 0)
+  const producaoInicial = ordem.duracao_planejada_min ?? (duracaoAtual > 0 ? Math.max(1, duracaoAtual - preparacaoInicial) : Number(tempos.producao ?? 60))
+  const [setupMin, setSetupMin] = useState(String(preparacaoInicial))
   const [producaoMin, setProducaoMin] = useState(String(Number(producaoInicial)))
-  const [limpezaMin, setLimpezaMin] = useState(String(Number(produto?.tempo_limpeza_min ?? 0)))
   const [saving, setSaving] = useState(false)
   const [erro, setErro] = useState('')
 
@@ -1151,14 +1153,13 @@ function OrderConfigModal({
 
     const setup = Math.max(0, Number(setupMin) || 0)
     const producao = Math.max(1, Number(producaoMin) || 1)
-    const limpeza = Math.max(0, Number(limpezaMin) || 0)
 
     setSaving(true)
     try {
-      await onSave(ordem, setup, producao, limpeza)
+      await onSave(ordem, setup, producao)
       onClose()
     } catch (err) {
-      setErro(err instanceof Error ? err.message : 'Nao foi possivel salvar os tempos do pedido.')
+      setErro(err instanceof Error ? err.message : 'Não foi possível salvar os tempos do pedido.')
     } finally {
       setSaving(false)
     }
@@ -1173,7 +1174,7 @@ function OrderConfigModal({
               <div className="text-xs font-medium uppercase tracking-wide text-[#2563EB]">Configurar pedido agendado</div>
               <h2 className="mt-1 truncate text-2xl font-semibold text-[#111827]">{ordemLabel(ordem)}</h2>
               <p className="mt-1 text-sm text-[#9CA3AF]">
-                #{ordem.numero_externo} - {maquina?.nome ?? 'Sem maquina'} - {ordem.quantidade} {ordem.unidade}
+                #{ordem.numero_externo} - {maquina?.nome ?? 'Sem máquina'} - {ordem.quantidade} {ordem.unidade}
               </p>
             </div>
             <button
@@ -1190,11 +1191,11 @@ function OrderConfigModal({
         <div className="min-h-0 overflow-y-auto p-6">
           <div className="grid gap-4 md:grid-cols-3">
             <div className="rounded-[8px] border border-[#E4E7EC] bg-[#F7F8FA] p-4">
-              <div className="text-xs font-medium uppercase tracking-wide text-[#9CA3AF]">Horario atual</div>
+              <div className="text-xs font-medium uppercase tracking-wide text-[#9CA3AF]">Horário atual</div>
               <div className="mt-2 font-mono text-lg font-semibold text-[#111827]">
-                {inicio && fim ? `${formatarHora(inicio)} - ${formatarHora(fim)}` : 'Sem horario'}
+                {inicio && fim ? `${formatarHora(inicio)} - ${formatarHora(fim)}` : 'Sem horário'}
               </div>
-              <div className="mt-1 text-sm text-[#9CA3AF]">{duracaoAtual ? formatarDuracao(duracaoAtual) : 'Nao calculado'}</div>
+              <div className="mt-1 text-sm text-[#9CA3AF]">{duracaoAtual ? formatarDuracao(duracaoAtual) : 'Não calculado'}</div>
             </div>
             <div className="rounded-[8px] border border-[#E4E7EC] bg-[#F7F8FA] p-4">
               <div className="text-xs font-medium uppercase tracking-wide text-[#9CA3AF]">Produto</div>
@@ -1208,9 +1209,9 @@ function OrderConfigModal({
             </div>
           </div>
 
-          <div className="mt-5 grid gap-4 md:grid-cols-3">
+          <div className="mt-5 grid gap-4 md:grid-cols-2">
             <label className="block rounded-[8px] border border-[#E4E7EC] p-4">
-              <span className="text-xs font-medium uppercase tracking-wide text-[#9CA3AF]">Setup</span>
+              <span className="text-xs font-medium uppercase tracking-wide text-[#9CA3AF]">Preparação</span>
               <input
                 type="number"
                 min="0"
@@ -1218,10 +1219,10 @@ function OrderConfigModal({
                 onChange={(e) => setSetupMin(e.target.value)}
                 className="mt-2 h-11 w-full rounded-[8px] border border-[#E4E7EC] px-3 font-mono text-lg font-semibold text-[#111827] outline-none focus:border-[#2563EB]"
               />
-              <span className="mt-1 block text-xs text-[#9CA3AF]">minutos antes da producao</span>
+              <span className="mt-1 block text-xs text-[#9CA3AF]">inclui setup, ajustes e limpeza</span>
             </label>
             <label className="block rounded-[8px] border border-[#E4E7EC] p-4">
-              <span className="text-xs font-medium uppercase tracking-wide text-[#9CA3AF]">Tempo de producao</span>
+              <span className="text-xs font-medium uppercase tracking-wide text-[#9CA3AF]">Tempo de produção</span>
               <input
                 type="number"
                 min="1"
@@ -1230,17 +1231,6 @@ function OrderConfigModal({
                 className="mt-2 h-11 w-full rounded-[8px] border border-[#E4E7EC] px-3 font-mono text-lg font-semibold text-[#111827] outline-none focus:border-[#2563EB]"
               />
               <span className="mt-1 block text-xs text-[#9CA3AF]">minutos totais desta ordem</span>
-            </label>
-            <label className="block rounded-[8px] border border-[#E4E7EC] p-4">
-              <span className="text-xs font-medium uppercase tracking-wide text-[#9CA3AF]">Tempo de limpeza</span>
-              <input
-                type="number"
-                min="0"
-                value={limpezaMin}
-                onChange={(e) => setLimpezaMin(e.target.value)}
-                className="mt-2 h-11 w-full rounded-[8px] border border-[#E4E7EC] px-3 font-mono text-lg font-semibold text-[#111827] outline-none focus:border-[#2563EB]"
-              />
-              <span className="mt-1 block text-xs text-[#9CA3AF]">minutos apos producao</span>
             </label>
           </div>
 
@@ -1326,7 +1316,7 @@ function ConflictModal({
         <div className="border-b border-[#E4E7EC] px-5 py-4">
           <h2 className="text-lg font-semibold text-[#111827]">Resolver conflito de agenda</h2>
           <p className="mt-1 text-sm text-[#9CA3AF]">
-            Ajuste os horarios antes de salvar. A agenda so aceita a mudanca quando nao houver sobreposicao.
+            Ajuste os horários antes de salvar. A agenda só aceita a mudança quando não houver sobreposição.
           </p>
           {pending.error && <p className="mt-2 rounded-[8px] bg-red-50 px-3 py-2 text-sm text-[#DC2626]">{pending.error}</p>}
         </div>
@@ -1544,12 +1534,12 @@ function MachineInspector({
         <div className="border-b border-slate-200 p-3">
           <div className="mb-2 flex items-center gap-2 text-xs font-bold uppercase text-slate-500">
             <CalendarClock size={14} />
-            Esteira da maquina
+            Esteira da máquina
           </div>
           <div className="space-y-2">
             {agenda.length === 0 ? (
               <div className="rounded-md border border-dashed border-slate-300 p-5 text-center text-xs text-slate-400">
-                Nenhum produto agendado para esta maquina na janela atual.
+                Nenhum produto agendado para esta máquina na janela atual.
               </div>
             ) : (
               agenda.map((ordem) => {
@@ -1570,7 +1560,7 @@ function MachineInspector({
                       <div className="min-w-0 flex-1">
                         <div className="truncate text-sm font-bold text-slate-900">{ordemLabel(ordem)}</div>
                         <div className="mt-0.5 text-[11px] text-slate-500">
-                          {inicio ? `${format(inicio, 'dd/MM')} as ${formatarHora(inicio)}` : 'Sem horario'} · #{ordem.numero_externo}
+                          {inicio ? `${format(inicio, 'dd/MM')} as ${formatarHora(inicio)}` : 'Sem horário'} · #{ordem.numero_externo}
                         </div>
                       </div>
                       <span className="rounded bg-white px-1.5 py-0.5 text-[10px] font-semibold text-slate-600">
@@ -1606,8 +1596,8 @@ function MachineInspector({
               </div>
 
               <ScheduleEditor
-                title="Reprogramacao"
-                label="Ajuste maquina, data e inicio"
+                title="Reprogramação"
+                label="Ajuste máquina, data e início"
                 maquinas={maquinas}
                 machine={machine}
                 date={date}
@@ -1672,6 +1662,7 @@ type TanqueOrdemDetail = {
   unidade: string
   data_prevista: string | null
   planning_status: string
+  setup_time_minutes: number | null
   production_time_minutes: number | null
   cleaning_time_minutes: number | null
   total_duration_minutes: number | null
@@ -1883,7 +1874,7 @@ function TanqueDetailModal({
   const totalUnidadesPedidos = pedidos.reduce((acc, p) => acc + Number(p.quantidade ?? 0), 0)
 
   const STATUS_MAP: Record<string, { label: string; dot: string; bg: string; text: string }> = {
-    BACKLOG:       { label: 'Backlog',      dot: '#9CA3AF', bg: '#F0F2F5', text: '#4B5563' },
+    BACKLOG:       { label: 'Para agendar', dot: '#9CA3AF', bg: '#F0F2F5', text: '#4B5563' },
     SCHEDULED:     { label: 'Agendado',     dot: '#2563EB', bg: '#EFF6FF', text: '#2563EB' },
     IN_PRODUCTION: { label: 'Em Produção',  dot: '#16A34A', bg: '#F0FDF4', text: '#16A34A' },
     COMPLETED:     { label: 'Concluído',    dot: '#15803D', bg: '#DCFCE7', text: '#15803D' },
@@ -1893,14 +1884,15 @@ function TanqueDetailModal({
     label: ordem?.planning_status ?? '—', dot: '#9CA3AF', bg: '#F0F2F5', text: '#4B5563'
   }
 
-  const duracaoSoma = (ordem?.production_time_minutes ?? 0) + (ordem?.cleaning_time_minutes ?? 0)
+  const preparacaoMin = Number(ordem?.setup_time_minutes ?? 0) + Number(ordem?.cleaning_time_minutes ?? 0)
+  const duracaoSoma = preparacaoMin + (ordem?.production_time_minutes ?? 0)
   const duracaoTotal = (ordem?.total_duration_minutes ?? duracaoSoma) || null
 
+  const preparacaoPct = duracaoTotal && preparacaoMin
+    ? Math.round((preparacaoMin / duracaoTotal) * 100)
+    : null
   const producaoPct = duracaoTotal && ordem?.production_time_minutes
     ? Math.round((ordem.production_time_minutes / duracaoTotal) * 100)
-    : null
-  const limpezaPct = duracaoTotal && ordem?.cleaning_time_minutes
-    ? Math.round((ordem.cleaning_time_minutes / duracaoTotal) * 100)
     : null
 
   return (
@@ -2020,18 +2012,29 @@ function TanqueDetailModal({
                   </div>
 
                   {/* Barra de progresso dos tempos */}
-                  {producaoPct !== null && (
+                  {(preparacaoPct !== null || producaoPct !== null) && (
                     <div className="mb-3 overflow-hidden rounded-full bg-[#F0F2F5]" style={{ height: 6 }}>
                       <div className="flex h-full">
-                        <div className="bg-[#2563EB]" style={{ width: `${producaoPct}%` }} />
-                        {limpezaPct !== null && (
-                          <div className="bg-[#93C5FD]" style={{ width: `${limpezaPct}%` }} />
+                        {preparacaoPct !== null && (
+                          <div className="bg-[#93C5FD]" style={{ width: `${preparacaoPct}%` }} />
+                        )}
+                        {producaoPct !== null && (
+                          <div className="bg-[#2563EB]" style={{ width: `${producaoPct}%` }} />
                         )}
                       </div>
                     </div>
                   )}
 
                   <div className="grid grid-cols-3 gap-2">
+                    {preparacaoMin > 0 && (
+                      <div className="rounded-[8px] bg-[#F0F2F5] p-3 text-center">
+                        <div className="text-[9px] font-bold uppercase tracking-wider text-[#9CA3AF]">Preparo</div>
+                        <div className="mt-1 font-mono text-[16px] font-bold text-[#4B5563]">
+                          {preparacaoMin}
+                        </div>
+                        <div className="text-[10px] text-[#9CA3AF]">min</div>
+                      </div>
+                    )}
                     {ordem.production_time_minutes != null && (
                       <div className="rounded-[8px] bg-[#EFF6FF] p-3 text-center">
                         <div className="text-[9px] font-bold uppercase tracking-wider text-[#93C5FD]">Produção</div>
@@ -2039,15 +2042,6 @@ function TanqueDetailModal({
                           {ordem.production_time_minutes}
                         </div>
                         <div className="text-[10px] text-[#93C5FD]">min</div>
-                      </div>
-                    )}
-                    {ordem.cleaning_time_minutes != null && (
-                      <div className="rounded-[8px] bg-[#F0F2F5] p-3 text-center">
-                        <div className="text-[9px] font-bold uppercase tracking-wider text-[#9CA3AF]">Limpeza</div>
-                        <div className="mt-1 font-mono text-[16px] font-bold text-[#4B5563]">
-                          {ordem.cleaning_time_minutes}
-                        </div>
-                        <div className="text-[10px] text-[#9CA3AF]">min</div>
                       </div>
                     )}
                     <div className="rounded-[8px] bg-[#111827] p-3 text-center">
@@ -2158,7 +2152,6 @@ export default function CalendarioPage() {
   const [ordensBacklogEnvase, setOrdensBacklogEnvase] = useState<OrdemBacklogEnvaseItem[]>([])
   const [backlogLoading, setBacklogLoading] = useState(false)
   const [backlogEnvaseLoading, setBacklogEnvaseLoading] = useState(false)
-  const [mensagem, setMensagem] = useState('')
   const [novaOrdemAberta, setNovaOrdemAberta] = useState(false)
   const [janela, setJanela] = useState<JanelaProducao>(DEFAULT_JANELA_PRODUCAO)
   const [zoomIndex, setZoomIndex] = useState(1)
@@ -2172,6 +2165,7 @@ export default function CalendarioPage() {
   const [selectedMachineId, setSelectedMachineId] = useState<string | null>(null)
   const [sidebarMode, setSidebarMode] = useState<'backlog' | 'form'>('backlog')
   const rowRefs = useRef<Record<string, HTMLDivElement | null>>({})
+  const janelaManualRef = useRef(false)
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }))
   const range = useMemo(() => getInicioFimVisivel(diaBase, viewMode), [diaBase, viewMode])
@@ -2207,7 +2201,6 @@ export default function CalendarioPage() {
 
   const carregarDados = useCallback(async () => {
     try {
-      setMensagem('')
       const [m, tn, tu, o, p] = await Promise.all([
         fetch(apiUrl('/api/maquinas')).then((r) => r.json()),
         fetch(apiUrl('/api/tanques')).then((r) => r.json()),
@@ -2222,9 +2215,9 @@ export default function CalendarioPage() {
       setOrdens(Array.isArray(o) ? o : [])
       setProdutos(Array.isArray(p) ? p : [])
 
-      if (o?.error) setMensagem(o.error)
+      if (o?.error) toast.error(o.error)
     } catch {
-      setMensagem('Erro ao carregar calendario de producao.')
+      toast.error('Erro ao carregar calendário de produção.')
     }
   }, [inicioYmd, fimYmd])
 
@@ -2247,12 +2240,25 @@ export default function CalendarioPage() {
       const savedTab = localStorage.getItem(TAB_STORAGE_KEY)
       if (savedTab === 'tanque' || savedTab === 'envase') setResourceTab(savedTab)
 
-      const salvo = localStorage.getItem(JANELA_STORAGE_KEY)
-      if (salvo) setJanela(sanitizarJanelaProducao(JSON.parse(salvo)))
+      // Janela nao e mais lida do localStorage — e derivada dos turnos cadastrados.
+      // O override manual do usuario dura apenas a sessao corrente.
     } catch {
       // Mantem padroes quando armazenamento local estiver indisponivel.
     }
   }, [])
+
+  // Quando os turnos carregam, derivar a janela de visualizacao a partir do menor inicio
+  // e maior fim dos turnos ativos — a menos que o usuario tenha ajustado manualmente nesta sessao.
+  useEffect(() => {
+    if (janelaManualRef.current) return
+    const ativos = turnos.filter((t) => t.ativo)
+    if (ativos.length === 0) return
+    const minInicio = Math.min(...ativos.map((t) => t.hora_inicio))
+    const maxFim = Math.max(...ativos.map((t) => t.hora_fim))
+    const startHour = Math.floor(minInicio / 60)
+    const endHour = Math.ceil(maxFim / 60)
+    setJanela((prev) => sanitizarJanelaProducao({ ...prev, startHour, endHour }))
+  }, [turnos])
 
   useEffect(() => {
     localStorage.setItem(VIEW_STORAGE_KEY, viewMode)
@@ -2266,9 +2272,11 @@ export default function CalendarioPage() {
     localStorage.setItem(TAB_STORAGE_KEY, resourceTab)
   }, [resourceTab])
 
+  // Janela nao e persistida no localStorage — os turnos cadastrados sao a fonte da verdade.
+  // Remover qualquer valor antigo que possa estar guardado para evitar estado podre.
   useEffect(() => {
-    localStorage.setItem(JANELA_STORAGE_KEY, JSON.stringify(janela))
-  }, [janela])
+    localStorage.removeItem(JANELA_STORAGE_KEY)
+  }, [])
 
   const maquinasAtivas = useMemo(() => maquinas.filter((m) => m.ativa), [maquinas])
   const tanquesAtivos = useMemo(() => tanques.filter((t) => t.ativo), [tanques])
@@ -2335,6 +2343,11 @@ export default function CalendarioPage() {
     inicio: Date | null,
     fim?: Date | null
   ): Promise<{ ok: boolean; status: number; error?: string }> {
+    if (inicio) {
+      const erroAgenda = validateScheduleStart(inicio)
+      if (erroAgenda) return { ok: false, status: 422, error: erroAgenda }
+    }
+
     const res = await fetch(apiUrl('/api/ordens'), {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -2342,13 +2355,14 @@ export default function CalendarioPage() {
         id: ordemId,
         maquina_id: resourceTab === 'envase' ? maquinaId : null,
         tank_id: resourceTab === 'tanque' ? maquinaId : undefined,
+        tanque: resourceTab === 'tanque' ? (tanques.find((t) => t.id === maquinaId)?.nome ?? undefined) : undefined,
         planning_status: inicio ? 'SCHEDULED' : 'BACKLOG',
         inicio_agendado: inicio?.toISOString() ?? null,
         ...(fim ? { fim_calculado: fim.toISOString() } : {}),
       }),
     })
     const data = await res.json().catch(() => ({}))
-    if (!res.ok) return { ok: false, status: res.status, error: data.error ?? 'Nao foi possivel salvar a agenda.' }
+    if (!res.ok) return { ok: false, status: res.status, error: data.error ?? 'Não foi possível salvar a agenda.' }
     return { ok: true, status: res.status }
   }
 
@@ -2360,12 +2374,12 @@ export default function CalendarioPage() {
     }
 
     if (result.status !== 409) {
-      setMensagem(result.error ?? 'Nao foi possivel salvar a agenda.')
+      toast.error(result.error ?? 'Não foi possível salvar a agenda.')
       return
     }
 
     if (resourceTab === 'tanque') {
-      setMensagem(result.error ?? 'Conflito no tanque selecionado.')
+      toast.warning(result.error ?? 'Conflito no tanque selecionado.')
       return
     }
 
@@ -2455,17 +2469,17 @@ export default function CalendarioPage() {
     await carregarTudo()
   }
 
-  async function salvarConfiguracaoPedido(ordem: Ordem, setupMin: number, producaoMin: number, limpezaMin: number) {
+  async function salvarConfiguracaoPedido(ordem: Ordem, preparacaoMin: number, producaoMin: number) {
     if (!ordem.produto?.id) throw new Error('Pedido sem produto vinculado para configurar tempos.')
     const maquinaId = ordem.maquina_id ?? selectedMachineId
-    if (!maquinaId) throw new Error('Selecione uma maquina para configurar o tempo de producao.')
+    if (!maquinaId) throw new Error('Selecione uma máquina para configurar o tempo de produção.')
 
     const produtoAtualizado: Produto = {
       ...ordem.produto,
-      tempo_limpeza_min: limpezaMin,
+      tempo_limpeza_min: 0,
       tempos_maquinas: {
         ...(ordem.produto.tempos_maquinas ?? {}),
-        [maquinaId]: { setup: setupMin, producao: producaoMin },
+        [maquinaId]: { setup: preparacaoMin, producao: producaoMin },
       },
     }
 
@@ -2479,18 +2493,18 @@ export default function CalendarioPage() {
       }),
     })
     const produtoData = await produtoRes.json().catch(() => ({}))
-    if (!produtoRes.ok) throw new Error(produtoData.error ?? 'Nao foi possivel salvar os tempos do produto.')
+    if (!produtoRes.ok) throw new Error(produtoData.error ?? 'Não foi possível salvar os tempos do produto.')
 
     if (ordem.inicio_agendado) {
       const inicio = new Date(ordem.inicio_agendado)
-      const duracaoPlanejada = Math.max(1, setupMin + producaoMin)
+      const duracaoPlanejada = Math.max(1, preparacaoMin + producaoMin)
       const result = await patchAgenda(
         ordem.id,
         maquinaId,
         inicio,
         calcularFim(inicio, duracaoPlanejada)
       )
-      if (!result.ok) throw new Error(result.error ?? 'Tempos salvos, mas nao foi possivel recalcular a agenda.')
+      if (!result.ok) throw new Error(result.error ?? 'Tempos salvos, mas não foi possível recalcular a agenda.')
     }
 
     await carregarTudo()
@@ -2502,6 +2516,12 @@ export default function CalendarioPage() {
   }
 
   async function agendarTanque(ordemId: string, tankId: string, inicio: Date) {
+    const erroAgenda = validateScheduleStart(inicio)
+    if (erroAgenda) {
+      toast.warning(erroAgenda)
+      return
+    }
+
     const ordemBacklog = ordensBacklogTanque.find((o) => o.id === ordemId)
     const duracao = ordemBacklog?.total_duration_minutes ?? 60
     const fim = calcularFim(inicio, duracao)
@@ -2527,6 +2547,7 @@ export default function CalendarioPage() {
         data_agendamento: dataAgendamento,
         inicio_agendado: inicio.toISOString(),
         fim_calculado: fim.toISOString(),
+        setup_time_minutes: ordemBacklog?.setup_time_minutes ?? null,
         production_time_minutes: producaoMin,
         cleaning_time_minutes: ordemBacklog?.cleaning_time_minutes ?? null,
       }),
@@ -2534,7 +2555,7 @@ export default function CalendarioPage() {
 
     if (!agendRes.ok) {
       const data = await agendRes.json().catch(() => ({}))
-      setMensagem(data.error ?? 'Erro ao criar agendamento no tanque.')
+      toast.error(data.error ?? 'Erro ao criar agendamento no tanque.')
       await carregarTudo()
       return
     }
@@ -2554,7 +2575,7 @@ export default function CalendarioPage() {
           const deleteRes = await fetch(apiUrl(`/api/producao/agendamentos?id=${agendamento.id}`), { method: 'DELETE' })
           if (!deleteRes.ok) {
             const data = await deleteRes.json().catch(() => ({}))
-            setMensagem(data.error ?? 'Erro ao remover agendamento do tanque.')
+            toast.error(data.error ?? 'Erro ao remover agendamento do tanque.')
             return
           }
           await fetch(apiUrl('/api/ordens'), {
@@ -2570,7 +2591,7 @@ export default function CalendarioPage() {
 
     const result = await patchAgenda(ordemId, null, null)
     if (!result.ok) {
-      setMensagem(result.error ?? 'Nao foi possivel desagendar.')
+      toast.error(result.error ?? 'Não foi possível desagendar.')
       return
     }
     await carregarTudo()
@@ -2644,7 +2665,10 @@ export default function CalendarioPage() {
               type="time"
               step={3600}
               value={horaParaInput(janela.startHour)}
-              onChange={(e) => setJanela((j) => sanitizarJanelaProducao({ ...j, startHour: inputParaHora(e.target.value, j.startHour) }))}
+              onChange={(e) => {
+                janelaManualRef.current = true
+                setJanela((j) => sanitizarJanelaProducao({ ...j, startHour: inputParaHora(e.target.value, j.startHour) }))
+              }}
               className="h-7 rounded-[6px] border-0 bg-white px-2 text-[13px] text-[#111827]"
             />
             <span className="text-[11px] text-[#9CA3AF]">até</span>
@@ -2653,6 +2677,7 @@ export default function CalendarioPage() {
               step={3600}
               value={horaParaInput(janela.endHour % 24 === 0 ? 0 : janela.endHour)}
               onChange={(e) => {
+                janelaManualRef.current = true
                 const hora = inputParaHora(e.target.value, janela.endHour)
                 setJanela((j) => sanitizarJanelaProducao({ ...j, endHour: hora === 0 ? 24 : hora }))
               }}
@@ -2690,11 +2715,6 @@ export default function CalendarioPage() {
             </div>
           </div>
         </header>
-
-        {mensagem && (
-          <div className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800">{mensagem}</div>
-        )}
-
         <main className="flex min-h-0 flex-1 gap-3 p-3">
           <aside className="flex w-80 shrink-0 flex-col overflow-hidden rounded-[12px] border border-[#E4E7EC] bg-white">
             {/* Cabeçalho da sidebar — tabs de recurso + botão nova ordem */}
@@ -2745,7 +2765,7 @@ export default function CalendarioPage() {
                 onFechar={() => setSidebarMode('backlog')}
               />
             ) : resourceTab === 'tanque' ? (
-              <BacklogTanques ordens={ordensBacklogTanque} loading={backlogLoading} />
+              <BacklogTanques ordens={ordensBacklogTanque} loading={backlogLoading} onDeletado={carregarTudo} />
             ) : (
               <BacklogEnvase ordens={ordensBacklogEnvase} loading={backlogEnvaseLoading} />
             )}
@@ -2823,7 +2843,7 @@ export default function CalendarioPage() {
                           <div className="truncate text-sm font-semibold">{resource.nome}</div>
                           <span className="rounded-full bg-[#F0F2F5] px-1.5 py-0.5 text-[10px] text-[#9CA3AF]">{agendaRecurso.length}</span>
                         </div>
-                        <div className="mt-1 text-[11px] text-[#9CA3AF]">ordens no periodo</div>
+                        <div className="mt-1 text-[11px] text-[#9CA3AF]">ordens no período</div>
                       </button>
                     )
                   })}
@@ -2936,7 +2956,7 @@ export default function CalendarioPage() {
               <div className="truncate text-sm font-bold text-slate-900">{ordemLabel(activeOrdem)}</div>
               <div className="mt-1 text-xs text-slate-500">
                 <RotateCcw size={12} className="mr-1 inline" />
-                {resourceTab === 'envase' ? 'Solte na maquina e horario desejados' : 'Solte no tanque e horario desejados'}
+                {resourceTab === 'envase' ? 'Solte na máquina e no horário desejados' : 'Solte no tanque e no horário desejados'}
               </div>
             </div>
           ) : null}

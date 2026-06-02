@@ -15,7 +15,7 @@ const STATUS_CONFIG: Record<
   { label: string; bg: string; text: string; dot: string }
 > = {
   BACKLOG: {
-    label: 'Na fila',
+    label: 'Para agendar',
     bg: 'bg-[#F0F2F5]',
     text: 'text-[#4B5563]',
     dot: 'bg-[#9CA3AF]',
@@ -27,7 +27,7 @@ const STATUS_CONFIG: Record<
     dot: 'bg-amber-500',
   },
   READY_TO_SCHEDULE: {
-    label: 'Pronto p/ agendar',
+    label: 'Para agendar',
     bg: 'bg-sky-100',
     text: 'text-sky-700',
     dot: 'bg-sky-500',
