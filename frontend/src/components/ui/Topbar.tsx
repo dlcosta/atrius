@@ -17,11 +17,11 @@ export function Topbar() {
   }
 
   return (
-    <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-[#E4E7EC] bg-white px-6">
-      <div className="flex items-center gap-4">
-        <h2 className="text-sm font-semibold text-[#111827]">{getPageTitle(pathname)}</h2>
-        <div className="h-4 w-px bg-[#E4E7EC]" />
-        <nav className="flex items-center gap-2 text-[11px] font-medium text-[#9CA3AF]">
+    <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-[#E4E7EC] bg-white px-4 sm:px-6">
+      <div className="flex min-w-0 items-center gap-4">
+        <h2 className="truncate text-sm font-semibold text-[#111827]">{getPageTitle(pathname)}</h2>
+        <div className="hidden h-4 w-px bg-[#E4E7EC] sm:block" />
+        <nav className="hidden items-center gap-2 text-[11px] font-medium text-[#9CA3AF] sm:flex">
           <span className="cursor-default">Home</span>
           <span>/</span>
           <span className="capitalize text-[#4B5563]">{pathname.replace('/', '')}</span>

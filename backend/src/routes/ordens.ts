@@ -229,13 +229,12 @@ router.get('/', async (req: Request, res: Response) => {
 
   if (inicioParam && fimParam) {
     query = query.or(
-      `and(data_prevista.gte.${inicioParam},data_prevista.lte.${fimParam}),and(inicio_agendado.gte.${inicioParam}T00:00:00.000Z,inicio_agendado.lte.${fimParam}T23:59:59.999Z),and(fim_calculado.gte.${inicioParam}T00:00:00.000Z,fim_calculado.lte.${fimParam}T23:59:59.999Z),inicio_agendado.is.null`
+      `and(data_prevista.gte.${inicioParam},data_prevista.lte.${fimParam}),and(inicio_agendado.gte.${inicioParam}T00:00:00.000Z,inicio_agendado.lte.${fimParam}T23:59:59.999Z),and(fim_calculado.gte.${inicioParam}T00:00:00.000Z,fim_calculado.lte.${fimParam}T23:59:59.999Z)`
     )
   } else if (data && !dias) {
     query = query.or(
       `data_prevista.eq.${data},` +
-      `and(inicio_agendado.gte.${data}T00:00:00.000Z,inicio_agendado.lte.${data}T23:59:59.999Z),` +
-      `inicio_agendado.is.null`
+      `and(inicio_agendado.gte.${data}T00:00:00.000Z,inicio_agendado.lte.${data}T23:59:59.999Z)`
     )
   }
 
@@ -260,15 +259,13 @@ router.get('/', async (req: Request, res: Response) => {
     const rangeFilter =
       `and(data_prevista.gte.${inicioParam},data_prevista.lte.${fimParam}),` +
       `and(inicio_agendado.gte.${inicioParam}T00:00:00.000Z,inicio_agendado.lte.${fimParam}T23:59:59.999Z),` +
-      `and(fim_calculado.gte.${inicioParam}T00:00:00.000Z,fim_calculado.lte.${fimParam}T23:59:59.999Z),` +
-      'inicio_agendado.is.null'
+      `and(fim_calculado.gte.${inicioParam}T00:00:00.000Z,fim_calculado.lte.${fimParam}T23:59:59.999Z)`
     queryTanquesNovo = queryTanquesNovo.or(rangeFilter)
     queryEnvasesNovo = queryEnvasesNovo.or(rangeFilter)
   } else if (data && !dias) {
     const sameDayFilter =
       `data_prevista.eq.${data},` +
-      `and(inicio_agendado.gte.${data}T00:00:00.000Z,inicio_agendado.lte.${data}T23:59:59.999Z),` +
-      `inicio_agendado.is.null`
+      `and(inicio_agendado.gte.${data}T00:00:00.000Z,inicio_agendado.lte.${data}T23:59:59.999Z)`
     queryTanquesNovo = queryTanquesNovo.or(sameDayFilter)
     queryEnvasesNovo = queryEnvasesNovo.or(sameDayFilter)
   }
@@ -335,6 +332,10 @@ router.get('/', async (req: Request, res: Response) => {
     })),
   ]
 
+  lista = lista.filter((ordem) => {
+    return !isCanceled(normalizarPlanningStatus(ordem.planning_status), ordem.status)
+  })
+
   if (inicioParam && fimParam) {
     const inicioMs = new Date(`${inicioParam}T00:00:00`).getTime()
     const fimDate = new Date(`${fimParam}T00:00:00`)
@@ -345,8 +346,7 @@ router.get('/', async (req: Request, res: Response) => {
       return (
         isDateOnlyInRange(ordem.data_prevista, inicioParam, fimParam) ||
         isDateInRange(ordem.inicio_agendado, inicioMs, fimMs) ||
-        isDateInRange(ordem.fim_calculado, inicioMs, fimMs) ||
-        ordem.inicio_agendado === null
+        isDateInRange(ordem.fim_calculado, inicioMs, fimMs)
       )
     })
   } else if (dias) {
