@@ -1,4 +1,5 @@
 'use client'
+
 import { apiUrl } from '@/lib/api'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -7,14 +8,21 @@ import { ptBR } from 'date-fns/locale'
 import {
   Activity,
   AlertTriangle,
+  ArrowUpRight,
+  Boxes,
   CalendarRange,
   CheckCircle2,
+  ChevronRight,
+  CircleGauge,
+  Clock3,
   Factory,
   Gauge,
+  Layers3,
+  ListChecks,
   PauseCircle,
-  PlayCircle,
   RefreshCw,
-  TimerReset,
+  TrendingUp,
+  Users,
 } from 'lucide-react'
 import type { Maquina, Ordem } from '@/types'
 import {
@@ -28,8 +36,10 @@ import {
   obterQuantidadeProduzidaEstimada,
   obterTempoProducaoMin,
   type EventoMonitoramento,
+  type MachinePerformance,
+  type OperatorPerformance,
 } from '@/lib/monitoring/indicadores'
-import { mesmoDia, pertenceAoDia } from '@/lib/planning/datas-ordem'
+import { pertenceAoDia } from '@/lib/planning/datas-ordem'
 
 const REFRESH_MS = 15000
 
@@ -54,6 +64,19 @@ type LiveResourceCard = {
   volumeHoje: number
 }
 
+type Bottleneck = {
+  id: string
+  title: string
+  detail: string
+  meta: string
+  severity: 'critical' | 'warning' | 'info'
+}
+
+function clampPercent(value: number): number {
+  if (!Number.isFinite(value)) return 0
+  return Math.min(100, Math.max(0, value))
+}
+
 function formatarNumero(valor: number, digits = 1): string {
   return new Intl.NumberFormat('pt-BR', {
     minimumFractionDigits: 0,
@@ -71,22 +94,60 @@ function formatarHora(dataIso: string | null | undefined): string {
   return format(new Date(dataIso), 'HH:mm')
 }
 
-function statusLabel(ordem: Ordem | null): string {
-  if (!ordem) return 'Sem ordem'
-  if (ordem.status === 'produzindo') return 'Em andamento'
+function statusLabel(ordem: Ordem | null, agoraMs = Date.now()): string {
+  if (!ordem) return 'Livre'
+  if (isCanceledOrder(ordem)) return 'Cancelada'
+  if (ordem.status === 'produzindo') return 'Produzindo'
   if (ordem.status === 'pausada') return 'Pausada'
-  if (ordem.status === 'concluida') return 'Concluída'
-  if (ordem.planning_status === 'WAITING_TANK') return 'Aguardando tanque'
+  if (ordem.status === 'concluida') return 'Concluida'
+  if (isExpiredUnstartedOrder(ordem, agoraMs)) return 'Vencida'
+  if (ordem.planning_status === 'BACKLOG' || ordem.planning_status === 'READY_TO_SCHEDULE') return 'Nao agendada'
+  if (ordem.planning_status === 'WAITING_TANK') return 'Aguard. tanque'
   return 'Programada'
 }
 
+function statusTone(ordem: Ordem | null): 'green' | 'amber' | 'blue' | 'slate' {
+  if (!ordem) return 'slate'
+  if (isCanceledOrder(ordem)) return 'slate'
+  if (ordem.status === 'produzindo') return 'green'
+  if (ordem.status === 'pausada' || ordem.planning_status === 'WAITING_TANK') return 'amber'
+  if (ordem.status === 'concluida') return 'slate'
+  return 'blue'
+}
+
+function isCanceledOrder(ordem: Ordem): boolean {
+  return ordem.status === 'cancelada' || ordem.planning_status === 'CANCELED'
+}
+
+function isExpiredUnstartedOrder(ordem: Ordem, agoraMs: number): boolean {
+  if (ordem.status !== 'aguardando') return false
+  if (ordem.inicio_operacao_em || ordem.fim_operacao_em) return false
+  if (!ordem.fim_calculado) return false
+  return new Date(ordem.fim_calculado).getTime() < agoraMs
+}
+
+function hasOperationalTrace(ordem: Ordem): boolean {
+  return Boolean(ordem.inicio_agendado || ordem.inicio_operacao_em || ordem.fim_operacao_em || ordem.fim_calculado)
+}
+
+function isMonitoringOrder(ordem: Ordem, agoraMs: number): boolean {
+  if (isCanceledOrder(ordem)) return false
+  if (isExpiredUnstartedOrder(ordem, agoraMs)) return false
+  if (ordem.planning_status === 'BACKLOG' || ordem.planning_status === 'READY_TO_SCHEDULE') {
+    return hasOperationalTrace(ordem)
+  }
+  return true
+}
+
 function statusClasses(ordem: Ordem | null): string {
-  if (!ordem) return 'border-slate-200 bg-slate-50 text-slate-500'
-  if (ordem.status === 'produzindo') return 'border-emerald-200 bg-emerald-50 text-emerald-700'
-  if (ordem.status === 'pausada') return 'border-amber-200 bg-amber-50 text-amber-700'
-  if (ordem.status === 'concluida') return 'border-slate-200 bg-slate-100 text-slate-600'
-  if (ordem.planning_status === 'WAITING_TANK') return 'border-orange-200 bg-orange-50 text-orange-700'
-  return 'border-blue-200 bg-blue-50 text-blue-700'
+  const tone = statusTone(ordem)
+  const map = {
+    green: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+    amber: 'border-amber-200 bg-amber-50 text-amber-700',
+    blue: 'border-blue-200 bg-blue-50 text-blue-700',
+    slate: 'border-slate-200 bg-slate-100 text-slate-600',
+  }
+  return map[tone]
 }
 
 function getResourceOrder(ordens: Ordem[], agoraMs: number) {
@@ -106,11 +167,12 @@ function getResourceOrder(ordens: Ordem[], agoraMs: number) {
   })
 
   const atual = emProducao ?? pausada ?? naFaixa ?? null
-  const proxima = ordenadas.find((ordem) => {
-    if (!ordem.inicio_agendado) return false
-    if (atual && ordem.id === atual.id) return false
-    return new Date(ordem.inicio_agendado).getTime() > agoraMs
-  }) ?? null
+  const proxima =
+    ordenadas.find((ordem) => {
+      if (!ordem.inicio_agendado) return false
+      if (atual && ordem.id === atual.id) return false
+      return new Date(ordem.inicio_agendado).getTime() > agoraMs
+    }) ?? null
 
   return { atual, proxima }
 }
@@ -120,7 +182,7 @@ function getResourceVolumeHoje(ordens: Ordem[], agoraMs: number) {
 }
 
 function getMachineName(ordem: Ordem) {
-  return ordem.maquina?.nome ?? (ordem.maquina_id ? `Máquina ${ordem.maquina_id.slice(0, 4)}` : '--')
+  return ordem.maquina?.nome ?? (ordem.maquina_id ? `Maquina ${ordem.maquina_id.slice(0, 4)}` : '--')
 }
 
 function getTankName(ordem: Ordem, index = 0) {
@@ -131,107 +193,457 @@ function getHistoryResource(ordem: Ordem) {
   return ordem.etapa === 'envase' ? getMachineName(ordem) : getTankName(ordem)
 }
 
-function KpiCard({
+function getOrderProduct(ordem: Ordem | null) {
+  if (!ordem) return '--'
+  return ordem.produto?.nome ?? ordem.produto_sku ?? '--'
+}
+
+function getResourceProgress(card: LiveResourceCard, agoraMs: number) {
+  const atual = card.atual
+  if (!atual?.inicio_operacao_em || !atual.fim_calculado) return 0
+  const inicioMs = new Date(atual.inicio_operacao_em).getTime()
+  const fimMs = new Date(atual.fim_calculado).getTime()
+  if (!Number.isFinite(inicioMs) || !Number.isFinite(fimMs) || fimMs <= inicioMs) return 0
+  return clampPercent(((agoraMs - inicioMs) / (fimMs - inicioMs)) * 100)
+}
+
+function getProductionHealth(params: {
+  onTimeRate: number
+  utilizationRate: number
+  delayCount: number
+  pauseMinutes: number
+  activeResources: number
+}) {
+  const delayPenalty = Math.min(24, params.delayCount * 7)
+  const pausePenalty = Math.min(18, params.pauseMinutes / 30)
+  const idleBonus = Math.min(8, params.activeResources * 2)
+  const score = Math.round(
+    clampPercent(params.onTimeRate * 0.45 + params.utilizationRate * 0.35 + 20 + idleBonus - delayPenalty - pausePenalty)
+  )
+
+  if (score >= 82) return { score, label: 'Operacao saudavel', tone: 'green' as const }
+  if (score >= 62) return { score, label: 'Atencao controlada', tone: 'amber' as const }
+  return { score, label: 'Risco operacional', tone: 'red' as const }
+}
+
+function buildBottlenecks(params: {
+  delayedOrders: Ordem[]
+  waitingTank: Ordem[]
+  desempenhoMaquinas: MachinePerformance[]
+  desempenhoOperadores: OperatorPerformance[]
+  pausasPeriodoMin: number
+}): Bottleneck[] {
+  const bottlenecks: Bottleneck[] = []
+  const weakMachine = params.desempenhoMaquinas.find((maquina) => maquina.totalOrders > 0 && maquina.utilizationRate < 40)
+  const highPauseMachine = params.desempenhoMaquinas.find((maquina) => maquina.pauseMinutes >= 30)
+  const operatorWithPauses = params.desempenhoOperadores.find((operador) => operador.pauseEvents > 0)
+
+  if (params.delayedOrders.length > 0) {
+    bottlenecks.push({
+      id: 'delayed',
+      title: `${params.delayedOrders.length} ordem(ns) com atraso aberto`,
+      detail: `Primeira: #${params.delayedOrders[0].numero_externo} em ${getHistoryResource(params.delayedOrders[0])}`,
+      meta: 'Fim previsto ja passou',
+      severity: 'critical',
+    })
+  }
+
+  if (params.waitingTank.length > 0) {
+    bottlenecks.push({
+      id: 'waiting-tank',
+      title: `${params.waitingTank.length} envase(s) aguardando tanque`,
+      detail: `Proxima liberacao: #${params.waitingTank[0].numero_externo}`,
+      meta: 'Dependencia entre etapas',
+      severity: 'warning',
+    })
+  }
+
+  if (highPauseMachine) {
+    bottlenecks.push({
+      id: `pause-${highPauseMachine.machineId}`,
+      title: `${highPauseMachine.machineName} concentra paradas`,
+      detail: `${formatarMinutos(highPauseMachine.pauseMinutes)} parado no periodo`,
+      meta: 'Revisar motivo das pausas',
+      severity: 'warning',
+    })
+  } else if (params.pausasPeriodoMin > 0) {
+    bottlenecks.push({
+      id: 'pause-period',
+      title: 'Pausas registradas no periodo',
+      detail: `${formatarMinutos(params.pausasPeriodoMin)} somados em eventos`,
+      meta: 'Acompanhar recorrencia',
+      severity: 'info',
+    })
+  }
+
+  if (weakMachine) {
+    bottlenecks.push({
+      id: `util-${weakMachine.machineId}`,
+      title: `${weakMachine.machineName} com baixa ocupacao`,
+      detail: `${formatarNumero(weakMachine.utilizationRate)}% de utilizacao`,
+      meta: 'Checar fila ou disponibilidade',
+      severity: 'info',
+    })
+  }
+
+  if (operatorWithPauses) {
+    bottlenecks.push({
+      id: `op-${operatorWithPauses.operatorName}`,
+      title: `${operatorWithPauses.operatorName} teve pausas no ciclo`,
+      detail: `${operatorWithPauses.pauseEvents} evento(s), ${formatarMinutos(operatorWithPauses.pauseMinutes)}`,
+      meta: 'Sinal de acompanhamento',
+      severity: 'info',
+    })
+  }
+
+  return bottlenecks.slice(0, 4)
+}
+
+function Panel({
+  children,
+  className = '',
+}: {
+  children: React.ReactNode
+  className?: string
+}) {
+  return (
+    <section className={`min-w-0 overflow-hidden rounded-[26px] border border-[#DDE3DD] bg-white/88 shadow-[0_20px_55px_rgba(36,45,38,0.07)] backdrop-blur ${className}`}>
+      {children}
+    </section>
+  )
+}
+
+function SectionHeader({
+  label,
+  title,
+  description,
+  action,
+}: {
+  label: string
+  title: string
+  description?: string
+  action?: React.ReactNode
+}) {
+  return (
+    <div className="flex flex-wrap items-start justify-between gap-3">
+      <div>
+        <div className="text-[11px] font-bold uppercase tracking-[0.22em] text-[#7A8478]">{label}</div>
+        <h2 className="mt-1 text-[20px] font-semibold tracking-[-0.03em] text-[#151A16]">{title}</h2>
+        {description ? <p className="mt-1 max-w-2xl text-sm leading-6 text-[#6D756C]">{description}</p> : null}
+      </div>
+      {action}
+    </div>
+  )
+}
+
+function MetricCard({
   title,
   value,
-  subtitle,
+  detail,
   icon: Icon,
   tone = 'slate',
 }: {
   title: string
   value: string
-  subtitle: string
+  detail: string
   icon: typeof Activity
-  tone?: 'slate' | 'blue' | 'emerald' | 'amber'
+  tone?: 'slate' | 'green' | 'amber' | 'blue'
 }) {
   const toneMap = {
-    slate: 'border-slate-200 bg-white text-slate-900',
-    blue: 'border-blue-200 bg-blue-50/80 text-blue-950',
-    emerald: 'border-emerald-200 bg-emerald-50/80 text-emerald-950',
-    amber: 'border-amber-200 bg-amber-50/80 text-amber-950',
+    slate: 'from-[#F8F6EF] to-white text-[#171A16] border-[#E3DED0]',
+    green: 'from-[#EDF8EF] to-white text-[#0B5B34] border-[#CFE8D5]',
+    amber: 'from-[#FFF4DE] to-white text-[#8A4B00] border-[#F4DBAD]',
+    blue: 'from-[#ECF5FF] to-white text-[#114C8C] border-[#CADFF5]',
   }
 
   return (
-    <div className={`rounded-2xl border p-4 shadow-sm ${toneMap[tone]}`}>
+    <div className={`rounded-[22px] border bg-gradient-to-br p-4 ${toneMap[tone]}`}>
       <div className="flex items-start justify-between gap-3">
-        <div>
-          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">{title}</div>
-          <div className="mt-2 text-3xl font-semibold leading-none">{value}</div>
+        <div className="min-w-0">
+          <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#7A8478]">{title}</p>
+          <p className="mt-2 truncate text-[30px] font-semibold leading-none tracking-[-0.05em]">{value}</p>
         </div>
-        <div className="rounded-2xl border border-white/70 bg-white/80 p-2 text-slate-600 shadow-sm">
+        <div className="rounded-2xl border border-white/70 bg-white/80 p-2.5 text-current shadow-sm">
           <Icon size={18} />
         </div>
       </div>
-      <div className="mt-3 text-sm text-slate-600">{subtitle}</div>
+      <p className="mt-3 text-sm leading-5 text-[#687066]">{detail}</p>
     </div>
   )
 }
 
-function LiveCard({ card, agoraMs }: { card: LiveResourceCard; agoraMs: number }) {
-  const restanteMs = card.atual ? calcularTempoRestanteMs(card.atual, agoraMs) : null
+function HealthGauge({
+  score,
+  label,
+  tone,
+}: {
+  score: number
+  label: string
+  tone: 'green' | 'amber' | 'red'
+}) {
+  const toneClass = {
+    green: 'text-emerald-700',
+    amber: 'text-amber-700',
+    red: 'text-rose-700',
+  }[tone]
 
   return (
-    <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-            {card.tipo === 'maquina' ? 'Máquina' : 'Tanque'}
+    <div className="grid min-w-0 gap-5 lg:grid-cols-[280px_1fr]">
+      <div className="relative flex min-h-[230px] items-center justify-center rounded-[30px] border border-[#203123]/10 bg-[#101711] p-5 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.14)]">
+        <div
+          className="absolute inset-5 rounded-[26px] opacity-70"
+          style={{
+            background:
+              'radial-gradient(circle at 48% 42%, rgba(74,222,128,0.24), transparent 34%), linear-gradient(150deg, rgba(255,255,255,0.08), transparent 62%)',
+          }}
+        />
+        <div className="relative flex h-40 w-40 items-center justify-center rounded-full bg-[conic-gradient(#129957_var(--score),rgba(255,255,255,0.13)_0)] p-3" style={{ '--score': `${score}%` } as React.CSSProperties}>
+          <div className="flex h-full w-full flex-col items-center justify-center rounded-full bg-[#101711] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)]">
+            <span className="text-[52px] font-semibold leading-none tracking-[-0.07em]">{score}</span>
+            <span className="mt-1 text-xs uppercase tracking-[0.2em] text-white/54">de 100</span>
           </div>
-          <h3 className="mt-1 text-lg font-semibold text-slate-900">{card.nome}</h3>
-        </div>
-        <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${statusClasses(card.atual)}`}>
-          {statusLabel(card.atual)}
-        </span>
-      </div>
-
-      <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
-        <div className="rounded-xl bg-slate-50 px-3 py-2">
-          <div className="text-xs uppercase tracking-wide text-slate-500">Ordens hoje</div>
-          <div className="mt-1 font-semibold text-slate-900">{card.ordens.length}</div>
-        </div>
-        <div className="rounded-xl bg-slate-50 px-3 py-2">
-          <div className="text-xs uppercase tracking-wide text-slate-500">Volume estimado</div>
-          <div className="mt-1 font-semibold text-slate-900">{formatarNumero(card.volumeHoje, 2)} L</div>
         </div>
       </div>
 
-      {card.atual ? (
-        <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-          <div className="flex items-center justify-between gap-3">
-            <div className="font-semibold text-slate-900">#{card.atual.numero_externo}</div>
-            <div className="text-xs text-slate-500">{card.atual.operador_nome ?? 'Operador não informado'}</div>
+      <div className="flex min-w-0 flex-col justify-center">
+        <div className={`text-sm font-bold uppercase tracking-[0.18em] ${toneClass}`}>{label}</div>
+        <h2 className="mt-2 max-w-2xl text-[26px] font-semibold leading-[1.06] tracking-[-0.06em] text-[#151A16] sm:text-[34px]">
+          Saude da operacao em uma leitura unica.
+        </h2>
+        <p className="mt-3 max-w-2xl text-sm leading-6 text-[#626A60]">
+          O score combina prazo, utilizacao, recursos ativos, atrasos e paradas para mostrar se a rotina esta fluindo ou se precisa de intervencao.
+        </p>
+        <div className="mt-5 grid max-w-2xl grid-cols-1 gap-2 sm:grid-cols-3">
+          <div className="rounded-2xl bg-[#F3F0E7] px-3 py-2">
+            <div className="text-[11px] uppercase tracking-[0.16em] text-[#7A8478]">Fluxo</div>
+            <div className="mt-1 text-sm font-semibold text-[#151A16]">Ao vivo</div>
           </div>
-          <div className="mt-1 text-sm text-slate-700">{card.atual.produto?.nome ?? card.atual.produto_sku ?? '--'}</div>
-          <div className="mt-3 grid grid-cols-2 gap-3 text-sm text-slate-600">
-            <div>
-              <div className="text-xs uppercase tracking-wide text-slate-400">Início</div>
-              <div className="mt-1 font-medium text-slate-900">{formatarHora(card.atual.inicio_operacao_em ?? card.atual.inicio_agendado)}</div>
-            </div>
-            <div>
-              <div className="text-xs uppercase tracking-wide text-slate-400">Restante</div>
-              <div className="mt-1 font-medium text-slate-900">
-                {restanteMs === null ? '--' : formatarDuracaoRelogio(restanteMs)}
-              </div>
-            </div>
+          <div className="rounded-2xl bg-[#F3F0E7] px-3 py-2">
+            <div className="text-[11px] uppercase tracking-[0.16em] text-[#7A8478]">Foco</div>
+            <div className="mt-1 text-sm font-semibold text-[#151A16]">Gargalos</div>
+          </div>
+          <div className="rounded-2xl bg-[#F3F0E7] px-3 py-2">
+            <div className="text-[11px] uppercase tracking-[0.16em] text-[#7A8478]">Base</div>
+            <div className="mt-1 text-sm font-semibold text-[#151A16]">Historico</div>
           </div>
         </div>
-      ) : (
-        <div className="mt-4 rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-5 text-sm text-slate-500">
-          Nenhuma ordem ativa neste recurso agora.
-        </div>
-      )}
+      </div>
+    </div>
+  )
+}
 
-      <div className="mt-4 border-t border-slate-100 pt-3 text-sm">
-        <div className="text-xs uppercase tracking-wide text-slate-400">Próxima ordem</div>
-        <div className="mt-1 font-medium text-slate-900">
-          {card.proxima ? `#${card.proxima.numero_externo} · ${formatarHora(card.proxima.inicio_agendado)}` : 'Sem próxima ordem no dia'}
+function ResourceRow({ card, agoraMs }: { card: LiveResourceCard; agoraMs: number }) {
+  const restanteMs = card.atual ? calcularTempoRestanteMs(card.atual, agoraMs) : null
+  const progress = getResourceProgress(card, agoraMs)
+  const tone = statusTone(card.atual)
+  const toneBar = {
+    green: 'bg-emerald-500',
+    amber: 'bg-amber-500',
+    blue: 'bg-blue-500',
+    slate: 'bg-slate-300',
+  }[tone]
+
+  return (
+    <article className="grid gap-4 rounded-[20px] border border-[#E3E7E0] bg-[#FCFBF7] p-4 transition hover:-translate-y-0.5 hover:shadow-[0_16px_38px_rgba(38,45,35,0.08)] lg:grid-cols-[220px_1fr_160px]">
+      <div className="flex min-w-0 items-start gap-3">
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#111A12] text-white">
+          {card.tipo === 'maquina' ? <Factory size={19} /> : <Layers3 size={19} />}
+        </div>
+        <div className="min-w-0">
+          <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#828B80]">
+            {card.tipo === 'maquina' ? 'Maquina' : 'Tanque'}
+          </div>
+          <h3 className="mt-1 truncate text-base font-semibold text-[#151A16]">{card.nome}</h3>
+          <span className={`mt-2 inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold ${statusClasses(card.atual)}`}>
+            {statusLabel(card.atual)}
+          </span>
+        </div>
+      </div>
+
+      <div className="min-w-0">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="min-w-0">
+            <div className="truncate text-sm font-semibold text-[#151A16]">{getOrderProduct(card.atual)}</div>
+            <div className="mt-0.5 text-xs text-[#778074]">
+              {card.atual ? `#${card.atual.numero_externo} | ${card.atual.operador_nome ?? 'Operador nao informado'}` : 'Sem ordem ativa neste momento'}
+            </div>
+          </div>
+          <div className="text-right font-mono text-sm font-semibold text-[#151A16]">
+            {restanteMs === null ? '--:--:--' : formatarDuracaoRelogio(restanteMs)}
+          </div>
+        </div>
+        <div className="mt-3 h-3 overflow-hidden rounded-full bg-[#E4E5DF]">
+          <div className={`h-full rounded-full ${toneBar}`} style={{ width: `${progress}%` }} />
+        </div>
+        <div className="mt-2 flex flex-wrap justify-between gap-2 text-[11px] uppercase tracking-[0.12em] text-[#80887D]">
+          <span>Inicio {formatarHora(card.atual?.inicio_operacao_em ?? card.atual?.inicio_agendado)}</span>
+          <span>{formatarNumero(progress, 0)}% do ciclo</span>
+          <span>Fim {formatarHora(card.atual?.fim_calculado)}</span>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2 lg:grid-cols-1">
+        <div className="rounded-2xl border border-[#E4E6DD] bg-white px-3 py-2">
+          <div className="text-[10px] uppercase tracking-[0.15em] text-[#828B80]">Hoje</div>
+          <div className="mt-1 text-sm font-semibold text-[#151A16]">{card.ordens.length} ordens</div>
+        </div>
+        <div className="rounded-2xl border border-[#E4E6DD] bg-white px-3 py-2">
+          <div className="text-[10px] uppercase tracking-[0.15em] text-[#828B80]">Proxima</div>
+          <div className="mt-1 truncate text-sm font-semibold text-[#151A16]">
+            {card.proxima ? `#${card.proxima.numero_externo} ${formatarHora(card.proxima.inicio_agendado)}` : 'Sem fila'}
+          </div>
         </div>
       </div>
     </article>
   )
 }
 
+function BottleneckList({ items }: { items: Bottleneck[] }) {
+  const iconMap = {
+    critical: 'border-rose-200 bg-rose-50 text-rose-700',
+    warning: 'border-amber-200 bg-amber-50 text-amber-700',
+    info: 'border-blue-200 bg-blue-50 text-blue-700',
+  }
+
+  return (
+    <div className="space-y-3">
+      {items.map((item) => (
+        <div key={item.id} className="group flex gap-3 rounded-[18px] border border-[#E1E5DC] bg-[#FCFBF7] p-3">
+          <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border ${iconMap[item.severity]}`}>
+            {item.severity === 'info' ? <Clock3 size={17} /> : <AlertTriangle size={17} />}
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="text-sm font-semibold text-[#151A16]">{item.title}</div>
+            <div className="mt-1 text-xs leading-5 text-[#626A60]">{item.detail}</div>
+            <div className="mt-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#8B9387]">{item.meta}</div>
+          </div>
+          <ChevronRight className="mt-2 text-[#A4AB9F] transition group-hover:translate-x-0.5" size={16} />
+        </div>
+      ))}
+
+      {items.length === 0 && (
+        <div className="rounded-[18px] border border-dashed border-[#DDE3DD] bg-[#FCFBF7] px-4 py-10 text-center">
+          <CheckCircle2 className="mx-auto text-emerald-600" size={28} />
+          <p className="mt-3 text-sm font-semibold text-[#151A16]">Sem gargalos relevantes agora.</p>
+          <p className="mt-1 text-xs text-[#70786E]">Continue acompanhando atrasos, paradas e liberacoes de tanque.</p>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function MachinePerformanceBars({ items }: { items: MachinePerformance[] }) {
+  return (
+    <div className="space-y-4">
+      {items.slice(0, 6).map((maquina) => (
+        <div key={maquina.machineId}>
+          <div className="mb-2 flex items-center justify-between gap-3 text-sm">
+            <div className="min-w-0">
+              <div className="truncate font-semibold text-[#151A16]">{maquina.machineName}</div>
+              <div className="text-xs text-[#737B71]">
+                {maquina.completedOrders} concluidas | {formatarNumero(maquina.outputLiters, 1)} L
+              </div>
+            </div>
+            <div className="font-mono text-sm font-semibold text-[#151A16]">{formatarNumero(maquina.utilizationRate)}%</div>
+          </div>
+          <div className="h-3 overflow-hidden rounded-full bg-[#E2E4DD]">
+            <div
+              className={`h-full rounded-full ${maquina.utilizationRate >= 60 ? 'bg-emerald-500' : maquina.utilizationRate >= 35 ? 'bg-amber-500' : 'bg-slate-400'}`}
+              style={{ width: `${clampPercent(maquina.utilizationRate)}%` }}
+            />
+          </div>
+          <div className="mt-2 grid grid-cols-3 gap-2 text-[11px] text-[#70786E]">
+            <span>Prod. {formatarMinutos(maquina.actualMinutes)}</span>
+            <span>Pausa {formatarMinutos(maquina.pauseMinutes)}</span>
+            <span>Prazo {formatarNumero(maquina.onTimeRate)}%</span>
+          </div>
+        </div>
+      ))}
+
+      {items.length === 0 && (
+        <div className="rounded-[18px] border border-dashed border-[#DDE3DD] px-4 py-8 text-center text-sm text-[#70786E]">
+          Nenhuma maquina ativa no periodo.
+        </div>
+      )}
+    </div>
+  )
+}
+
+function OperatorRank({ items }: { items: OperatorPerformance[] }) {
+  return (
+    <div className="space-y-3">
+      {items.slice(0, 5).map((operador, index) => (
+        <div key={operador.operatorName} className="flex items-center gap-3 rounded-[18px] border border-[#E1E5DC] bg-[#FCFBF7] p-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#141B14] text-sm font-semibold text-white">
+            {index + 1}
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-sm font-semibold text-[#151A16]">{operador.operatorName}</div>
+            <div className="mt-1 text-xs text-[#737B71]">
+              {operador.completedOrders} concluidas | {formatarNumero(operador.outputLiters, 1)} L
+            </div>
+          </div>
+          <div className="text-right">
+            <div className="font-mono text-lg font-semibold text-emerald-700">{formatarNumero(operador.onTimeRate)}%</div>
+            <div className="text-[10px] uppercase tracking-[0.12em] text-[#80887D]">no prazo</div>
+          </div>
+        </div>
+      ))}
+
+      {items.length === 0 && (
+        <div className="rounded-[18px] border border-dashed border-[#DDE3DD] px-4 py-8 text-center text-sm text-[#70786E]">
+          Ainda nao ha operadores com dados suficientes.
+        </div>
+      )}
+    </div>
+  )
+}
+
+function MonitoramentoSkeleton() {
+  return (
+    <div className="min-h-full w-full max-w-full overflow-hidden bg-[#ECE9DF] text-[#151A16]">
+      <div className="relative mx-auto flex w-full max-w-full min-w-0 flex-col gap-5 py-5 pl-4 pr-8 sm:px-6 lg:max-w-[1540px] lg:px-8">
+        <div className="rounded-[30px] border border-[#D6DACE] bg-[#FAF8F0]/86 px-5 py-4 shadow-[0_20px_60px_rgba(55,48,35,0.08)]">
+          <div className="h-5 w-40 rounded-full bg-[#E6E2D7]" />
+          <div className="mt-5 h-10 max-w-xl rounded-2xl bg-[#DEDACF]" />
+          <div className="mt-3 h-4 max-w-2xl rounded-full bg-[#E6E2D7]" />
+        </div>
+
+        <div className="rounded-[26px] border border-[#DDE3DD] bg-white/88 p-5 shadow-[0_20px_55px_rgba(36,45,38,0.07)]">
+          <div className="grid gap-5 xl:grid-cols-[1.15fr_1fr]">
+            <div className="grid gap-5 lg:grid-cols-[280px_1fr]">
+              <div className="min-h-[230px] rounded-[30px] bg-[#101711]" />
+              <div className="space-y-3">
+                <div className="h-4 w-36 rounded-full bg-[#E6E2D7]" />
+                <div className="h-20 max-w-lg rounded-3xl bg-[#DEDACF]" />
+                <div className="h-16 max-w-xl rounded-3xl bg-[#E6E2D7]" />
+              </div>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {Array.from({ length: 4 }).map((_, index) => (
+                <div key={index} className="h-36 rounded-[22px] border border-[#E3DED0] bg-[#F8F6EF]" />
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function MonitoramentoPage() {
+  const [isMounted, setIsMounted] = useState(false)
+
+  useEffect(() => {
+    setIsMounted(true)
+  }, [])
+
+  if (!isMounted) return <MonitoramentoSkeleton />
+
+  return <MonitoramentoDashboard />
+}
+
+function MonitoramentoDashboard() {
   const hoje = useMemo(() => new Date(), [])
   const hojeYmd = useMemo(() => format(hoje, 'yyyy-MM-dd'), [hoje])
   const [periodStart, setPeriodStart] = useState(() => format(subDays(hoje, 6), 'yyyy-MM-dd'))
@@ -262,10 +674,10 @@ export default function MonitoramentoPage() {
         readJsonSafe(eventosRes),
       ])
 
-      if (!mRes.ok) throw new Error((mData as { error?: string } | null)?.error ?? 'Erro ao carregar máquinas')
+      if (!mRes.ok) throw new Error((mData as { error?: string } | null)?.error ?? 'Erro ao carregar maquinas')
       if (!hojeRes.ok) throw new Error((hojeData as { error?: string } | null)?.error ?? 'Erro ao carregar ordens do dia')
-      if (!periodoRes.ok) throw new Error((periodoData as { error?: string } | null)?.error ?? 'Erro ao carregar ordens do período')
-      if (!eventosRes.ok) throw new Error((eventosData as { error?: string } | null)?.error ?? 'Erro ao carregar eventos do período')
+      if (!periodoRes.ok) throw new Error((periodoData as { error?: string } | null)?.error ?? 'Erro ao carregar ordens do periodo')
+      if (!eventosRes.ok) throw new Error((eventosData as { error?: string } | null)?.error ?? 'Erro ao carregar eventos do periodo')
 
       setMaquinas(Array.isArray(mData) ? mData : [])
       setOrdensHoje(Array.isArray(hojeData) ? hojeData : [])
@@ -298,13 +710,13 @@ export default function MonitoramentoPage() {
   const maquinasAtivas = useMemo(() => maquinas.filter((maquina) => maquina.ativa), [maquinas])
 
   const ordensHojeValidas = useMemo(
-    () => ordensHoje.filter((ordem) => ordem.status !== 'cancelada').filter((ordem) => pertenceAoDia(ordem, hojeYmd)),
-    [ordensHoje, hojeYmd]
+    () => ordensHoje.filter((ordem) => isMonitoringOrder(ordem, agoraMs)).filter((ordem) => pertenceAoDia(ordem, hojeYmd)),
+    [ordensHoje, hojeYmd, agoraMs]
   )
 
   const ordensPeriodoValidas = useMemo(
-    () => ordensPeriodo.filter((ordem) => ordem.status !== 'cancelada'),
-    [ordensPeriodo]
+    () => ordensPeriodo.filter((ordem) => isMonitoringOrder(ordem, agoraMs)),
+    [ordensPeriodo, agoraMs]
   )
 
   const indicadoresPeriodo = useMemo(
@@ -377,6 +789,8 @@ export default function MonitoramentoPage() {
     })
   }, [ordensHojeValidas, agoraMs])
 
+  const liveCards = useMemo(() => [...liveMachineCards, ...liveTankCards], [liveMachineCards, liveTankCards])
+
   const historyRows = useMemo(() => {
     return [...ordensPeriodoValidas].sort((a, b) => {
       const aMs =
@@ -399,9 +813,7 @@ export default function MonitoramentoPage() {
 
   const utilizacaoMedia = useMemo(() => {
     if (desempenhoMaquinas.length === 0) return 0
-    return (
-      desempenhoMaquinas.reduce((acc, maquina) => acc + maquina.utilizationRate, 0) / desempenhoMaquinas.length
-    )
+    return desempenhoMaquinas.reduce((acc, maquina) => acc + maquina.utilizationRate, 0) / desempenhoMaquinas.length
   }, [desempenhoMaquinas])
 
   const operadoresAtivosHoje = useMemo(() => {
@@ -413,6 +825,57 @@ export default function MonitoramentoPage() {
     ).size
   }, [ordensHojeValidas])
 
+  const ordensAtrasadas = useMemo(
+    () =>
+      ordensPeriodoValidas.filter((ordem) => {
+        if (ordem.status === 'concluida' || isCanceledOrder(ordem)) return false
+        if (!ordem.fim_calculado) return false
+        return new Date(ordem.fim_calculado).getTime() < agoraMs
+      }),
+    [ordensPeriodoValidas, agoraMs]
+  )
+
+  const aguardandoTanque = useMemo(
+    () => ordensPeriodoValidas.filter((ordem) => ordem.planning_status === 'WAITING_TANK'),
+    [ordensPeriodoValidas]
+  )
+
+  const onTimeRate = useMemo(() => {
+    if (desempenhoMaquinas.length === 0) return 0
+    const totalConcluidas = desempenhoMaquinas.reduce((acc, maquina) => acc + maquina.completedOrders, 0)
+    if (totalConcluidas === 0) return 0
+    return (
+      desempenhoMaquinas.reduce((acc, maquina) => acc + maquina.onTimeRate * maquina.completedOrders, 0) /
+      totalConcluidas
+    )
+  }, [desempenhoMaquinas])
+
+  const activeResources = liveCards.filter((card) => card.atual?.status === 'produzindo').length
+
+  const health = useMemo(
+    () =>
+      getProductionHealth({
+        onTimeRate,
+        utilizationRate: utilizacaoMedia,
+        delayCount: ordensAtrasadas.length,
+        pauseMinutes: pausasPeriodoMin,
+        activeResources,
+      }),
+    [onTimeRate, utilizacaoMedia, ordensAtrasadas.length, pausasPeriodoMin, activeResources]
+  )
+
+  const bottlenecks = useMemo(
+    () =>
+      buildBottlenecks({
+        delayedOrders: ordensAtrasadas,
+        waitingTank: aguardandoTanque,
+        desempenhoMaquinas,
+        desempenhoOperadores,
+        pausasPeriodoMin,
+      }),
+    [ordensAtrasadas, aguardandoTanque, desempenhoMaquinas, desempenhoOperadores, pausasPeriodoMin]
+  )
+
   function aplicarPreset(dias: number) {
     const fim = format(new Date(), 'yyyy-MM-dd')
     const inicio = format(subDays(new Date(), dias - 1), 'yyyy-MM-dd')
@@ -421,486 +884,302 @@ export default function MonitoramentoPage() {
   }
 
   return (
-    <div className="flex flex-col h-full overflow-hidden bg-[#F7F8FA]">
-      <div className="border-b border-slate-200 bg-white/95 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-3 px-6 py-4">
-          <div>
-            <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
-              Painel de acompanhamento
-            </div>
-            <h1 className="mt-1 text-2xl font-semibold text-slate-950">Produção ao vivo e histórico operacional</h1>
-            <p className="mt-1 text-sm text-slate-500">
-              Visão do dia para operação e análise do período para gestão.
-            </p>
-          </div>
-
-          <div className="ml-auto flex flex-wrap items-center gap-2">
-            <button
-              onClick={() => aplicarPreset(1)}
-              className="rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"
-            >
-              Hoje
-            </button>
-            <button
-              onClick={() => aplicarPreset(7)}
-              className="rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"
-            >
-              7 dias
-            </button>
-            <button
-              onClick={() => aplicarPreset(30)}
-              className="rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"
-            >
-              30 dias
-            </button>
-            <button
-              onClick={carregarDados}
-              disabled={carregando}
-              className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-60"
-            >
-              <RefreshCw size={14} className={carregando ? 'animate-spin' : ''} />
-              Atualizar
-            </button>
-          </div>
-        </div>
-
-        <div className="mx-auto flex max-w-7xl flex-wrap items-end gap-3 px-6 pb-4">
-          <div>
-            <label className="mb-1 block text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-              Início
-            </label>
-            <input
-              type="date"
-              value={periodStart}
-              max={periodEnd}
-              onChange={(e) => setPeriodStart(e.target.value)}
-              className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-              Fim
-            </label>
-            <input
-              type="date"
-              value={periodEnd}
-              min={periodStart}
-              onChange={(e) => setPeriodEnd(e.target.value)}
-              className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
-            />
-          </div>
-          <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
-            <div className="font-semibold">Período selecionado</div>
-            <div className="mt-1 text-blue-800">
-              {format(new Date(`${periodStart}T00:00:00`), "dd 'de' MMM", { locale: ptBR })} até{' '}
-              {format(new Date(`${periodEnd}T00:00:00`), "dd 'de' MMM yyyy", { locale: ptBR })}
-            </div>
-          </div>
-        </div>
+    <div className="min-h-full w-full max-w-full overflow-hidden bg-[#ECE9DF] text-[#151A16]">
+      <div className="pointer-events-none fixed inset-0 opacity-80">
+        <div className="absolute left-[-10%] top-[-18%] h-[520px] w-[520px] rounded-full bg-emerald-200/45 blur-3xl" />
+        <div className="absolute right-[-12%] top-[10%] h-[460px] w-[460px] rounded-full bg-amber-100/80 blur-3xl" />
+        <div className="absolute bottom-[-20%] left-[30%] h-[520px] w-[520px] rounded-full bg-blue-100/60 blur-3xl" />
       </div>
 
-      {erro && (
-        <div className="border-b border-amber-200 bg-amber-50 px-6 py-3 text-sm text-amber-800">{erro}</div>
-      )}
-
-      <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-6 py-6">
-        <section className="rounded-[28px] border border-slate-200 bg-[linear-gradient(135deg,#0f172a_0%,#172554_52%,#1d4ed8_100%)] p-6 text-white shadow-[0_20px_80px_rgba(15,23,42,0.18)]">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div className="max-w-2xl">
-              <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.22em] text-blue-100">
-                <Activity size={13} />
-                Centro operacional
+      <div className="relative mx-auto flex w-full max-w-full min-w-0 flex-col gap-5 py-5 pl-4 pr-8 sm:px-6 lg:max-w-[1540px] lg:px-8">
+        <header className="rounded-[30px] border border-[#D6DACE] bg-[#FAF8F0]/86 px-5 py-4 shadow-[0_20px_60px_rgba(55,48,35,0.08)] backdrop-blur">
+          <div className="grid min-w-0 gap-4 xl:grid-cols-[1fr_auto] xl:items-center">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+                  <span className="h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_0_4px_rgba(16,185,129,0.16)]" />
+                  Ao vivo
+                </span>
+                <span className="text-xs font-medium text-[#6F776C]">
+                  Atualiza a cada {REFRESH_MS / 1000}s | {format(new Date(agoraMs), 'HH:mm:ss')}
+                </span>
               </div>
-              <h2 className="mt-4 text-3xl font-semibold leading-tight">
-                O que está rodando agora e o que o período conta sobre a sua produção.
-              </h2>
-              <p className="mt-3 max-w-xl text-sm text-blue-100/85">
-                O topo mostra a foto do turno atual. Abaixo, você acompanha desempenho de máquinas,
-                operadores, pausas e histórico consolidado.
+              <h1 className="mt-3 max-w-full break-words text-[30px] font-semibold leading-none tracking-[-0.07em] text-[#111511] sm:text-[44px]">
+                Monitoramento operacional
+              </h1>
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-[#626A60]">
+                Uma leitura clara do que esta rodando agora, onde a operacao pode travar e como o periodo esta performando.
               </p>
             </div>
 
-            <div className="grid min-w-[280px] grid-cols-2 gap-3 rounded-3xl border border-white/10 bg-white/10 p-4 backdrop-blur">
-              <div>
-                <div className="text-[11px] uppercase tracking-[0.16em] text-blue-100/70">Em produção agora</div>
-                <div className="mt-1 text-3xl font-semibold">
-                  {ordensHojeValidas.filter((ordem) => ordem.status === 'produzindo').length}
-                </div>
+            <div className="grid min-w-0 gap-2 sm:grid-cols-[auto_auto_auto_auto]">
+              <div className="rounded-2xl border border-[#DBDED3] bg-white px-3 py-2">
+                <label className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.16em] text-[#7A8478]">
+                  <CalendarRange size={13} />
+                  Inicio
+                </label>
+                <input
+                  type="date"
+                  value={periodStart}
+                  max={periodEnd}
+                  onChange={(e) => setPeriodStart(e.target.value)}
+                  className="mt-1 w-full bg-transparent text-sm font-semibold text-[#151A16] outline-none"
+                />
               </div>
-              <div>
-                <div className="text-[11px] uppercase tracking-[0.16em] text-blue-100/70">Pausadas agora</div>
-                <div className="mt-1 text-3xl font-semibold">
-                  {ordensHojeValidas.filter((ordem) => ordem.status === 'pausada').length}
-                </div>
+              <div className="rounded-2xl border border-[#DBDED3] bg-white px-3 py-2">
+                <label className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.16em] text-[#7A8478]">
+                  <CalendarRange size={13} />
+                  Fim
+                </label>
+                <input
+                  type="date"
+                  value={periodEnd}
+                  min={periodStart}
+                  onChange={(e) => setPeriodEnd(e.target.value)}
+                  className="mt-1 w-full bg-transparent text-sm font-semibold text-[#151A16] outline-none"
+                />
               </div>
-              <div>
-                <div className="text-[11px] uppercase tracking-[0.16em] text-blue-100/70">Operadores ativos</div>
-                <div className="mt-1 text-3xl font-semibold">{operadoresAtivosHoje}</div>
-              </div>
-              <div>
-                <div className="text-[11px] uppercase tracking-[0.16em] text-blue-100/70">Máquinas ativas</div>
-                <div className="mt-1 text-3xl font-semibold">
-                  {liveMachineCards.filter((card) => card.atual).length}
-                </div>
-              </div>
+              <button
+                onClick={() => aplicarPreset(7)}
+                className="rounded-2xl border border-[#DBDED3] bg-white px-4 py-3 text-sm font-semibold text-[#485044] hover:bg-[#F4F2EA]"
+              >
+                7 dias
+              </button>
+              <button
+                onClick={carregarDados}
+                disabled={carregando}
+                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#111A12] px-4 py-3 text-sm font-semibold text-white shadow-[0_12px_26px_rgba(17,26,18,0.18)] hover:bg-[#203024] disabled:opacity-60"
+              >
+                <RefreshCw size={16} className={carregando ? 'animate-spin' : ''} />
+                Atualizar
+              </button>
             </div>
           </div>
-        </section>
+        </header>
 
-        <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <KpiCard
-            title="Ordens no período"
-            value={String(indicadoresPeriodo.totalOrdens)}
-            subtitle="Todas as ordens que tocaram o período filtrado."
-            icon={CalendarRange}
-          />
-          <KpiCard
-            title="Concluídas"
-            value={String(indicadoresPeriodo.ordensConcluidas)}
-            subtitle="Ordens encerradas com dados operacionais no período."
-            icon={CheckCircle2}
-            tone="emerald"
-          />
-          <KpiCard
-            title="Volume processado"
-            value={`${formatarNumero(litrosPeriodo, 2)} L`}
-            subtitle="Volume estimado ou concluído consolidado no período."
-            icon={Factory}
-            tone="blue"
-          />
-          <KpiCard
-            title="Paradas registradas"
-            value={formatarMinutos(pausasPeriodoMin)}
-            subtitle="Tempo em pausa registrado pelas máquinas no período."
-            icon={PauseCircle}
-            tone="amber"
-          />
-          <KpiCard
-            title="Utilização média"
-            value={`${formatarNumero(utilizacaoMedia)}%`}
-            subtitle="Tempo em produção vs período selecionado."
-            icon={Gauge}
-            tone="blue"
-          />
-          <KpiCard
-            title="Ciclo médio"
-            value={formatarMinutos(indicadoresPeriodo.tempoMedioCicloMin)}
-            subtitle="Média real das ordens com início e fim operacionais."
-            icon={TimerReset}
-          />
-          <KpiCard
-            title="Em andamento"
-            value={String(indicadoresPeriodo.ordensEmProducao)}
-            subtitle="Ordens ainda abertas no recorte atual."
-            icon={PlayCircle}
-            tone="emerald"
-          />
-          <KpiCard
-            title="Atrasos abertos"
-            value={String(indicadoresPeriodo.ordensAtrasadas)}
-            subtitle="Ordens não concluídas cujo fim previsto já passou."
-            icon={AlertTriangle}
-            tone="amber"
-          />
-        </section>
+        {erro && (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 px-5 py-3 text-sm font-medium text-amber-800">
+            {erro}
+          </div>
+        )}
 
-        <section className="grid grid-cols-1 gap-6 xl:grid-cols-[1.5fr_1fr]">
-          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Ao vivo</div>
-                <h2 className="mt-1 text-xl font-semibold text-slate-950">Recursos em tempo real</h2>
-                <p className="mt-1 text-sm text-slate-500">Máquinas e tanques com a foto operacional de hoje.</p>
-              </div>
-              <div className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
-                Atualização a cada {REFRESH_MS / 1000}s
-              </div>
-            </div>
-
-            <div className="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-2">
-              {liveMachineCards.map((card) => (
-                <LiveCard key={card.id} card={card} agoraMs={agoraMs} />
-              ))}
-              {liveTankCards.map((card) => (
-                <LiveCard key={card.id} card={card} agoraMs={agoraMs} />
-              ))}
+        <Panel className="p-4 sm:p-5">
+          <div className="grid gap-4 xl:grid-cols-[1.15fr_1fr]">
+            <HealthGauge score={health.score} label={health.label} tone={health.tone} />
+            <div className="grid gap-3 sm:grid-cols-2">
+              <MetricCard
+                title="Producao no periodo"
+                value={`${formatarNumero(litrosPeriodo, 1)} L`}
+                detail={`${formatarNumero(indicadoresPeriodo.percentualProduzido)}% do volume planejado estimado.`}
+                icon={Factory}
+                tone="green"
+              />
+              <MetricCard
+                title="No prazo"
+                value={`${formatarNumero(onTimeRate)}%`}
+                detail={`${indicadoresPeriodo.ordensConcluidas} concluidas de ${indicadoresPeriodo.totalOrdens} ordens.`}
+                icon={CheckCircle2}
+                tone="green"
+              />
+              <MetricCard
+                title="Paradas"
+                value={formatarMinutos(pausasPeriodoMin)}
+                detail="Tempo acumulado em pausa no recorte selecionado."
+                icon={PauseCircle}
+                tone={pausasPeriodoMin > 0 ? 'amber' : 'slate'}
+              />
+              <MetricCard
+                title="Recursos ativos"
+                value={`${activeResources}/${liveCards.length}`}
+                detail={`${operadoresAtivosHoje} operador(es) tocando ordens hoje.`}
+                icon={CircleGauge}
+                tone="blue"
+              />
             </div>
           </div>
+        </Panel>
 
-          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Top operadores</div>
-            <h2 className="mt-1 text-xl font-semibold text-slate-950">Melhores índices do período</h2>
-            <p className="mt-1 text-sm text-slate-500">
-              Ranking por taxa no prazo, eficiência e volume operado.
-            </p>
-
+        <div className="grid gap-5 xl:grid-cols-[minmax(0,1.55fr)_420px]">
+          <Panel className="p-4 sm:p-5">
+            <SectionHeader
+              label="Ao vivo"
+              title="Recursos em operacao"
+              description="Maquinas e tanques aparecem como linhas de comando: status, produto, progresso, tempo restante e proxima ordem."
+              action={
+                <div className="flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+                  <Activity size={13} />
+                  {activeResources} produzindo
+                </div>
+              }
+            />
             <div className="mt-5 space-y-3">
-              {desempenhoOperadores.slice(0, 5).map((operador, index) => (
-                <div key={operador.operatorName} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              {liveCards.map((card) => (
+                <ResourceRow key={`${card.tipo}-${card.id}`} card={card} agoraMs={agoraMs} />
+              ))}
+              {liveCards.length === 0 && (
+                <div className="rounded-[22px] border border-dashed border-[#DDE3DD] bg-[#FCFBF7] px-4 py-12 text-center text-sm text-[#70786E]">
+                  Nenhum recurso configurado ou nenhuma ordem agendada para hoje.
+                </div>
+              )}
+            </div>
+          </Panel>
+
+          <div className="grid gap-5">
+            <Panel className="p-4 sm:p-5">
+              <SectionHeader label="Gargalos" title="O que merece atencao" />
+              <div className="mt-4">
+                <BottleneckList items={bottlenecks} />
+              </div>
+            </Panel>
+
+            <Panel className="p-4 sm:p-5">
+              <SectionHeader label="Pessoas" title="Top operadores" description="Ranking por prazo e eficiencia no periodo." />
+              <div className="mt-4">
+                <OperatorRank items={desempenhoOperadores} />
+              </div>
+            </Panel>
+          </div>
+        </div>
+
+        <div className="grid gap-5 xl:grid-cols-[1fr_1fr_1.15fr]">
+          <Panel className="p-4 sm:p-5">
+            <SectionHeader label="Performance" title="Ocupacao das maquinas" />
+            <div className="mt-5">
+              <MachinePerformanceBars items={desempenhoMaquinas} />
+            </div>
+          </Panel>
+
+          <Panel className="p-4 sm:p-5">
+            <SectionHeader label="Produtos" title="Ciclos reais" description="Produtos com mais historico aparecem primeiro." />
+            <div className="mt-5 space-y-3">
+              {mediasProduto.slice(0, 6).map((media) => (
+                <div key={media.produtoSku} className="rounded-[18px] border border-[#E1E5DC] bg-[#FCFBF7] p-3">
                   <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-900 text-sm font-semibold text-white">
-                        {index + 1}
-                      </div>
-                      <div>
-                        <div className="font-semibold text-slate-900">{operador.operatorName}</div>
-                        <div className="text-sm text-slate-500">
-                          {operador.completedOrders} concluídas · {formatarNumero(operador.outputLiters, 2)} L
-                        </div>
-                      </div>
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-semibold text-[#151A16]">{media.produtoNome}</div>
+                      <div className="mt-1 text-xs text-[#737B71]">{media.produtoSku}</div>
                     </div>
                     <div className="text-right">
-                      <div className="text-xs uppercase tracking-wide text-slate-400">No prazo</div>
-                      <div className="text-lg font-semibold text-slate-900">{formatarNumero(operador.onTimeRate)}%</div>
+                      <div className="font-mono text-lg font-semibold text-[#151A16]">{formatarMinutos(media.tempoMedioMin)}</div>
+                      <div className="text-[10px] uppercase tracking-[0.12em] text-[#80887D]">medio</div>
                     </div>
                   </div>
-                  <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
-                    <div>
-                      <div className="text-xs uppercase tracking-wide text-slate-400">Tempo médio</div>
-                      <div className="mt-1 font-medium text-slate-900">{formatarMinutos(operador.averageCycleMinutes)}</div>
+                  <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
+                    <div className="rounded-2xl bg-white px-3 py-2">
+                      <div className="text-[#80887D]">Ordens</div>
+                      <div className="mt-1 font-semibold text-[#151A16]">{media.ordensConcluidas}</div>
                     </div>
-                    <div>
-                      <div className="text-xs uppercase tracking-wide text-slate-400">Eficiência</div>
-                      <div className="mt-1 font-medium text-slate-900">{formatarNumero(operador.efficiencyRate)}%</div>
+                    <div className="rounded-2xl bg-white px-3 py-2">
+                      <div className="text-[#80887D]">Melhor</div>
+                      <div className="mt-1 font-semibold text-emerald-700">{formatarMinutos(media.tempoMinMin)}</div>
                     </div>
-                    <div>
-                      <div className="text-xs uppercase tracking-wide text-slate-400">Pausas</div>
-                      <div className="mt-1 font-medium text-slate-900">
-                        {operador.pauseEvents} · {formatarMinutos(operador.pauseMinutes)}
-                      </div>
-                    </div>
-                    <div>
-                      <div className="text-xs uppercase tracking-wide text-slate-400">Desvio médio</div>
-                      <div className="mt-1 font-medium text-slate-900">{formatarMinutos(operador.averageDelayMinutes)}</div>
+                    <div className="rounded-2xl bg-white px-3 py-2">
+                      <div className="text-[#80887D]">Pior</div>
+                      <div className="mt-1 font-semibold text-amber-700">{formatarMinutos(media.tempoMaxMin)}</div>
                     </div>
                   </div>
                 </div>
               ))}
-
-              {desempenhoOperadores.length === 0 && (
-                <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
-                  Ainda não há operadores suficientes com ordens registradas no período.
-                </div>
-              )}
-            </div>
-          </div>
-        </section>
-
-        <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Performance</div>
-              <h2 className="mt-1 text-xl font-semibold text-slate-950">Desempenho das máquinas</h2>
-              <p className="mt-1 text-sm text-slate-500">
-                Tempo médio, ocupação, volume processado e quanto cada máquina ficou parada.
-              </p>
-            </div>
-          </div>
-
-          <div className="mt-5 grid grid-cols-1 gap-4 xl:grid-cols-3">
-            {desempenhoMaquinas.map((maquina) => (
-              <article key={maquina.machineId} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Envase</div>
-                    <h3 className="mt-1 text-lg font-semibold text-slate-950">{maquina.machineName}</h3>
-                  </div>
-                  <div className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-600 shadow-sm">
-                    {formatarNumero(maquina.utilizationRate)}% ocupação
-                  </div>
-                </div>
-
-                <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
-                  <div className="rounded-xl bg-white px-3 py-2">
-                    <div className="text-xs uppercase tracking-wide text-slate-400">Ordens concluídas</div>
-                    <div className="mt-1 font-semibold text-slate-900">{maquina.completedOrders}</div>
-                  </div>
-                  <div className="rounded-xl bg-white px-3 py-2">
-                    <div className="text-xs uppercase tracking-wide text-slate-400">Volume</div>
-                    <div className="mt-1 font-semibold text-slate-900">{formatarNumero(maquina.outputLiters, 2)} L</div>
-                  </div>
-                  <div className="rounded-xl bg-white px-3 py-2">
-                    <div className="text-xs uppercase tracking-wide text-slate-400">Tempo médio</div>
-                    <div className="mt-1 font-semibold text-slate-900">{formatarMinutos(maquina.averageCycleMinutes)}</div>
-                  </div>
-                  <div className="rounded-xl bg-white px-3 py-2">
-                    <div className="text-xs uppercase tracking-wide text-slate-400">No prazo</div>
-                    <div className="mt-1 font-semibold text-slate-900">{formatarNumero(maquina.onTimeRate)}%</div>
-                  </div>
-                </div>
-
-                <div className="mt-4 space-y-2 text-sm text-slate-600">
-                  <div className="flex items-center justify-between gap-3">
-                    <span>Produzindo no período</span>
-                    <span className="font-medium text-slate-900">{formatarMinutos(maquina.actualMinutes)}</span>
-                  </div>
-                  <div className="flex items-center justify-between gap-3">
-                    <span>Pausada no período</span>
-                    <span className="font-medium text-slate-900">{formatarMinutos(maquina.pauseMinutes)}</span>
-                  </div>
-                  <div className="flex items-center justify-between gap-3">
-                    <span>Sem produção no período</span>
-                    <span className="font-medium text-slate-900">{formatarMinutos(maquina.idleMinutes)}</span>
-                  </div>
-                  <div className="flex items-center justify-between gap-3">
-                    <span>Desvio médio</span>
-                    <span className="font-medium text-slate-900">{formatarMinutos(maquina.averageDelayMinutes)}</span>
-                  </div>
-                </div>
-              </article>
-            ))}
-          </div>
-        </section>
-
-        <section className="grid grid-cols-1 gap-6 xl:grid-cols-[1.15fr_1fr]">
-          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-            <div>
-              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Operadores</div>
-              <h2 className="mt-1 text-xl font-semibold text-slate-950">Desempenho detalhado por operador</h2>
-            </div>
-
-            <div className="mt-5 overflow-x-auto">
-              <table className="w-full min-w-[780px] text-sm">
-                <thead className="border-b border-slate-200 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                  <tr>
-                    <th className="px-3 py-3">Operador</th>
-                    <th className="px-3 py-3 text-right">Concluídas</th>
-                    <th className="px-3 py-3 text-right">Ativas</th>
-                    <th className="px-3 py-3 text-right">Litros</th>
-                    <th className="px-3 py-3 text-right">Tempo médio</th>
-                    <th className="px-3 py-3 text-right">No prazo</th>
-                    <th className="px-3 py-3 text-right">Pausas</th>
-                    <th className="px-3 py-3 text-right">Eficiência</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {desempenhoOperadores.map((operador) => (
-                    <tr key={operador.operatorName}>
-                      <td className="px-3 py-3 font-medium text-slate-900">{operador.operatorName}</td>
-                      <td className="px-3 py-3 text-right text-slate-700">{operador.completedOrders}</td>
-                      <td className="px-3 py-3 text-right text-slate-700">{operador.activeOrders}</td>
-                      <td className="px-3 py-3 text-right text-slate-700">{formatarNumero(operador.outputLiters, 2)} L</td>
-                      <td className="px-3 py-3 text-right text-slate-700">{formatarMinutos(operador.averageCycleMinutes)}</td>
-                      <td className="px-3 py-3 text-right font-medium text-slate-900">{formatarNumero(operador.onTimeRate)}%</td>
-                      <td className="px-3 py-3 text-right text-slate-700">
-                        {operador.pauseEvents} · {formatarMinutos(operador.pauseMinutes)}
-                      </td>
-                      <td className="px-3 py-3 text-right text-slate-700">{formatarNumero(operador.efficiencyRate)}%</td>
-                    </tr>
-                  ))}
-                  {desempenhoOperadores.length === 0 && (
-                    <tr>
-                      <td colSpan={8} className="px-3 py-8 text-center text-slate-400">
-                        Nenhum operador encontrado no período selecionado.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-            <div>
-              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Produtos</div>
-              <h2 className="mt-1 text-xl font-semibold text-slate-950">Média real por produto</h2>
-            </div>
-
-            <div className="mt-5 space-y-3">
-              {mediasProduto.slice(0, 8).map((media) => (
-                <div key={media.produtoSku} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <div className="font-semibold text-slate-900">{media.produtoNome}</div>
-                      <div className="text-sm text-slate-500">{media.produtoSku}</div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-xs uppercase tracking-wide text-slate-400">Ciclo médio</div>
-                      <div className="font-semibold text-slate-900">{formatarMinutos(media.tempoMedioMin)}</div>
-                    </div>
-                  </div>
-                  <div className="mt-3 grid grid-cols-3 gap-3 text-sm">
-                    <div>
-                      <div className="text-xs uppercase tracking-wide text-slate-400">Ordens</div>
-                      <div className="mt-1 font-medium text-slate-900">{media.ordensConcluidas}</div>
-                    </div>
-                    <div>
-                      <div className="text-xs uppercase tracking-wide text-slate-400">Melhor</div>
-                      <div className="mt-1 font-medium text-emerald-700">{formatarMinutos(media.tempoMinMin)}</div>
-                    </div>
-                    <div>
-                      <div className="text-xs uppercase tracking-wide text-slate-400">Pior</div>
-                      <div className="mt-1 font-medium text-rose-700">{formatarMinutos(media.tempoMaxMin)}</div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-
               {mediasProduto.length === 0 && (
-                <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
-                  Ainda não existem ordens concluídas suficientes para calcular médias de produto.
+                <div className="rounded-[18px] border border-dashed border-[#DDE3DD] px-4 py-8 text-center text-sm text-[#70786E]">
+                  Ainda nao ha ordens concluidas suficientes para medias de produto.
                 </div>
               )}
             </div>
-          </div>
-        </section>
+          </Panel>
 
-        <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Histórico</div>
-              <h2 className="mt-1 text-xl font-semibold text-slate-950">Rastro de ordens do período</h2>
-              <p className="mt-1 text-sm text-slate-500">
-                O que foi produzido, o que ainda está em andamento e a diferença entre planejado e real.
-              </p>
+          <Panel className="p-4 sm:p-5">
+            <SectionHeader label="Resumo" title="Mapa do periodo" />
+            <div className="mt-5 grid gap-3">
+              <div className="rounded-[22px] bg-[#111A12] p-4 text-white">
+                <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.17em] text-white/58">
+                  <TrendingUp size={14} />
+                  Utilizacao media
+                </div>
+                <div className="mt-4 text-[42px] font-semibold leading-none tracking-[-0.07em]">{formatarNumero(utilizacaoMedia)}%</div>
+                <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/16">
+                  <div className="h-full rounded-full bg-emerald-400" style={{ width: `${clampPercent(utilizacaoMedia)}%` }} />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-[20px] border border-[#E1E5DC] bg-[#FCFBF7] p-4">
+                  <ListChecks className="text-[#687066]" size={18} />
+                  <div className="mt-3 text-2xl font-semibold tracking-[-0.05em]">{indicadoresPeriodo.totalOrdens}</div>
+                  <div className="text-xs text-[#737B71]">ordens no recorte</div>
+                </div>
+                <div className="rounded-[20px] border border-[#E1E5DC] bg-[#FCFBF7] p-4">
+                  <Boxes className="text-[#687066]" size={18} />
+                  <div className="mt-3 text-2xl font-semibold tracking-[-0.05em]">{formatarNumero(indicadoresPeriodo.quantidadePlanejada, 0)}</div>
+                  <div className="text-xs text-[#737B71]">L planejados</div>
+                </div>
+                <div className="rounded-[20px] border border-[#E1E5DC] bg-[#FCFBF7] p-4">
+                  <Gauge className="text-[#687066]" size={18} />
+                  <div className="mt-3 text-2xl font-semibold tracking-[-0.05em]">{formatarMinutos(indicadoresPeriodo.tempoMedioCicloMin)}</div>
+                  <div className="text-xs text-[#737B71]">ciclo medio</div>
+                </div>
+                <div className="rounded-[20px] border border-[#E1E5DC] bg-[#FCFBF7] p-4">
+                  <Users className="text-[#687066]" size={18} />
+                  <div className="mt-3 text-2xl font-semibold tracking-[-0.05em]">{operadoresAtivosHoje}</div>
+                  <div className="text-xs text-[#737B71]">operadores hoje</div>
+                </div>
+              </div>
             </div>
-            <div className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
-              {historyRows.length} ordens no recorte
-            </div>
-          </div>
+          </Panel>
+        </div>
 
-          <div className="mt-5 overflow-x-auto">
+        <Panel className="overflow-hidden">
+          <div className="border-b border-[#E1E5DC] px-4 py-4 sm:px-5">
+            <SectionHeader
+              label="Rastreabilidade"
+              title="Ordens recentes do periodo"
+              description="Historico operacional com planejado, real, volume, desvio e status em uma tabela mais compacta."
+              action={<ArrowUpRight className="text-[#747D72]" size={18} />}
+            />
+          </div>
+          <div className="overflow-x-auto">
             <table className="w-full min-w-[1120px] text-sm">
-              <thead className="border-b border-slate-200 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+              <thead className="border-b border-[#E1E5DC] bg-[#F7F5EE] text-left text-[11px] font-bold uppercase tracking-[0.17em] text-[#7A8478]">
                 <tr>
-                  <th className="px-3 py-3">Ordem</th>
-                  <th className="px-3 py-3">Etapa</th>
-                  <th className="px-3 py-3">Recurso</th>
-                  <th className="px-3 py-3">Produto</th>
-                  <th className="px-3 py-3">Status</th>
-                  <th className="px-3 py-3">Operador</th>
-                  <th className="px-3 py-3">Planejado</th>
-                  <th className="px-3 py-3">Real</th>
-                  <th className="px-3 py-3">Volume</th>
-                  <th className="px-3 py-3">Desvio</th>
+                  <th className="px-5 py-3">Ordem</th>
+                  <th className="px-5 py-3">Etapa</th>
+                  <th className="px-5 py-3">Recurso</th>
+                  <th className="px-5 py-3">Produto</th>
+                  <th className="px-5 py-3">Status</th>
+                  <th className="px-5 py-3">Operador</th>
+                  <th className="px-5 py-3">Planejado</th>
+                  <th className="px-5 py-3">Real</th>
+                  <th className="px-5 py-3 text-right">Volume</th>
+                  <th className="px-5 py-3 text-right">Desvio</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
-                {historyRows.map((ordem) => {
+              <tbody className="divide-y divide-[#E8EAE4] bg-white">
+                {historyRows.slice(0, 12).map((ordem) => {
                   const plannedMinutes = Number(ordem.total_duration_minutes ?? 0)
                   const actualMinutes = obterTempoProducaoMin(ordem, agoraMs)
                   const delayMinutes = Math.max(actualMinutes - plannedMinutes, 0)
 
                   return (
-                    <tr key={ordem.id}>
-                      <td className="px-3 py-3 font-medium text-slate-900">#{ordem.numero_externo}</td>
-                      <td className="px-3 py-3 capitalize text-slate-700">{ordem.etapa}</td>
-                      <td className="px-3 py-3 text-slate-700">{getHistoryResource(ordem)}</td>
-                      <td className="px-3 py-3 text-slate-700">{ordem.produto?.nome ?? ordem.produto_sku ?? '--'}</td>
-                      <td className="px-3 py-3">
+                    <tr key={ordem.id} className="hover:bg-[#FBFAF5]">
+                      <td className="px-5 py-3 font-mono font-semibold text-[#151A16]">#{ordem.numero_externo}</td>
+                      <td className="px-5 py-3 capitalize text-[#626A60]">{ordem.etapa}</td>
+                      <td className="px-5 py-3 text-[#626A60]">{getHistoryResource(ordem)}</td>
+                      <td className="max-w-[260px] truncate px-5 py-3 font-medium text-[#151A16]">{getOrderProduct(ordem)}</td>
+                      <td className="px-5 py-3">
                         <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${statusClasses(ordem)}`}>
-                          {statusLabel(ordem)}
+                          {statusLabel(ordem, agoraMs)}
                         </span>
                       </td>
-                      <td className="px-3 py-3 text-slate-700">{ordem.operador_nome ?? '--'}</td>
-                      <td className="px-3 py-3 text-slate-700">
-                        {formatarDataHora(ordem.inicio_agendado)} · {formatarMinutos(plannedMinutes)}
+                      <td className="px-5 py-3 text-[#626A60]">{ordem.operador_nome ?? '--'}</td>
+                      <td className="px-5 py-3 text-[#626A60]">
+                        {formatarDataHora(ordem.inicio_agendado)} | {formatarMinutos(plannedMinutes)}
                       </td>
-                      <td className="px-3 py-3 text-slate-700">
+                      <td className="px-5 py-3 text-[#626A60]">
                         {formatarDataHora(ordem.inicio_operacao_em)} / {formatarDataHora(ordem.fim_operacao_em)}
                       </td>
-                      <td className="px-3 py-3 text-slate-700">{formatarNumero(obterQuantidadeProduzidaEstimada(ordem, agoraMs), 2)} L</td>
-                      <td className="px-3 py-3 text-slate-700">
+                      <td className="px-5 py-3 text-right font-medium text-[#151A16]">
+                        {formatarNumero(obterQuantidadeProduzidaEstimada(ordem, agoraMs), 1)} L
+                      </td>
+                      <td className="px-5 py-3 text-right text-[#626A60]">
                         {actualMinutes > 0 ? formatarMinutos(delayMinutes) : '--'}
                       </td>
                     </tr>
@@ -908,16 +1187,16 @@ export default function MonitoramentoPage() {
                 })}
                 {historyRows.length === 0 && (
                   <tr>
-                    <td colSpan={10} className="px-3 py-10 text-center text-slate-400">
-                      Nenhuma ordem encontrada no período selecionado.
+                    <td colSpan={10} className="px-5 py-12 text-center text-[#70786E]">
+                      Nenhuma ordem encontrada no periodo selecionado.
                     </td>
                   </tr>
                 )}
               </tbody>
             </table>
           </div>
-        </section>
-      </main>
+        </Panel>
+      </div>
     </div>
   )
 }

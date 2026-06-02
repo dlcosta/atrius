@@ -25,13 +25,13 @@ export function Sidebar() {
 
   return (
     <aside
-      className={`relative sticky top-0 flex h-screen flex-col border-r border-[#E4E7EC] bg-white transition-all duration-150 ${
-        isCollapsed ? 'w-[74px]' : 'w-[288px]'
+      className={`relative sticky top-0 hidden h-screen w-[74px] shrink-0 flex-col border-r border-[#E4E7EC] bg-white transition-all duration-150 sm:flex ${
+        isCollapsed ? 'md:w-[74px]' : 'md:w-[288px]'
       }`}
     >
       <button
         onClick={() => setIsCollapsed(!isCollapsed)}
-        className="absolute -right-3 top-20 z-50 rounded-full border border-[#E4E7EC] bg-white p-1 text-[#4B5563] shadow-[var(--shadow-sm)] hover:border-[#CDD2DA] hover:bg-[#F7F8FA] hover:text-[#111827]"
+        className="absolute -right-3 top-20 z-50 hidden rounded-full border border-[#E4E7EC] bg-white p-1 text-[#4B5563] shadow-[var(--shadow-sm)] hover:border-[#CDD2DA] hover:bg-[#F7F8FA] hover:text-[#111827] md:block"
       >
         {isCollapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
       </button>
@@ -51,8 +51,8 @@ export function Sidebar() {
                 key={item.href}
                 href={item.href}
                 title={isCollapsed ? item.name : ''}
-                className={`relative flex rounded-[8px] text-sm font-medium transition-all duration-[120ms] ${
-                  isCollapsed ? 'h-10 justify-center px-2' : 'min-h-[48px] items-center gap-3 px-3 py-2'
+                className={`relative flex h-10 justify-center rounded-[8px] px-2 text-sm font-medium transition-all duration-[120ms] ${
+                  isCollapsed ? 'md:h-10 md:justify-center md:px-2' : 'md:min-h-[48px] md:items-center md:justify-start md:gap-3 md:px-3 md:py-2'
                 } ${
                   isActive
                     ? 'bg-[#EFF6FF] text-[#2563EB]'
@@ -64,7 +64,7 @@ export function Sidebar() {
                 )}
                 <Icon size={18} className={`shrink-0 ${isActive ? 'text-[#2563EB]' : 'text-[#9CA3AF]'}`} />
                 {!isCollapsed && (
-                  <span className="line-clamp-2 leading-5 text-left">
+                  <span className="hidden leading-5 text-left md:line-clamp-2">
                     {item.name}
                   </span>
                 )}
@@ -80,7 +80,7 @@ export function Sidebar() {
             JD
           </div>
           {!isCollapsed && (
-            <div className="min-w-0 flex-1">
+            <div className="hidden min-w-0 flex-1 md:block">
               <p className="truncate text-sm font-semibold text-[#111827]">John Doe</p>
               <p className="truncate text-xs text-[#9CA3AF]">Operador</p>
             </div>
@@ -88,7 +88,7 @@ export function Sidebar() {
         </div>
 
         {!isCollapsed && (
-          <div className="mt-3 flex items-center gap-2 px-1">
+          <div className="mt-3 hidden items-center gap-2 px-1 md:flex">
             <span className="h-2 w-2 rounded-full bg-[#16A34A] [animation:status-pulse_2s_infinite]" />
             <span className="text-xs text-[#9CA3AF]">Conectado</span>
           </div>
