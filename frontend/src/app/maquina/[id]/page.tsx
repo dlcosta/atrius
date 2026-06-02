@@ -27,7 +27,7 @@ export default function MaquinaPage() {
       const dasMaquinas = data.filter((o) => o.maquina_id === id && o.inicio_agendado !== null)
       setOrdens(ordenarPorInicio(dasMaquinas))
     } catch (err) {
-      console.error('Erro ao carregar ordens da maquina:', err)
+      console.error('Erro ao carregar ordens da máquina:', err)
     }
   }, [id])
 

@@ -189,7 +189,7 @@ async function validarConclusaoSemDivergencia({ supabase, ordem, requestedPlanni
   const balance = await calcularBalanceamentoTanque(supabase, tankOrderId)
   if (!balance) return null
   if (Math.abs(balance.deltaLiters) > VOLUME_BALANCE_TOLERANCE_LITERS) {
-    return `Nao e possivel concluir enquanto houver divergencia de volume: ${balance.warning ?? 'diferenca detectada'}`
+    return `Não é possível concluir enquanto houver divergência de volume: ${balance.warning ?? 'diferença detectada'}`
   }
   return null
 }
@@ -202,21 +202,21 @@ router.get('/', async (req: Request, res: Response) => {
   const inicioParam = req.query.inicio as string | undefined
   const fimParam = req.query.fim as string | undefined
 
-  if (data && !DATE_REGEX.test(data)) return res.status(400).json({ error: 'data invalida' })
-  if (inicioParam && !DATE_REGEX.test(inicioParam)) return res.status(400).json({ error: 'inicio invalido' })
-  if (fimParam && !DATE_REGEX.test(fimParam)) return res.status(400).json({ error: 'fim invalido' })
+  if (data && !DATE_REGEX.test(data)) return res.status(400).json({ error: 'data inválida' })
+  if (inicioParam && !DATE_REGEX.test(inicioParam)) return res.status(400).json({ error: 'início inválido' })
+  if (fimParam && !DATE_REGEX.test(fimParam)) return res.status(400).json({ error: 'fim inválido' })
   if ((inicioParam && !fimParam) || (!inicioParam && fimParam)) {
-    return res.status(400).json({ error: 'inicio e fim devem ser informados juntos' })
+    return res.status(400).json({ error: 'início e fim devem ser informados juntos' })
   }
   if (inicioParam && fimParam && inicioParam > fimParam) {
-    return res.status(400).json({ error: 'inicio deve ser menor ou igual ao fim' })
+    return res.status(400).json({ error: 'início deve ser menor ou igual ao fim' })
   }
 
   let dias: number | null = null
   if (diasParam) {
     const parsed = Number(diasParam)
     if (!Number.isInteger(parsed) || parsed < 1 || parsed > 60) {
-      return res.status(400).json({ error: 'dias invalido (use 1..60)' })
+      return res.status(400).json({ error: 'dias inválido (use 1..60)' })
     }
     dias = parsed
   }
@@ -476,7 +476,7 @@ router.patch('/', async (req: Request, res: Response) => {
   const body = req.body
 
   const id = normalizarTexto(body.id)
-  if (!id) return res.status(400).json({ error: 'id obrigatorio' })
+  if (!id) return res.status(400).json({ error: 'id obrigatório' })
 
   const inicio_agendado = body.inicio_agendado as string | null | undefined
   const fim_calculado = body.fim_calculado as string | null | undefined
@@ -517,7 +517,7 @@ router.patch('/', async (req: Request, res: Response) => {
           ? ('ordens_envase_novo_fluxo' as const)
           : null)
 
-    if (!novoFluxoTable) return res.status(404).json({ error: 'Ordem nao encontrada' })
+    if (!novoFluxoTable) return res.status(404).json({ error: 'Ordem não encontrada' })
 
     const simpleUpdate: Record<string, unknown> = {}
     if (inicio_agendado === null) {
@@ -541,7 +541,7 @@ router.patch('/', async (req: Request, res: Response) => {
       }
     }
 
-    if (Object.keys(simpleUpdate).length === 0) return res.status(422).json({ error: 'nenhuma alteracao enviada' })
+    if (Object.keys(simpleUpdate).length === 0) return res.status(422).json({ error: 'nenhuma alteração enviada' })
 
     const { data: updatedNovo, error: updateError } = await supabase
       .from(novoFluxoTable).update(simpleUpdate).eq('id', id).select('*').single()
@@ -555,13 +555,13 @@ router.patch('/', async (req: Request, res: Response) => {
   const requestedPlanningStatus = normalizarPlanningStatus(metaUpdates.planning_status ?? ordemData.planning_status)
 
   if (inicio_agendado === undefined && body.maquina_id === undefined && body.machine_id === undefined) {
-    if (Object.keys(metaUpdates).length === 0) return res.status(422).json({ error: 'nenhuma alteracao enviada' })
+    if (Object.keys(metaUpdates).length === 0) return res.status(422).json({ error: 'nenhuma alteração enviada' })
 
     if (etapa === 'envase') {
-      if (!originTankOrderId) return res.status(422).json({ error: 'Origem de tanque obrigatoria para envase' })
+      if (!originTankOrderId) return res.status(422).json({ error: 'Origem de tanque obrigatória para envase' })
       const origem = await carregarOrigemTanque(supabase, originTankOrderId)
       if (!origem || origem.etapa !== 'tanque') {
-        return res.status(422).json({ error: 'Origem de tanque invalida para envase' })
+        return res.status(422).json({ error: 'Origem de tanque inválida para envase' })
       }
     }
 
@@ -586,17 +586,17 @@ router.patch('/', async (req: Request, res: Response) => {
     return res.json(updated)
   }
 
-  if (!inicio_agendado) return res.status(422).json({ error: 'inicio_agendado obrigatorio' })
+  if (!inicio_agendado) return res.status(422).json({ error: 'inicio_agendado obrigatório' })
 
   const resourceTankId = tank_id ?? normalizarTexto(ordemData.tank_id)
   const resourceMachineId = maquina_id ?? normalizarTexto(ordemData.maquina_id)
 
   if (etapa === 'tanque' && !resourceTankId) {
-    return res.status(422).json({ error: 'tank_id e obrigatorio para producao em tanque' })
+    return res.status(422).json({ error: 'tank_id é obrigatório para produção em tanque' })
   }
   if (etapa === 'envase') {
-    if (!resourceMachineId) return res.status(422).json({ error: 'maquina_id e obrigatorio para envase' })
-    if (!originTankOrderId) return res.status(422).json({ error: 'Origem de tanque obrigatoria para envase' })
+    if (!resourceMachineId) return res.status(422).json({ error: 'maquina_id é obrigatório para envase' })
+    if (!originTankOrderId) return res.status(422).json({ error: 'Origem de tanque obrigatória para envase' })
   }
 
   const calcMode = normalizarCalcMode(metaUpdates.calc_mode ?? body.calc_mode ?? ordemData.calc_mode)
@@ -608,7 +608,7 @@ router.patch('/', async (req: Request, res: Response) => {
   if (calcMode === 'BOXES_MASTER' && inputBoxes !== null && packageVolumeLiters !== null && unitsPerBox > 0) {
     litros = calculateLitersFromBoxes({ boxes: inputBoxes, packageVolumeLiters, unitsPerBox })
   }
-  if (!Number.isFinite(litros) || litros <= 0) return res.status(422).json({ error: 'Litros invalido' })
+  if (!Number.isFinite(litros) || litros <= 0) return res.status(422).json({ error: 'Litros inválido' })
 
   const setupTimeMinutes = normalizarInteiro(metaUpdates.setup_time_minutes ?? ordemData.setup_time_minutes) ?? 0
   const rawProductionTimeMinutes = normalizarInteiro(metaUpdates.production_time_minutes ?? ordemData.production_time_minutes) ?? 0
@@ -618,7 +618,7 @@ router.patch('/', async (req: Request, res: Response) => {
     ? rawProductionTimeMinutes
     : Math.max(0, totalDurationFallback - setupTimeMinutes - cleaningTimeMinutes)
   if (setupTimeMinutes < 0 || productionTimeMinutes <= 0 || cleaningTimeMinutes < 0) {
-    return res.status(422).json({ error: 'Defina o tempo de producao da ordem antes de agendar.' })
+    return res.status(422).json({ error: 'Defina o tempo de produção da ordem antes de agendar.' })
   }
   if (packageVolumeLiters !== null && packageVolumeLiters <= 0) {
     return res.status(422).json({ error: 'packageVolumeLiters deve ser maior que zero' })
@@ -634,11 +634,11 @@ router.patch('/', async (req: Request, res: Response) => {
   let origemTanque: any | null = null
   if (etapa === 'envase' && originTankOrderId) {
     origemTanque = await carregarOrigemTanque(supabase, originTankOrderId)
-    if (!origemTanque || origemTanque.etapa !== 'tanque') return res.status(422).json({ error: 'Origem de tanque invalida para envase' })
+    if (!origemTanque || origemTanque.etapa !== 'tanque') return res.status(422).json({ error: 'Origem de tanque inválida para envase' })
   }
 
   const inicio = new Date(inicio_agendado)
-  if (!Number.isFinite(inicio.getTime())) return res.status(422).json({ error: 'inicio_agendado invalido' })
+  if (!Number.isFinite(inicio.getTime())) return res.status(422).json({ error: 'inicio_agendado inválido' })
   if (isScheduleStartInPast(inicio)) return res.status(422).json({ error: SCHEDULE_IN_PAST_ERROR })
 
   const totalDurationMinutes = Math.max(1, calculateTotalDuration({ setupTimeMinutes, productionTimeMinutes, cleaningTimeMinutes }))
@@ -660,7 +660,7 @@ router.patch('/', async (req: Request, res: Response) => {
     newEnd: fim,
     existingSchedules: (ordensExistentes as Ordem[]) ?? [],
   })
-  if (conflict) return res.status(409).json({ error: 'Ja existe uma producao agendada nesse recurso para este horario.' })
+  if (conflict) return res.status(409).json({ error: 'Já existe uma produção agendada nesse recurso para este horário.' })
 
   const updates: Record<string, unknown> = {
     maquina_id: etapa === 'envase' ? resourceMachineId : null,
@@ -741,16 +741,16 @@ router.post('/', async (req: Request, res: Response) => {
   if (resultado.erro) return res.status(422).json({ error: resultado.erro })
 
   const { data: produto } = await supabase.from('produtos').select('sku, cor').eq('sku', body.produto_sku).single()
-  if (!produto) return res.status(404).json({ error: 'Produto nao encontrado' })
+  if (!produto) return res.status(404).json({ error: 'Produto não encontrado' })
 
   let originTank: any | null = null
   if (etapa === 'envase') {
     originTank = await carregarOrigemTanque(supabase, originTankOrderId)
     if (!originTank || originTank.etapa !== 'tanque') {
-      return res.status(422).json({ error: 'Origem de tanque invalida para envase' })
+      return res.status(422).json({ error: 'Origem de tanque inválida para envase' })
     }
     if (isCanceled(originTank.planning_status, originTank.status)) {
-      return res.status(422).json({ error: 'Origem de tanque cancelada nao pode ser usada no envase' })
+      return res.status(422).json({ error: 'Origem de tanque cancelada não pode ser usada no envase' })
     }
   }
 
@@ -762,17 +762,17 @@ router.post('/', async (req: Request, res: Response) => {
   const totalDurationMinutes = Math.max(1, calculateTotalDuration({ setupTimeMinutes, productionTimeMinutes, cleaningTimeMinutes }))
   const startAt = plannedStartAt ? new Date(plannedStartAt) : null
   if (startAt && !Number.isFinite(startAt.getTime())) {
-    return res.status(422).json({ error: 'plannedStartAt invalido' })
+    return res.status(422).json({ error: 'plannedStartAt inválido' })
   }
   if (startAt && isScheduleStartInPast(startAt)) {
     return res.status(422).json({ error: SCHEDULE_IN_PAST_ERROR })
   }
 
   if (startAt && etapa === 'tanque' && !tankId) {
-    return res.status(422).json({ error: 'tank_id e obrigatorio para producao em tanque agendada' })
+    return res.status(422).json({ error: 'tank_id é obrigatório para produção em tanque agendada' })
   }
   if (startAt && etapa === 'envase' && !machineId) {
-    return res.status(422).json({ error: 'maquina_id e obrigatorio para envase agendado' })
+    return res.status(422).json({ error: 'maquina_id é obrigatório para envase agendado' })
   }
 
   const fim = startAt ? calculateProductionEndTime(startAt, totalDurationMinutes) : null
@@ -789,7 +789,7 @@ router.post('/', async (req: Request, res: Response) => {
       existingSchedules: (existentes as Ordem[]) ?? [],
     })
     if (hasConflict) {
-      return res.status(409).json({ error: 'Ja existe uma producao agendada nesse recurso para este horario.' })
+      return res.status(409).json({ error: 'Já existe uma produção agendada nesse recurso para este horário.' })
     }
   }
 
@@ -1087,15 +1087,15 @@ router.post('/operacao', async (req: Request, res: Response) => {
     if (ordem.etapa !== 'envase' || !ordem.origin_tank_order_id) return null
     if (source === 'novo_fluxo_envase' && ordem.origin_tank_source === 'novo_fluxo') {
       const { data } = await supabase.from('ordens_tanque_novo_fluxo').select('planning_status, status').eq('id', ordem.origin_tank_order_id).maybeSingle()
-      if (!data) return 'Ordem de tanque de origem nao encontrada.'
-      if (data.status === 'cancelada' || data.planning_status === 'CANCELED') return 'Ordem de tanque cancelada nao pode liberar envase.'
-      if (data.planning_status !== 'COMPLETED') return 'So e possivel iniciar o envase quando a ordem do tanque estiver concluida.'
+      if (!data) return 'Ordem de tanque de origem não encontrada.'
+      if (data.status === 'cancelada' || data.planning_status === 'CANCELED') return 'Ordem de tanque cancelada não pode liberar envase.'
+      if (data.planning_status !== 'COMPLETED') return 'Só é possível iniciar o envase quando a ordem do tanque estiver concluída.'
       return null
     }
     const { data } = await supabase.from('ordens').select('planning_status, status').eq('id', ordem.origin_tank_order_id).maybeSingle()
-    if (!data) return 'Ordem de tanque de origem nao encontrada.'
-    if (data.status === 'cancelada' || data.planning_status === 'CANCELED') return 'Ordem de tanque cancelada nao pode liberar envase.'
-    if (data.planning_status !== 'COMPLETED') return 'So e possivel iniciar o envase quando a ordem do tanque estiver concluida.'
+    if (!data) return 'Ordem de tanque de origem não encontrada.'
+    if (data.status === 'cancelada' || data.planning_status === 'CANCELED') return 'Ordem de tanque cancelada não pode liberar envase.'
+    if (data.planning_status !== 'COMPLETED') return 'Só é possível iniciar o envase quando a ordem do tanque estiver concluída.'
     return null
   }
 
@@ -1117,9 +1117,9 @@ router.post('/operacao', async (req: Request, res: Response) => {
       const compatUpdates: Record<string, unknown> = {
         status: updates.status,
         planning_status: updates.planning_status,
-        // Janela de agendamento (inicio_agendado/fim_calculado) NUNCA e tocada pela operacao —
-        // preserva "Inicio previsto", "Fim previsto" planejado e a posicao no calendario.
-        // Grava nas colunas diretas para consistência com o banco e com o monitoramento
+        // Janela de agendamento (inicio_agendado/fim_calculado) NUNCA é tocada pela operação.
+        // Preserva "Início previsto", "Fim previsto" planejado e a posição no calendário.
+        // Grava nas colunas diretas para consistência com o banco e com o monitoramento.
         inicio_operacao_em: compatOperacao.inicio_operacao_em,
         fim_operacao_em: compatOperacao.fim_operacao_em,
         pausado_em: compatOperacao.pausado_em,
@@ -1139,7 +1139,7 @@ router.post('/operacao', async (req: Request, res: Response) => {
     const legacyUpdates: Record<string, unknown> = { ...updates }
     delete legacyUpdates.operador_id
     delete legacyUpdates.observacao_pausa
-    // fim_estimado nao e coluna de `ordens`; persiste apenas via notes (mergeCompatNotes)
+    // fim_estimado não é coluna de `ordens`; persiste apenas via notes (mergeCompatNotes)
     delete legacyUpdates.fim_estimado
     legacyUpdates.notes = mergeCompatNotes(resolution.ordem.notes, compatOperacao)
     const { data, error } = await supabase.from(resolution.table).update(legacyUpdates).eq('id', resolution.ordem.id).select('*').single()
@@ -1200,8 +1200,8 @@ router.post('/operacao', async (req: Request, res: Response) => {
   const observacaoPausa = body.observacao_pausa?.trim() ?? ''
   const requestedSource = validarSource(body.flow_source) ? body.flow_source : undefined
 
-  if (!ordemId) return res.status(422).json({ error: 'ordem_id obrigatorio' })
-  if (!validarAcao(acao)) return res.status(422).json({ error: 'acao invalida' })
+  if (!ordemId) return res.status(422).json({ error: 'ordem_id obrigatório' })
+  if (!validarAcao(acao)) return res.status(422).json({ error: 'acao inválida' })
 
   const operadorId = body.operador_id?.trim() ?? ''
   const operadorNomeDigitado = body.operador_nome?.trim() ?? ''
@@ -1211,7 +1211,7 @@ router.post('/operacao', async (req: Request, res: Response) => {
   if (operadorId) {
     const operador = await buscarOperadorPorId(operadorId)
     if (!operador || !operador.ativo) {
-      return res.status(422).json({ error: 'Operador selecionado nao esta disponivel.' })
+      return res.status(422).json({ error: 'Operador selecionado não está disponível.' })
     }
     resolvedOperadorId = operador.id
     resolvedOperadorNome = operador.nome
@@ -1219,28 +1219,28 @@ router.post('/operacao', async (req: Request, res: Response) => {
     resolvedOperadorId = null
     resolvedOperadorNome = operadorNomeDigitado
   } else {
-    return res.status(422).json({ error: 'operador_id obrigatorio' })
+    return res.status(422).json({ error: 'operador_id obrigatório' })
   }
 
   if (acao === 'pausar' && !observacaoPausa) {
-    return res.status(422).json({ error: 'observacao_pausa obrigatoria para registrar a pausa.' })
+    return res.status(422).json({ error: 'observacao_pausa obrigatória para registrar a pausa.' })
   }
 
   const resolution = await resolveOrder(ordemId, requestedSource)
-  if (!resolution) return res.status(404).json({ error: 'Ordem nao encontrada' })
+  if (!resolution) return res.status(404).json({ error: 'Ordem não encontrada' })
 
   const { ordem } = resolution
   if (isCanceled(ordem.planning_status, ordem.status)) {
-    return res.status(409).json({ error: 'Ordem cancelada nao pode ser movimentada.' })
+    return res.status(409).json({ error: 'Ordem cancelada não pode ser movimentada.' })
   }
   if (isFinalized(ordem.status, ordem.planning_status)) {
-    return res.status(409).json({ error: 'Ordem ja concluida.' })
+    return res.status(409).json({ error: 'Ordem já concluída.' })
   }
 
   const resourceId = ordem.etapa === 'tanque' ? ordem.tank_id : ordem.maquina_id
   const resourceType: ResourceType = ordem.etapa === 'tanque' ? 'tank' : 'machine'
   if (!resourceId) {
-    return res.status(409).json({ error: 'A ordem precisa estar vinculada a um recurso para iniciar a producao.' })
+    return res.status(409).json({ error: 'A ordem precisa estar vinculada a um recurso para iniciar a produção.' })
   }
 
   const agora = new Date()
@@ -1248,12 +1248,12 @@ router.post('/operacao', async (req: Request, res: Response) => {
 
   if (acao === 'iniciar') {
     if (isPaused(ordem.status, ordem.planning_status)) {
-      return res.status(409).json({ error: 'A ordem esta pausada. Use retomar para continuar.' })
+      return res.status(409).json({ error: 'A ordem está pausada. Use retomar para continuar.' })
     }
     const erroOrigem = await validarOrigemTanqueConcluida(resolution)
     if (erroOrigem) return res.status(422).json({ error: erroOrigem })
     const conflito = await hasOperationalConflictOnResource(resourceType, resourceId, ordem.id, resolution.source)
-    if (conflito) return res.status(409).json({ error: 'Ja existe outra ordem em andamento ou pausada nesse recurso.' })
+    if (conflito) return res.status(409).json({ error: 'Já existe outra ordem em andamento ou pausada nesse recurso.' })
 
     const durationMinutes = resolution.isLegacy
       ? await calcularDuracaoPlanejadaMinLegado(ordem)
@@ -1290,7 +1290,7 @@ router.post('/operacao', async (req: Request, res: Response) => {
     const erroOrigem = await validarOrigemTanqueConcluida(resolution)
     if (erroOrigem) return res.status(422).json({ error: erroOrigem })
     const conflito = await hasOperationalConflictOnResource(resourceType, resourceId, ordem.id, resolution.source)
-    if (conflito) return res.status(409).json({ error: 'Ja existe outra ordem em andamento ou pausada nesse recurso.' })
+    if (conflito) return res.status(409).json({ error: 'Já existe outra ordem em andamento ou pausada nesse recurso.' })
 
     const { data, error } = await updateOrder(resolution, buildRetomarUpdate({
       ordem, now: agora,
@@ -1301,8 +1301,8 @@ router.post('/operacao', async (req: Request, res: Response) => {
     return res.json({ ...data, flow_source: resolution.source })
   }
 
-  // finalizar — registra o fim real (fim_operacao_em). fim_calculado permanece o planejado,
-  // permitindo o calculo de atraso (real x planejado) no monitoramento.
+  // Finalizar registra o fim real (fim_operacao_em). fim_calculado permanece o planejado,
+  // permitindo o cálculo de atraso (real x planejado) no monitoramento.
   const { data, error } = await updateOrder(resolution, buildFinalizarUpdate({
     ordem, now: agora,
     operadorId: resolvedOperadorId, operadorNome: resolvedOperadorNome,

@@ -32,7 +32,7 @@ export const toast = {
   success(message: string, title = 'Sucesso') {
     emit({ tone: 'success', title, message })
   },
-  warning(message: string, title = 'Atencao') {
+  warning(message: string, title = 'Atenção') {
     emit({ tone: 'warning', title, message })
   },
   error(message: string, title = 'Erro') {

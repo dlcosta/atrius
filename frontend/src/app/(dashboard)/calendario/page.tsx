@@ -1486,10 +1486,10 @@ function MachineInspector({
           <div>
             <div className="flex items-center gap-2 text-xs font-bold uppercase text-blue-700">
               <Settings2 size={14} />
-              Maquina expandida
+              Máquina expandida
             </div>
             <h2 className="mt-1 text-xl font-black tracking-tight text-slate-900">{maquina.nome}</h2>
-            <p className="text-xs text-slate-500">Produtos e ordens da agenda visivel</p>
+            <p className="text-xs text-slate-500">Produtos e ordens da agenda visível</p>
           </div>
           <button
             type="button"

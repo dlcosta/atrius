@@ -152,7 +152,7 @@ export function OrdemProducaoTanquePage({ produtos }: Props) {
     e.preventDefault()
 
     if (hasPreviewConflict) {
-      toast.error('Esse tanque ja possui uma ordem agendada nesse intervalo.')
+      toast.error('Esse tanque já possui uma ordem agendada nesse intervalo.')
       return
     }
 

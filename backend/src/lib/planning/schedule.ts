@@ -1,5 +1,5 @@
 export const SCHEDULE_IN_PAST_ERROR =
-  'Nao e permitido agendar producao em horario passado. Escolha o horario atual ou futuro.'
+  'Não é permitido agendar produção em horário passado. Escolha o horário atual ou futuro.'
 
 function truncateToMinute(date: Date): Date {
   const result = new Date(date)

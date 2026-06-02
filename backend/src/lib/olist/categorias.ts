@@ -18,7 +18,7 @@ export type CategoriaParaUpsert = {
 
 export function parseCategoriaNode(rawNode: unknown): CategoriaArvore {
   if (!rawNode || typeof rawNode !== 'object') {
-    throw new Error('Resposta de categoria invalida: item nao e objeto.')
+    throw new Error('Resposta de categoria inválida: item não é objeto.')
   }
 
   const candidate = rawNode as Record<string, unknown>
@@ -27,11 +27,11 @@ export function parseCategoriaNode(rawNode: unknown): CategoriaArvore {
   const filhasRaw = Array.isArray(candidate.filhas) ? candidate.filhas : []
 
   if (!Number.isFinite(id)) {
-    throw new Error('Resposta de categoria invalida: campo id ausente ou invalido.')
+    throw new Error('Resposta de categoria inválida: campo id ausente ou inválido.')
   }
 
   if (!descricao) {
-    throw new Error(`Resposta de categoria invalida: descricao ausente na categoria ${id}.`)
+    throw new Error(`Resposta de categoria inválida: descrição ausente na categoria ${id}.`)
   }
 
   return {
@@ -60,7 +60,7 @@ export function extrairCategoriasResposta(payload: unknown): CategoriaArvore[] {
     }
   }
 
-  throw new Error('Formato de resposta da API de categorias nao reconhecido.')
+  throw new Error('Formato de resposta da API de categorias não reconhecido.')
 }
 
 export async function fetchCategoriasArvore(): Promise<CategoriaArvore[]> {

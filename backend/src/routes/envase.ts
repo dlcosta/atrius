@@ -207,14 +207,14 @@ type PostCadastroBody = {
 const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/
 
 function validarCadastro(body: PostCadastroBody): string | null {
-  if (!body.produto_sku?.trim()) return 'produto_sku obrigatorio'
-  if (!body.origin_tank_order_id?.trim()) return 'origin_tank_order_id obrigatorio'
-  if (!body.maquina_id?.trim()) return 'maquina_id obrigatorio'
-  if (!body.data_prevista?.trim()) return 'data_prevista obrigatoria'
-  if (!DATE_REGEX.test(body.data_prevista)) return 'data_prevista invalida'
-  if (!body.inicio_agendado?.trim()) return 'inicio_agendado obrigatorio'
-  if (!body.nome_produto?.trim()) return 'nome_produto obrigatorio'
-  if (!body.embalagem_label?.trim()) return 'embalagem_label obrigatoria'
+  if (!body.produto_sku?.trim()) return 'produto_sku obrigatório'
+  if (!body.origin_tank_order_id?.trim()) return 'origin_tank_order_id obrigatório'
+  if (!body.maquina_id?.trim()) return 'maquina_id obrigatório'
+  if (!body.data_prevista?.trim()) return 'data_prevista obrigatória'
+  if (!DATE_REGEX.test(body.data_prevista)) return 'data_prevista inválida'
+  if (!body.inicio_agendado?.trim()) return 'inicio_agendado obrigatório'
+  if (!body.nome_produto?.trim()) return 'nome_produto obrigatório'
+  if (!body.embalagem_label?.trim()) return 'embalagem_label obrigatória'
   if (!Number.isFinite(Number(body.package_volume_liters)) || Number(body.package_volume_liters) <= 0) {
     return 'package_volume_liters deve ser maior que zero'
   }
@@ -245,7 +245,7 @@ router.post('/cadastro', async (req: Request, res: Response) => {
 
   const startAt = new Date(String(body.inicio_agendado))
   if (!Number.isFinite(startAt.getTime())) {
-    return res.status(422).json({ error: 'inicio_agendado invalido' })
+    return res.status(422).json({ error: 'inicio_agendado inválido' })
   }
   if (isScheduleStartInPast(startAt)) {
     return res.status(422).json({ error: SCHEDULE_IN_PAST_ERROR })
@@ -270,7 +270,7 @@ router.post('/cadastro', async (req: Request, res: Response) => {
     .single()
 
   if (produtoError || !produto) {
-    return res.status(404).json({ error: 'Produto nao encontrado' })
+    return res.status(404).json({ error: 'Produto não encontrado' })
   }
 
   const { data: originTank, error: originError } = await supabase
@@ -280,18 +280,18 @@ router.post('/cadastro', async (req: Request, res: Response) => {
     .single()
 
   if (originError || !originTank) {
-    return res.status(404).json({ error: 'Ordem de tanque nao encontrada' })
+    return res.status(404).json({ error: 'Ordem de tanque não encontrada' })
   }
 
   const origem = originTank as any
   if (origem.etapa !== 'tanque') {
-    return res.status(422).json({ error: 'Origem informada nao e uma ordem de tanque' })
+    return res.status(422).json({ error: 'Origem informada não é uma ordem de tanque' })
   }
   if (origem.planning_status !== 'COMPLETED') {
-    return res.status(422).json({ error: 'Somente ordens de tanque concluidas podem originar envase' })
+    return res.status(422).json({ error: 'Somente ordens de tanque concluídas podem originar envase' })
   }
   if (origem.planning_status === 'CANCELED' || origem.status === 'cancelada') {
-    return res.status(422).json({ error: 'Ordem de tanque cancelada nao pode ser usada' })
+    return res.status(422).json({ error: 'Ordem de tanque cancelada não pode ser usada' })
   }
 
   const { data: fillingOrders, error: fillingError } = await supabase
@@ -318,7 +318,7 @@ router.post('/cadastro', async (req: Request, res: Response) => {
 
   if (balance.status === 'OVER') {
     return res.status(422).json({
-      error: `Volume de envase excede o saldo do tanque. Disponivel: ${balance.deltaLiters + Number(body.total_litros || 0)}L`,
+      error: `Volume de envase excede o saldo do tanque. Disponível: ${balance.deltaLiters + Number(body.total_litros || 0)}L`,
     })
   }
 
@@ -337,7 +337,7 @@ router.post('/cadastro', async (req: Request, res: Response) => {
   })
 
   if (hasConflict) {
-    return res.status(409).json({ error: 'Ja existe uma producao agendada nessa maquina para este horario.' })
+    return res.status(409).json({ error: 'Já existe uma produção agendada nessa máquina para este horário.' })
   }
 
   const packageVolumeLiters = Number(body.package_volume_liters)

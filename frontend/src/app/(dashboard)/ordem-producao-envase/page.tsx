@@ -23,7 +23,7 @@ async function buscarMaquinas(): Promise<Maquina[]> {
     .order('nome', { ascending: true })
 
   if (error) {
-    console.error('[ordem-producao-envase] erro ao buscar maquinas:', error.message)
+    console.error('[ordem-producao-envase] erro ao buscar máquinas:', error.message)
     return []
   }
 

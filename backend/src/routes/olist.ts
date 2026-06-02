@@ -87,7 +87,7 @@ router.get('/pedidos', async (req: Request, res: Response) => {
     return res.json(listagem)
   } catch (err) {
     if (err instanceof OlistAuthError) {
-      return res.status(401).json({ error: 'Olist nao conectado. Acesse /admin/olist para reconectar.' })
+      return res.status(401).json({ error: 'Olist não conectado. Acesse /admin/olist para reconectar.' })
     }
     if (err instanceof OlistApiError) {
       return res.status(502).json({ error: `API Olist retornou ${err.status}`, detalhe: err.body })

@@ -99,9 +99,9 @@ function statusLabel(ordem: Ordem | null, agoraMs = Date.now()): string {
   if (isCanceledOrder(ordem)) return 'Cancelada'
   if (ordem.status === 'produzindo') return 'Produzindo'
   if (ordem.status === 'pausada') return 'Pausada'
-  if (ordem.status === 'concluida') return 'Concluida'
+  if (ordem.status === 'concluida') return 'Concluída'
   if (isExpiredUnstartedOrder(ordem, agoraMs)) return 'Vencida'
-  if (ordem.planning_status === 'BACKLOG' || ordem.planning_status === 'READY_TO_SCHEDULE') return 'Nao agendada'
+  if (ordem.planning_status === 'BACKLOG' || ordem.planning_status === 'READY_TO_SCHEDULE') return 'Não agendada'
   if (ordem.planning_status === 'WAITING_TANK') return 'Aguard. tanque'
   return 'Programada'
 }
@@ -182,7 +182,7 @@ function getResourceVolumeHoje(ordens: Ordem[], agoraMs: number) {
 }
 
 function getMachineName(ordem: Ordem) {
-  return ordem.maquina?.nome ?? (ordem.maquina_id ? `Maquina ${ordem.maquina_id.slice(0, 4)}` : '--')
+  return ordem.maquina?.nome ?? (ordem.maquina_id ? `Máquina ${ordem.maquina_id.slice(0, 4)}` : '--')
 }
 
 function getTankName(ordem: Ordem, index = 0) {
@@ -221,8 +221,8 @@ function getProductionHealth(params: {
     clampPercent(params.onTimeRate * 0.45 + params.utilizationRate * 0.35 + 20 + idleBonus - delayPenalty - pausePenalty)
   )
 
-  if (score >= 82) return { score, label: 'Operacao saudavel', tone: 'green' as const }
-  if (score >= 62) return { score, label: 'Atencao controlada', tone: 'amber' as const }
+  if (score >= 82) return { score, label: 'Operação saudável', tone: 'green' as const }
+  if (score >= 62) return { score, label: 'Atenção controlada', tone: 'amber' as const }
   return { score, label: 'Risco operacional', tone: 'red' as const }
 }
 
@@ -243,7 +243,7 @@ function buildBottlenecks(params: {
       id: 'delayed',
       title: `${params.delayedOrders.length} ordem(ns) com atraso aberto`,
       detail: `Primeira: #${params.delayedOrders[0].numero_externo} em ${getHistoryResource(params.delayedOrders[0])}`,
-      meta: 'Fim previsto ja passou',
+      meta: 'Fim previsto já passou',
       severity: 'critical',
     })
   }
@@ -252,8 +252,8 @@ function buildBottlenecks(params: {
     bottlenecks.push({
       id: 'waiting-tank',
       title: `${params.waitingTank.length} envase(s) aguardando tanque`,
-      detail: `Proxima liberacao: #${params.waitingTank[0].numero_externo}`,
-      meta: 'Dependencia entre etapas',
+      detail: `Próxima liberação: #${params.waitingTank[0].numero_externo}`,
+      meta: 'Dependência entre etapas',
       severity: 'warning',
     })
   }
@@ -262,16 +262,16 @@ function buildBottlenecks(params: {
     bottlenecks.push({
       id: `pause-${highPauseMachine.machineId}`,
       title: `${highPauseMachine.machineName} concentra paradas`,
-      detail: `${formatarMinutos(highPauseMachine.pauseMinutes)} parado no periodo`,
+      detail: `${formatarMinutos(highPauseMachine.pauseMinutes)} parado no período`,
       meta: 'Revisar motivo das pausas',
       severity: 'warning',
     })
   } else if (params.pausasPeriodoMin > 0) {
     bottlenecks.push({
       id: 'pause-period',
-      title: 'Pausas registradas no periodo',
+      title: 'Pausas registradas no período',
       detail: `${formatarMinutos(params.pausasPeriodoMin)} somados em eventos`,
-      meta: 'Acompanhar recorrencia',
+      meta: 'Acompanhar recorrência',
       severity: 'info',
     })
   }
@@ -279,8 +279,8 @@ function buildBottlenecks(params: {
   if (weakMachine) {
     bottlenecks.push({
       id: `util-${weakMachine.machineId}`,
-      title: `${weakMachine.machineName} com baixa ocupacao`,
-      detail: `${formatarNumero(weakMachine.utilizationRate)}% de utilizacao`,
+      title: `${weakMachine.machineName} com baixa ocupação`,
+      detail: `${formatarNumero(weakMachine.utilizationRate)}% de utilização`,
       meta: 'Checar fila ou disponibilidade',
       severity: 'info',
     })
@@ -408,10 +408,10 @@ function HealthGauge({
       <div className="flex min-w-0 flex-col justify-center">
         <div className={`text-sm font-bold uppercase tracking-[0.18em] ${toneClass}`}>{label}</div>
         <h2 className="mt-2 max-w-2xl text-[26px] font-semibold leading-[1.06] tracking-[-0.06em] text-[#151A16] sm:text-[34px]">
-          Saude da operacao em uma leitura unica.
+          Saúde da operação em uma leitura única.
         </h2>
         <p className="mt-3 max-w-2xl text-sm leading-6 text-[#626A60]">
-          O score combina prazo, utilizacao, recursos ativos, atrasos e paradas para mostrar se a rotina esta fluindo ou se precisa de intervencao.
+          O score combina prazo, utilização, recursos ativos, atrasos e paradas para mostrar se a rotina está fluindo ou se precisa de intervenção.
         </p>
         <div className="mt-5 grid max-w-2xl grid-cols-1 gap-2 sm:grid-cols-3">
           <div className="rounded-2xl bg-[#F3F0E7] px-3 py-2">
@@ -424,7 +424,7 @@ function HealthGauge({
           </div>
           <div className="rounded-2xl bg-[#F3F0E7] px-3 py-2">
             <div className="text-[11px] uppercase tracking-[0.16em] text-[#7A8478]">Base</div>
-            <div className="mt-1 text-sm font-semibold text-[#151A16]">Historico</div>
+            <div className="mt-1 text-sm font-semibold text-[#151A16]">Histórico</div>
           </div>
         </div>
       </div>
@@ -451,7 +451,7 @@ function ResourceRow({ card, agoraMs }: { card: LiveResourceCard; agoraMs: numbe
         </div>
         <div className="min-w-0">
           <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#828B80]">
-            {card.tipo === 'maquina' ? 'Maquina' : 'Tanque'}
+            {card.tipo === 'maquina' ? 'Máquina' : 'Tanque'}
           </div>
           <h3 className="mt-1 truncate text-base font-semibold text-[#151A16]">{card.nome}</h3>
           <span className={`mt-2 inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold ${statusClasses(card.atual)}`}>
@@ -465,7 +465,7 @@ function ResourceRow({ card, agoraMs }: { card: LiveResourceCard; agoraMs: numbe
           <div className="min-w-0">
             <div className="truncate text-sm font-semibold text-[#151A16]">{getOrderProduct(card.atual)}</div>
             <div className="mt-0.5 text-xs text-[#778074]">
-              {card.atual ? `#${card.atual.numero_externo} | ${card.atual.operador_nome ?? 'Operador nao informado'}` : 'Sem ordem ativa neste momento'}
+              {card.atual ? `#${card.atual.numero_externo} | ${card.atual.operador_nome ?? 'Operador não informado'}` : 'Sem ordem ativa neste momento'}
             </div>
           </div>
           <div className="text-right font-mono text-sm font-semibold text-[#151A16]">
@@ -476,7 +476,7 @@ function ResourceRow({ card, agoraMs }: { card: LiveResourceCard; agoraMs: numbe
           <div className={`h-full rounded-full ${toneBar}`} style={{ width: `${progress}%` }} />
         </div>
         <div className="mt-2 flex flex-wrap justify-between gap-2 text-[11px] uppercase tracking-[0.12em] text-[#80887D]">
-          <span>Inicio {formatarHora(card.atual?.inicio_operacao_em ?? card.atual?.inicio_agendado)}</span>
+          <span>Início {formatarHora(card.atual?.inicio_operacao_em ?? card.atual?.inicio_agendado)}</span>
           <span>{formatarNumero(progress, 0)}% do ciclo</span>
           <span>Fim {formatarHora(card.atual?.fim_calculado)}</span>
         </div>
@@ -488,7 +488,7 @@ function ResourceRow({ card, agoraMs }: { card: LiveResourceCard; agoraMs: numbe
           <div className="mt-1 text-sm font-semibold text-[#151A16]">{card.ordens.length} ordens</div>
         </div>
         <div className="rounded-2xl border border-[#E4E6DD] bg-white px-3 py-2">
-          <div className="text-[10px] uppercase tracking-[0.15em] text-[#828B80]">Proxima</div>
+          <div className="text-[10px] uppercase tracking-[0.15em] text-[#828B80]">Próxima</div>
           <div className="mt-1 truncate text-sm font-semibold text-[#151A16]">
             {card.proxima ? `#${card.proxima.numero_externo} ${formatarHora(card.proxima.inicio_agendado)}` : 'Sem fila'}
           </div>
@@ -525,7 +525,7 @@ function BottleneckList({ items }: { items: Bottleneck[] }) {
         <div className="rounded-[18px] border border-dashed border-[#DDE3DD] bg-[#FCFBF7] px-4 py-10 text-center">
           <CheckCircle2 className="mx-auto text-emerald-600" size={28} />
           <p className="mt-3 text-sm font-semibold text-[#151A16]">Sem gargalos relevantes agora.</p>
-          <p className="mt-1 text-xs text-[#70786E]">Continue acompanhando atrasos, paradas e liberacoes de tanque.</p>
+          <p className="mt-1 text-xs text-[#70786E]">Continue acompanhando atrasos, paradas e liberações de tanque.</p>
         </div>
       )}
     </div>
@@ -541,7 +541,7 @@ function MachinePerformanceBars({ items }: { items: MachinePerformance[] }) {
             <div className="min-w-0">
               <div className="truncate font-semibold text-[#151A16]">{maquina.machineName}</div>
               <div className="text-xs text-[#737B71]">
-                {maquina.completedOrders} concluidas | {formatarNumero(maquina.outputLiters, 1)} L
+                {maquina.completedOrders} concluídas | {formatarNumero(maquina.outputLiters, 1)} L
               </div>
             </div>
             <div className="font-mono text-sm font-semibold text-[#151A16]">{formatarNumero(maquina.utilizationRate)}%</div>
@@ -562,7 +562,7 @@ function MachinePerformanceBars({ items }: { items: MachinePerformance[] }) {
 
       {items.length === 0 && (
         <div className="rounded-[18px] border border-dashed border-[#DDE3DD] px-4 py-8 text-center text-sm text-[#70786E]">
-          Nenhuma maquina ativa no periodo.
+          Nenhuma máquina ativa no período.
         </div>
       )}
     </div>
@@ -580,7 +580,7 @@ function OperatorRank({ items }: { items: OperatorPerformance[] }) {
           <div className="min-w-0 flex-1">
             <div className="truncate text-sm font-semibold text-[#151A16]">{operador.operatorName}</div>
             <div className="mt-1 text-xs text-[#737B71]">
-              {operador.completedOrders} concluidas | {formatarNumero(operador.outputLiters, 1)} L
+              {operador.completedOrders} concluídas | {formatarNumero(operador.outputLiters, 1)} L
             </div>
           </div>
           <div className="text-right">
@@ -592,7 +592,7 @@ function OperatorRank({ items }: { items: OperatorPerformance[] }) {
 
       {items.length === 0 && (
         <div className="rounded-[18px] border border-dashed border-[#DDE3DD] px-4 py-8 text-center text-sm text-[#70786E]">
-          Ainda nao ha operadores com dados suficientes.
+          Ainda não há operadores com dados suficientes.
         </div>
       )}
     </div>
@@ -674,10 +674,10 @@ function MonitoramentoDashboard() {
         readJsonSafe(eventosRes),
       ])
 
-      if (!mRes.ok) throw new Error((mData as { error?: string } | null)?.error ?? 'Erro ao carregar maquinas')
+      if (!mRes.ok) throw new Error((mData as { error?: string } | null)?.error ?? 'Erro ao carregar máquinas')
       if (!hojeRes.ok) throw new Error((hojeData as { error?: string } | null)?.error ?? 'Erro ao carregar ordens do dia')
-      if (!periodoRes.ok) throw new Error((periodoData as { error?: string } | null)?.error ?? 'Erro ao carregar ordens do periodo')
-      if (!eventosRes.ok) throw new Error((eventosData as { error?: string } | null)?.error ?? 'Erro ao carregar eventos do periodo')
+      if (!periodoRes.ok) throw new Error((periodoData as { error?: string } | null)?.error ?? 'Erro ao carregar ordens do período')
+      if (!eventosRes.ok) throw new Error((eventosData as { error?: string } | null)?.error ?? 'Erro ao carregar eventos do período')
 
       setMaquinas(Array.isArray(mData) ? mData : [])
       setOrdensHoje(Array.isArray(hojeData) ? hojeData : [])
@@ -902,7 +902,7 @@ function MonitoramentoDashboard() {
                 Monitoramento operacional
               </h1>
               <p className="mt-2 max-w-3xl text-sm leading-6 text-[#626A60]">
-                Uma leitura clara do que esta rodando agora, onde a operacao pode travar e como o periodo esta performando.
+                Uma leitura clara do que está rodando agora, onde a operação pode travar e como o período está performando.
               </p>
             </div>
 
@@ -910,7 +910,7 @@ function MonitoramentoDashboard() {
               <div className="rounded-2xl border border-[#DBDED3] bg-white px-3 py-2">
                 <label className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.16em] text-[#7A8478]">
                   <CalendarRange size={13} />
-                  Inicio
+                  Início
                 </label>
                 <input
                   type="date"
@@ -962,7 +962,7 @@ function MonitoramentoDashboard() {
             <HealthGauge score={health.score} label={health.label} tone={health.tone} />
             <div className="grid gap-3 sm:grid-cols-2">
               <MetricCard
-                title="Producao no periodo"
+                title="Produção no período"
                 value={`${formatarNumero(litrosPeriodo, 1)} L`}
                 detail={`${formatarNumero(indicadoresPeriodo.percentualProduzido)}% do volume planejado estimado.`}
                 icon={Factory}
@@ -971,7 +971,7 @@ function MonitoramentoDashboard() {
               <MetricCard
                 title="No prazo"
                 value={`${formatarNumero(onTimeRate)}%`}
-                detail={`${indicadoresPeriodo.ordensConcluidas} concluidas de ${indicadoresPeriodo.totalOrdens} ordens.`}
+                detail={`${indicadoresPeriodo.ordensConcluidas} concluídas de ${indicadoresPeriodo.totalOrdens} ordens.`}
                 icon={CheckCircle2}
                 tone="green"
               />
@@ -997,8 +997,8 @@ function MonitoramentoDashboard() {
           <Panel className="p-4 sm:p-5">
             <SectionHeader
               label="Ao vivo"
-              title="Recursos em operacao"
-              description="Maquinas e tanques aparecem como linhas de comando: status, produto, progresso, tempo restante e proxima ordem."
+              title="Recursos em operação"
+              description="Máquinas e tanques aparecem como linhas de comando: status, produto, progresso, tempo restante e próxima ordem."
               action={
                 <div className="flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
                   <Activity size={13} />
@@ -1020,14 +1020,14 @@ function MonitoramentoDashboard() {
 
           <div className="grid gap-5">
             <Panel className="p-4 sm:p-5">
-              <SectionHeader label="Gargalos" title="O que merece atencao" />
+              <SectionHeader label="Gargalos" title="O que merece atenção" />
               <div className="mt-4">
                 <BottleneckList items={bottlenecks} />
               </div>
             </Panel>
 
             <Panel className="p-4 sm:p-5">
-              <SectionHeader label="Pessoas" title="Top operadores" description="Ranking por prazo e eficiencia no periodo." />
+              <SectionHeader label="Pessoas" title="Top operadores" description="Ranking por prazo e eficiência no período." />
               <div className="mt-4">
                 <OperatorRank items={desempenhoOperadores} />
               </div>
@@ -1037,14 +1037,14 @@ function MonitoramentoDashboard() {
 
         <div className="grid gap-5 xl:grid-cols-[1fr_1fr_1.15fr]">
           <Panel className="p-4 sm:p-5">
-            <SectionHeader label="Performance" title="Ocupacao das maquinas" />
+            <SectionHeader label="Performance" title="Ocupação das máquinas" />
             <div className="mt-5">
               <MachinePerformanceBars items={desempenhoMaquinas} />
             </div>
           </Panel>
 
           <Panel className="p-4 sm:p-5">
-            <SectionHeader label="Produtos" title="Ciclos reais" description="Produtos com mais historico aparecem primeiro." />
+            <SectionHeader label="Produtos" title="Ciclos reais" description="Produtos com mais histórico aparecem primeiro." />
             <div className="mt-5 space-y-3">
               {mediasProduto.slice(0, 6).map((media) => (
                 <div key={media.produtoSku} className="rounded-[18px] border border-[#E1E5DC] bg-[#FCFBF7] p-3">
@@ -1055,7 +1055,7 @@ function MonitoramentoDashboard() {
                     </div>
                     <div className="text-right">
                       <div className="font-mono text-lg font-semibold text-[#151A16]">{formatarMinutos(media.tempoMedioMin)}</div>
-                      <div className="text-[10px] uppercase tracking-[0.12em] text-[#80887D]">medio</div>
+                      <div className="text-[10px] uppercase tracking-[0.12em] text-[#80887D]">médio</div>
                     </div>
                   </div>
                   <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
@@ -1076,19 +1076,19 @@ function MonitoramentoDashboard() {
               ))}
               {mediasProduto.length === 0 && (
                 <div className="rounded-[18px] border border-dashed border-[#DDE3DD] px-4 py-8 text-center text-sm text-[#70786E]">
-                  Ainda nao ha ordens concluidas suficientes para medias de produto.
+                  Ainda não há ordens concluídas suficientes para médias de produto.
                 </div>
               )}
             </div>
           </Panel>
 
           <Panel className="p-4 sm:p-5">
-            <SectionHeader label="Resumo" title="Mapa do periodo" />
+            <SectionHeader label="Resumo" title="Mapa do período" />
             <div className="mt-5 grid gap-3">
               <div className="rounded-[22px] bg-[#111A12] p-4 text-white">
                 <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.17em] text-white/58">
                   <TrendingUp size={14} />
-                  Utilizacao media
+                  Utilização média
                 </div>
                 <div className="mt-4 text-[42px] font-semibold leading-none tracking-[-0.07em]">{formatarNumero(utilizacaoMedia)}%</div>
                 <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/16">
@@ -1109,7 +1109,7 @@ function MonitoramentoDashboard() {
                 <div className="rounded-[20px] border border-[#E1E5DC] bg-[#FCFBF7] p-4">
                   <Gauge className="text-[#687066]" size={18} />
                   <div className="mt-3 text-2xl font-semibold tracking-[-0.05em]">{formatarMinutos(indicadoresPeriodo.tempoMedioCicloMin)}</div>
-                  <div className="text-xs text-[#737B71]">ciclo medio</div>
+                  <div className="text-xs text-[#737B71]">ciclo médio</div>
                 </div>
                 <div className="rounded-[20px] border border-[#E1E5DC] bg-[#FCFBF7] p-4">
                   <Users className="text-[#687066]" size={18} />
@@ -1125,8 +1125,8 @@ function MonitoramentoDashboard() {
           <div className="border-b border-[#E1E5DC] px-4 py-4 sm:px-5">
             <SectionHeader
               label="Rastreabilidade"
-              title="Ordens recentes do periodo"
-              description="Historico operacional com planejado, real, volume, desvio e status em uma tabela mais compacta."
+              title="Ordens recentes do período"
+              description="Histórico operacional com planejado, real, volume, desvio e status em uma tabela mais compacta."
               action={<ArrowUpRight className="text-[#747D72]" size={18} />}
             />
           </div>
@@ -1182,7 +1182,7 @@ function MonitoramentoDashboard() {
                 {historyRows.length === 0 && (
                   <tr>
                     <td colSpan={10} className="px-5 py-12 text-center text-[#70786E]">
-                      Nenhuma ordem encontrada no periodo selecionado.
+                      Nenhuma ordem encontrada no período selecionado.
                     </td>
                   </tr>
                 )}

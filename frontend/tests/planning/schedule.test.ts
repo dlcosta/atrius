@@ -9,8 +9,8 @@ describe('schedule (frontend)', () => {
     expect(isScheduleStartInPast(new Date('2026-06-01T11:59:59.000Z'), NOW)).toBe(true)
   })
 
-  it('validateScheduleStart retorna erro para data invalida', () => {
-    expect(validateScheduleStart(new Date('data-invalida'), NOW)).toMatch(/invalido/)
+  it('validateScheduleStart retorna erro para data inválida', () => {
+    expect(validateScheduleStart(new Date('data-invalida'), NOW)).toMatch(/inválido/)
   })
 
   it('validateScheduleStart retorna erro de passado', () => {

@@ -74,7 +74,7 @@ router.post('/', async (_req: Request, res: Response) => {
     // Fall back to external API
     const ordensExternas = await fetchOrdensExternas()
     const { data: maquinas } = await supabase.from('maquinas').select('id, nome')
-    if (!maquinas) throw new Error('Falha ao carregar maquinas')
+    if (!maquinas) throw new Error('Falha ao carregar máquinas')
 
     const maquinaMap: Record<string, string> = {}
     maquinas.forEach((m) => {
@@ -260,7 +260,7 @@ router.post('/pedidos', async (req: Request, res: Response) => {
 
     return res.json({ mode, total_api: total, pages_processadas: pagesProcessadas, importados, pulados, erros })
   } catch (err) {
-    if (err instanceof OlistAuthError) return res.status(401).json({ error: 'Olist nao conectado.' })
+    if (err instanceof OlistAuthError) return res.status(401).json({ error: 'Olist não conectado.' })
     if (err instanceof OlistApiError) return res.status(502).json({ error: `API Olist retornou ${err.status}` })
     return res.status(500).json({ error: String(err) })
   }
@@ -419,7 +419,7 @@ router.post('/pedidos/itens', async (req: Request, res: Response) => {
 
     return res.json({ modo: 'incremental', checkpoint_anterior: checkpointAnterior, checkpoint_novo: checkpointNovo, total_pedidos_encontrados: totalPedidosEncontrados, pages_processadas: pagesProcessadas, pedidos_processados: pedidosProcessados, itens_importados: itensImportados, pulados, erros })
   } catch (err) {
-    if (err instanceof OlistAuthError) return res.status(401).json({ error: 'Olist nao conectado.' })
+    if (err instanceof OlistAuthError) return res.status(401).json({ error: 'Olist não conectado.' })
     if (err instanceof OlistApiError) return res.status(502).json({ error: `API Olist retornou ${err.status}` })
     return res.status(500).json({ error: String(err) })
   }

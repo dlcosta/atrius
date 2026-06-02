@@ -61,7 +61,7 @@ export function ToastViewport() {
         typeof message === 'string'
           ? message
           : message == null
-            ? 'Atencao'
+            ? 'Atenção'
             : JSON.stringify(message)
       toast.warning(formatted)
     }) as typeof window.alert

@@ -24,7 +24,7 @@ interface ResultadoValidacao {
 }
 
 export function validarNovaOrdem(input: NovaOrdemInput): ResultadoValidacao {
-  if (!input.produto_sku) return { erro: 'Produto obrigatorio' }
+  if (!input.produto_sku) return { erro: 'Produto obrigatório' }
 
   const quantidadeBase = Number(input.liters ?? input.quantidade ?? 0)
   if (!Number.isFinite(quantidadeBase) || quantidadeBase <= 0) return { erro: 'Litros deve ser maior que zero' }
@@ -36,9 +36,9 @@ export function validarNovaOrdem(input: NovaOrdemInput): ResultadoValidacao {
   if (production <= 0) return { erro: 'productionTimeMinutes deve ser maior que zero' }
   if (cleaning < 0) return { erro: 'cleaningTimeMinutes deve ser maior ou igual a zero' }
 
-  if (input.etapa === 'tanque' && !input.tank_id) return { erro: 'Tank e obrigatorio para producao de tanque' }
-  if (input.etapa === 'envase' && !input.origin_tank_order_id) return { erro: 'Origem de tanque obrigatoria para envase' }
-  if (input.etapa === 'envase' && !input.machine_id) return { erro: 'Maquina obrigatoria para envase' }
+  if (input.etapa === 'tanque' && !input.tank_id) return { erro: 'Tanque é obrigatório para produção de tanque' }
+  if (input.etapa === 'envase' && !input.origin_tank_order_id) return { erro: 'Origem de tanque obrigatória para envase' }
+  if (input.etapa === 'envase' && !input.machine_id) return { erro: 'Máquina obrigatória para envase' }
   if (input.package_volume_liters !== undefined && input.package_volume_liters !== null && Number(input.package_volume_liters) <= 0) {
     return { erro: 'packageVolumeLiters deve ser maior que zero' }
   }
@@ -46,8 +46,8 @@ export function validarNovaOrdem(input: NovaOrdemInput): ResultadoValidacao {
     return { erro: 'unitsPerBox deve ser maior que zero' }
   }
 
-  if (!input.data_prevista) return { erro: 'Data prevista obrigatoria' }
-  if (!DATE_REGEX.test(input.data_prevista)) return { erro: 'Data prevista invalida (use YYYY-MM-DD)' }
+  if (!input.data_prevista) return { erro: 'Data prevista obrigatória' }
+  if (!DATE_REGEX.test(input.data_prevista)) return { erro: 'Data prevista inválida (use YYYY-MM-DD)' }
 
   const unidade = (input.unidade || 'UN').trim().toUpperCase()
   return {

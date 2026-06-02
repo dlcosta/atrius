@@ -25,8 +25,8 @@ router.get('/tanques', async (req: Request, res: Response) => {
   const inicio = req.query.inicio as string | undefined
   const fim = req.query.fim as string | undefined
 
-  if (inicio && !DATE_REGEX.test(inicio)) return res.status(400).json({ error: 'inicio invalido' })
-  if (fim && !DATE_REGEX.test(fim)) return res.status(400).json({ error: 'fim invalido' })
+  if (inicio && !DATE_REGEX.test(inicio)) return res.status(400).json({ error: 'início inválido' })
+  if (fim && !DATE_REGEX.test(fim)) return res.status(400).json({ error: 'fim inválido' })
 
   let query = supabase
     .from('ordens_tanque_novo_fluxo')
@@ -64,12 +64,12 @@ router.post('/tanques', async (req: Request, res: Response) => {
     notes?: string | null
   }
 
-  if (!body.numero_externo?.trim()) return res.status(422).json({ error: 'numero_externo obrigatorio' })
-  if (!body.produto_sku?.trim()) return res.status(422).json({ error: 'produto_sku obrigatorio' })
-  if (!body.tank_id?.trim()) return res.status(422).json({ error: 'tank_id obrigatorio' })
-  if (!body.inicio_agendado?.trim()) return res.status(422).json({ error: 'inicio_agendado obrigatorio' })
+  if (!body.numero_externo?.trim()) return res.status(422).json({ error: 'numero_externo obrigatório' })
+  if (!body.produto_sku?.trim()) return res.status(422).json({ error: 'produto_sku obrigatório' })
+  if (!body.tank_id?.trim()) return res.status(422).json({ error: 'tank_id obrigatório' })
+  if (!body.inicio_agendado?.trim()) return res.status(422).json({ error: 'inicio_agendado obrigatório' })
   if (!body.data_prevista?.trim() || !DATE_REGEX.test(body.data_prevista)) {
-    return res.status(422).json({ error: 'data_prevista invalida' })
+    return res.status(422).json({ error: 'data_prevista inválida' })
   }
 
   const liters = Number(body.liters ?? 0)
@@ -79,7 +79,7 @@ router.post('/tanques', async (req: Request, res: Response) => {
   if (!Number.isFinite(liters) || liters <= 0) return res.status(422).json({ error: 'liters deve ser maior que zero' })
 
   const startAt = new Date(body.inicio_agendado)
-  if (!Number.isFinite(startAt.getTime())) return res.status(422).json({ error: 'inicio_agendado invalido' })
+  if (!Number.isFinite(startAt.getTime())) return res.status(422).json({ error: 'inicio_agendado inválido' })
   if (isScheduleStartInPast(startAt)) return res.status(422).json({ error: SCHEDULE_IN_PAST_ERROR })
 
   const { data: produto } = await supabase
@@ -87,14 +87,14 @@ router.post('/tanques', async (req: Request, res: Response) => {
     .select('sku, nome, cor')
     .eq('sku', body.produto_sku)
     .single()
-  if (!produto) return res.status(404).json({ error: 'Produto nao encontrado' })
+  if (!produto) return res.status(404).json({ error: 'Produto não encontrado' })
 
   const { data: tanque } = await supabase
     .from('tanques')
     .select('id, nome, volume_liters')
     .eq('id', body.tank_id)
     .single()
-  if (!tanque) return res.status(404).json({ error: 'Tanque nao encontrado' })
+  if (!tanque) return res.status(404).json({ error: 'Tanque não encontrado' })
 
   if (!validateTankCapacity(liters, Number((tanque as any).volume_liters || 0))) {
     return res.status(422).json({ error: 'Volume planejado ultrapassa a capacidade do tanque selecionado' })
@@ -107,7 +107,7 @@ router.post('/tanques', async (req: Request, res: Response) => {
     .eq('numero_externo', numeroExterno)
     .maybeSingle()
   if (ordemExistente) {
-    return res.status(409).json({ error: 'Ja existe uma ordem de tanque com esse ID.' })
+    return res.status(409).json({ error: 'Já existe uma ordem de tanque com esse ID.' })
   }
 
   const totalDurationMinutes = Math.max(
@@ -148,7 +148,7 @@ router.post('/tanques', async (req: Request, res: Response) => {
     } as Ordem)),
   })
   if (hasConflict) {
-    return res.status(409).json({ error: 'Ja existe uma producao agendada nesse tanque para este horario.' })
+    return res.status(409).json({ error: 'Já existe uma produção agendada nesse tanque para este horário.' })
   }
 
   const { data: nova, error } = await supabase
@@ -294,8 +294,8 @@ router.get('/envase', async (req: Request, res: Response) => {
   const inicio = req.query.inicio as string | undefined
   const fim = req.query.fim as string | undefined
 
-  if (inicio && !DATE_REGEX.test(inicio)) return res.status(400).json({ error: 'inicio invalido' })
-  if (fim && !DATE_REGEX.test(fim)) return res.status(400).json({ error: 'fim invalido' })
+  if (inicio && !DATE_REGEX.test(inicio)) return res.status(400).json({ error: 'início inválido' })
+  if (fim && !DATE_REGEX.test(fim)) return res.status(400).json({ error: 'fim inválido' })
 
   let query = supabase
     .from('ordens_envase_novo_fluxo')
@@ -335,13 +335,13 @@ router.post('/envase', async (req: Request, res: Response) => {
     cleaning_time_minutes?: number
   }
 
-  if (!body.produto_sku?.trim()) return res.status(422).json({ error: 'produto_sku obrigatorio' })
-  if (!body.origin_tank_order_id?.trim()) return res.status(422).json({ error: 'origin_tank_order_id obrigatorio' })
-  if (!body.maquina_id?.trim()) return res.status(422).json({ error: 'maquina_id obrigatorio' })
-  if (!body.data_prevista?.trim() || !DATE_REGEX.test(body.data_prevista)) return res.status(422).json({ error: 'data_prevista invalida' })
-  if (!body.inicio_agendado?.trim()) return res.status(422).json({ error: 'inicio_agendado obrigatorio' })
-  if (!body.nome_produto?.trim()) return res.status(422).json({ error: 'nome_produto obrigatorio' })
-  if (!body.embalagem_label?.trim()) return res.status(422).json({ error: 'embalagem_label obrigatoria' })
+  if (!body.produto_sku?.trim()) return res.status(422).json({ error: 'produto_sku obrigatório' })
+  if (!body.origin_tank_order_id?.trim()) return res.status(422).json({ error: 'origin_tank_order_id obrigatório' })
+  if (!body.maquina_id?.trim()) return res.status(422).json({ error: 'maquina_id obrigatório' })
+  if (!body.data_prevista?.trim() || !DATE_REGEX.test(body.data_prevista)) return res.status(422).json({ error: 'data_prevista inválida' })
+  if (!body.inicio_agendado?.trim()) return res.status(422).json({ error: 'inicio_agendado obrigatório' })
+  if (!body.nome_produto?.trim()) return res.status(422).json({ error: 'nome_produto obrigatório' })
+  if (!body.embalagem_label?.trim()) return res.status(422).json({ error: 'embalagem_label obrigatória' })
   if (!Number.isFinite(Number(body.package_volume_liters)) || Number(body.package_volume_liters) <= 0) return res.status(422).json({ error: 'package_volume_liters deve ser maior que zero' })
   if (!Number.isFinite(Number(body.units_per_box)) || Number(body.units_per_box) <= 0) return res.status(422).json({ error: 'units_per_box deve ser maior que zero' })
   if (!Number.isFinite(Number(body.total_unidades)) || Number(body.total_unidades) <= 0) return res.status(422).json({ error: 'total_unidades deve ser maior que zero' })
@@ -370,8 +370,8 @@ router.post('/envase', async (req: Request, res: Response) => {
     origem = data
   }
 
-  if (!origem) return res.status(422).json({ error: 'Ordem de tanque nao encontrada' })
-  if (isCanceled(origem.planning_status, origem.status)) return res.status(422).json({ error: 'Ordem de tanque cancelada nao pode ser usada' })
+  if (!origem) return res.status(422).json({ error: 'Ordem de tanque não encontrada' })
+  if (isCanceled(origem.planning_status, origem.status)) return res.status(422).json({ error: 'Ordem de tanque cancelada não pode ser usada' })
 
   const [{ data: novosEnvases }, { data: legacyEnvases }] = await Promise.all([
     supabase
@@ -409,7 +409,7 @@ router.post('/envase', async (req: Request, res: Response) => {
   }
 
   const startAt = new Date(String(body.inicio_agendado))
-  if (!Number.isFinite(startAt.getTime())) return res.status(422).json({ error: 'inicio_agendado invalido' })
+  if (!Number.isFinite(startAt.getTime())) return res.status(422).json({ error: 'inicio_agendado inválido' })
   if (isScheduleStartInPast(startAt)) return res.status(422).json({ error: SCHEDULE_IN_PAST_ERROR })
 
   const productionTimeMinutes = Math.max(1, Math.round(Number(body.production_time_minutes)))
@@ -425,7 +425,7 @@ router.post('/envase', async (req: Request, res: Response) => {
     .select('sku, cor')
     .eq('sku', body.produto_sku)
     .single()
-  if (!produto) return res.status(404).json({ error: 'Produto nao encontrado' })
+  if (!produto) return res.status(404).json({ error: 'Produto não encontrado' })
 
   const { data: existentes } = await supabase.from('ordens_envase_novo_fluxo').select('*')
   const hasConflict = hasScheduleConflict({
@@ -440,7 +440,7 @@ router.post('/envase', async (req: Request, res: Response) => {
     } as Ordem)),
   })
   if (hasConflict) {
-    return res.status(409).json({ error: 'Ja existe uma producao agendada nessa maquina para este horario.' })
+    return res.status(409).json({ error: 'Já existe uma produção agendada nessa máquina para este horário.' })
   }
 
   const packageVolumeLiters = Number(body.package_volume_liters)

@@ -14,11 +14,11 @@ function normalizarErro(error: SupabaseErrorLike | null | undefined, fallback: s
   }
 
   if (error.code === 'PGRST205' || error.message?.includes(`table 'public.${OPERADORES_TABLE}'`)) {
-    return new Error('Tabela public.operadores nao encontrada no Supabase. Rode a migration mais recente antes de usar este cadastro.')
+    return new Error('Tabela public.operadores não encontrada no Supabase. Rode a migration mais recente antes de usar este cadastro.')
   }
 
   if (error.code === '23505') {
-    return new Error('Ja existe um operador com esse nome')
+    return new Error('Já existe um operador com esse nome')
   }
 
   return new Error(error.message || fallback)
@@ -27,7 +27,7 @@ function normalizarErro(error: SupabaseErrorLike | null | undefined, fallback: s
 function normalizarNome(nome: string) {
   const nomeNormalizado = nome.trim()
   if (!nomeNormalizado) {
-    throw new Error('Nome do operador obrigatorio')
+    throw new Error('Nome do operador obrigatório')
   }
 
   return nomeNormalizado
@@ -68,7 +68,7 @@ export async function atualizarOperador(id: string, updates: Partial<Pick<Operad
   const supabase = createClient()
   const operadorId = id.trim()
   if (!operadorId) {
-    throw new Error('id obrigatorio')
+    throw new Error('id obrigatório')
   }
 
   const payload: Record<string, unknown> = {}
@@ -81,7 +81,7 @@ export async function atualizarOperador(id: string, updates: Partial<Pick<Operad
   }
 
   if (Object.keys(payload).length === 0) {
-    throw new Error('Nenhum campo valido para atualizar')
+    throw new Error('Nenhum campo válido para atualizar')
   }
 
   const { data, error } = await supabase
@@ -96,7 +96,7 @@ export async function atualizarOperador(id: string, updates: Partial<Pick<Operad
   }
 
   if (!data) {
-    throw new Error('Operador nao encontrado')
+    throw new Error('Operador não encontrado')
   }
 
   return data as Operador
@@ -125,7 +125,7 @@ export async function buscarOperadorPorId(id: string) {
 export async function removerOperador(id: string) {
   const operadorId = id.trim()
   if (!operadorId) {
-    throw new Error('id obrigatorio')
+    throw new Error('id obrigatório')
   }
 
   const supabase = createClient()

@@ -36,7 +36,7 @@ router.post('/audit-log', async (req: Request, res: Response) => {
   }
 
   if (!body.ordem_id || !body.operacao || !body.descricao) {
-    return res.status(422).json({ error: 'ordem_id, operacao e descricao são obrigatórios' })
+    return res.status(422).json({ error: 'ordem_id, operação e descrição são obrigatórios' })
   }
 
   const { data, error } = await supabase

@@ -1,5 +1,5 @@
 export const SCHEDULE_IN_PAST_ERROR =
-  'Nao e permitido agendar producao em horario passado. Escolha o horario atual ou futuro.'
+  'Não é permitido agendar produção em horário passado. Escolha o horário atual ou futuro.'
 
 function truncateToMinute(date: Date): Date {
   const result = new Date(date)
@@ -13,7 +13,7 @@ export function isScheduleStartInPast(startAt: Date, now = new Date()): boolean 
 
 export function validateScheduleStart(startAt: Date, now = new Date()): string | null {
   if (!Number.isFinite(startAt.getTime())) {
-    return 'Horario de agendamento invalido.'
+    return 'Horário de agendamento inválido.'
   }
 
   if (isScheduleStartInPast(startAt, now)) {

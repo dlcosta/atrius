@@ -36,7 +36,7 @@ router.patch('/', async (req: Request, res: Response) => {
   try {
     const { id, nome, ativo } = req.body as { id?: string; nome?: string; ativo?: boolean }
     if (!id?.trim()) {
-      return res.status(422).json({ error: 'id obrigatorio' })
+      return res.status(422).json({ error: 'id obrigatório' })
     }
     const operador = await atualizarOperador(id, { nome, ativo })
     return res.json(operador)
@@ -51,7 +51,7 @@ router.delete('/', async (req: Request, res: Response) => {
   try {
     const { id } = req.body as { id?: string }
     if (!id?.trim()) {
-      return res.status(422).json({ error: 'id obrigatorio' })
+      return res.status(422).json({ error: 'id obrigatório' })
     }
     await removerOperador(id)
     return res.json({ ok: true })

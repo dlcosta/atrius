@@ -11,7 +11,7 @@ const base = {
 }
 
 describe('validarNovaOrdem', () => {
-  it('aceita ordem valida e normaliza unidade', () => {
+  it('aceita ordem válida e normaliza unidade', () => {
     const r = validarNovaOrdem({ ...base, unidade: 'l' })
     expect(r.valido).toBe(true)
     expect(r.dadosNormalizados?.unidade).toBe('L')
@@ -30,19 +30,19 @@ describe('validarNovaOrdem', () => {
   })
 
   it('tanque exige tank_id', () => {
-    expect(validarNovaOrdem({ ...base, etapa: 'tanque' }).erro).toMatch(/Tank/)
+    expect(validarNovaOrdem({ ...base, etapa: 'tanque' }).erro).toMatch(/Tanque/)
     expect(validarNovaOrdem({ ...base, etapa: 'tanque', tank_id: 'tank-1' }).valido).toBe(true)
   })
 
-  it('envase exige origem de tanque e maquina', () => {
+  it('envase exige origem de tanque e máquina', () => {
     expect(validarNovaOrdem({ ...base, etapa: 'envase' }).erro).toMatch(/Origem de tanque/)
-    expect(validarNovaOrdem({ ...base, etapa: 'envase', origin_tank_order_id: 'o1' }).erro).toMatch(/Maquina/)
+    expect(validarNovaOrdem({ ...base, etapa: 'envase', origin_tank_order_id: 'o1' }).erro).toMatch(/Máquina/)
     expect(validarNovaOrdem({ ...base, etapa: 'envase', origin_tank_order_id: 'o1', machine_id: 'm1' }).valido).toBe(true)
   })
 
   it('data_prevista deve casar com YYYY-MM-DD', () => {
-    expect(validarNovaOrdem({ ...base, data_prevista: '02/06/2026' }).erro).toMatch(/invalida/)
-    expect(validarNovaOrdem({ ...base, data_prevista: null }).erro).toMatch(/obrigatoria/)
+    expect(validarNovaOrdem({ ...base, data_prevista: '02/06/2026' }).erro).toMatch(/inválida/)
+    expect(validarNovaOrdem({ ...base, data_prevista: null }).erro).toMatch(/obrigatória/)
   })
 
   it('rejeita package_volume_liters/units_per_box <= 0 quando informados', () => {

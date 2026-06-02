@@ -11,15 +11,15 @@ router.get('/eventos', async (req: Request, res: Response) => {
   const fim = req.query.fim as string | undefined
 
   if (!inicio || !fim) {
-    return res.status(422).json({ error: 'inicio e fim sao obrigatorios' })
+    return res.status(422).json({ error: 'início e fim são obrigatórios' })
   }
 
   if (!DATE_REGEX.test(inicio) || !DATE_REGEX.test(fim)) {
-    return res.status(422).json({ error: 'inicio ou fim invalido' })
+    return res.status(422).json({ error: 'início ou fim inválido' })
   }
 
   if (inicio > fim) {
-    return res.status(422).json({ error: 'inicio deve ser menor ou igual ao fim' })
+    return res.status(422).json({ error: 'início deve ser menor ou igual ao fim' })
   }
 
   const inicioIso = `${inicio}T00:00:00.000Z`

@@ -53,14 +53,14 @@ STATUS_CONFIG.PAUSED = {
 }
 
 function fmtMin(m: number | null | undefined): string {
-  if (!m) return '�'
+  if (!m) return '--'
   const h = Math.floor(m / 60)
   const min = m % 60
   return h > 0 ? `${h}h${min > 0 ? String(min).padStart(2, '0') : ''}` : `${min}min`
 }
 
 function fmtData(iso: string | null | undefined): string {
-  if (!iso) return '�'
+  if (!iso) return '--'
   try { return format(parseISO(iso), 'dd/MM/yyyy', { locale: ptBR }) } catch { return iso }
 }
 

@@ -220,7 +220,7 @@ router.post('/agendamentos', async (req: Request, res: Response) => {
   const { ordem_id, tank_id, turno_id, turno_nome, data_agendamento, inicio_agendado, fim_calculado, production_time_minutes, cleaning_time_minutes } = body as Required<typeof body>
   if (inicio_agendado) {
     const startAt = new Date(inicio_agendado)
-    if (!Number.isFinite(startAt.getTime())) return res.status(422).json({ error: 'inicio_agendado invalido' })
+    if (!Number.isFinite(startAt.getTime())) return res.status(422).json({ error: 'inicio_agendado inválido' })
     if (isScheduleStartInPast(startAt)) return res.status(422).json({ error: SCHEDULE_IN_PAST_ERROR })
   }
 
