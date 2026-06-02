@@ -601,9 +601,9 @@ function OperatorRank({ items }: { items: OperatorPerformance[] }) {
 
 function MonitoramentoSkeleton() {
   return (
-    <div className="min-h-full w-full max-w-full overflow-hidden bg-[#ECE9DF] text-[#151A16]">
+    <div className="min-h-full w-full max-w-full overflow-hidden bg-[#F7F8FA] text-[#151A16]">
       <div className="relative mx-auto flex w-full max-w-full min-w-0 flex-col gap-5 py-5 pl-4 pr-8 sm:px-6 lg:max-w-[1540px] lg:px-8">
-        <div className="rounded-[30px] border border-[#D6DACE] bg-[#FAF8F0]/86 px-5 py-4 shadow-[0_20px_60px_rgba(55,48,35,0.08)]">
+        <div className="rounded-[30px] border border-[#E4E7EC] bg-white px-5 py-4 shadow-[0_14px_40px_rgba(15,23,42,0.06)]">
           <div className="h-5 w-40 rounded-full bg-[#E6E2D7]" />
           <div className="mt-5 h-10 max-w-xl rounded-2xl bg-[#DEDACF]" />
           <div className="mt-3 h-4 max-w-2xl rounded-full bg-[#E6E2D7]" />
@@ -884,15 +884,9 @@ function MonitoramentoDashboard() {
   }
 
   return (
-    <div className="min-h-full w-full max-w-full overflow-hidden bg-[#ECE9DF] text-[#151A16]">
-      <div className="pointer-events-none fixed inset-0 opacity-80">
-        <div className="absolute left-[-10%] top-[-18%] h-[520px] w-[520px] rounded-full bg-emerald-200/45 blur-3xl" />
-        <div className="absolute right-[-12%] top-[10%] h-[460px] w-[460px] rounded-full bg-amber-100/80 blur-3xl" />
-        <div className="absolute bottom-[-20%] left-[30%] h-[520px] w-[520px] rounded-full bg-blue-100/60 blur-3xl" />
-      </div>
-
+    <div className="min-h-full w-full max-w-full overflow-hidden bg-[#F7F8FA] text-[#151A16]">
       <div className="relative mx-auto flex w-full max-w-full min-w-0 flex-col gap-5 py-5 pl-4 pr-8 sm:px-6 lg:max-w-[1540px] lg:px-8">
-        <header className="rounded-[30px] border border-[#D6DACE] bg-[#FAF8F0]/86 px-5 py-4 shadow-[0_20px_60px_rgba(55,48,35,0.08)] backdrop-blur">
+        <header className="rounded-[30px] border border-[#E4E7EC] bg-white px-5 py-4 shadow-[0_14px_40px_rgba(15,23,42,0.06)]">
           <div className="grid min-w-0 gap-4 xl:grid-cols-[1fr_auto] xl:items-center">
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
