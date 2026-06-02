@@ -42,6 +42,18 @@ export type Produto = {
   tempo_limpeza_min: number
   tempos_maquinas: Record<string, TempoMaquina>
   cor: string
+  package_volume_liters: number | null
+  units_per_box: number
+  criado_em: string
+}
+
+export type ProdutoTanque = {
+  id: string
+  sku: string
+  nome: string
+  cor: string
+  volume_base: number
+  tempo_limpeza_min: number
   criado_em: string
 }
 

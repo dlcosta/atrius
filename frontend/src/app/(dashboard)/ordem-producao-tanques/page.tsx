@@ -1,21 +1,21 @@
 import { OrdemProducaoTanquePage } from '@/components/tanques/OrdemProducaoTanquePage'
 import { createClient } from '@/lib/supabase/server'
-import type { Produto } from '@/types'
+import type { ProdutoTanque } from '@/types'
 
-async function buscarProdutos(): Promise<Produto[]> {
+async function buscarProdutosTanque(): Promise<ProdutoTanque[]> {
   const supabase = await createClient()
-  const { data, error } = await supabase.from('produtos').select('*').order('nome')
+  const { data, error } = await supabase.from('produtos_tanque').select('*').order('nome')
 
   if (error) {
-    console.error('[ordem-producao-tanques] erro ao buscar produtos:', error.message)
+    console.error('[ordem-producao-tanques] erro ao buscar produtos_tanque:', error.message)
     return []
   }
 
-  return (data as Produto[]) ?? []
+  return (data as ProdutoTanque[]) ?? []
 }
 
 export default async function OrdemProducaoTanquesPage() {
-  const produtos = await buscarProdutos()
+  const produtosTanque = await buscarProdutosTanque()
 
-  return <OrdemProducaoTanquePage produtos={produtos} />
+  return <OrdemProducaoTanquePage produtosTanque={produtosTanque} />
 }

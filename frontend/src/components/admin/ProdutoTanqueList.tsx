@@ -1,22 +1,22 @@
-﻿'use client'
+'use client'
 import { apiUrl } from '@/lib/api'
 
 import { useState } from 'react'
-import type { Produto } from '@/types'
-import { ProdutoForm } from './ProdutoForm'
+import type { ProdutoTanque } from '@/types'
+import { ProdutoTanqueForm } from './ProdutoTanqueForm'
 
 type Props = {
-  produtos: Produto[]
+  produtosTanque: ProdutoTanque[]
   onAtualizado: () => void
 }
 
-export function ProdutoList({ produtos, onAtualizado }: Props) {
-  const [editando, setEditando] = useState<Produto | null>(null)
+export function ProdutoTanqueList({ produtosTanque, onAtualizado }: Props) {
+  const [editando, setEditando] = useState<ProdutoTanque | null>(null)
   const [criando, setCriando] = useState(false)
 
   async function deletar(id: string, nome: string) {
     if (!confirm(`Excluir "${nome}"?`)) return
-    const res = await fetch(apiUrl('/api/produtos'), {
+    const res = await fetch(apiUrl('/api/produtos-tanque'), {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id }),
@@ -24,7 +24,7 @@ export function ProdutoList({ produtos, onAtualizado }: Props) {
 
     if (!res.ok) {
       const data = await res.json()
-      alert(data.error ?? 'Erro ao excluir produto')
+      alert(data.error ?? 'Erro ao excluir fórmula')
       return
     }
 
@@ -35,9 +35,9 @@ export function ProdutoList({ produtos, onAtualizado }: Props) {
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h3 className="text-lg font-semibold text-slate-900">Produtos</h3>
+          <h3 className="text-lg font-semibold text-slate-900">Fórmulas de Tanque</h3>
           <p className="text-sm text-slate-500">
-            Cadastre SKU, nome e cor do produto usados no planejamento e na operação.
+            Fórmulas base para produção em tanque — sem variantes de embalagem.
           </p>
         </div>
 
@@ -46,14 +46,14 @@ export function ProdutoList({ produtos, onAtualizado }: Props) {
             onClick={() => setCriando(true)}
             className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700"
           >
-            + Novo produto
+            + Nova fórmula
           </button>
         )}
       </div>
 
       {criando && (
         <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4">
-          <ProdutoForm
+          <ProdutoTanqueForm
             onSalvo={() => {
               setCriando(false)
               onAtualizado()
@@ -69,18 +69,17 @@ export function ProdutoList({ produtos, onAtualizado }: Props) {
             <tr>
               <th className="px-4 py-3 text-left">SKU</th>
               <th className="px-4 py-3 text-left">Nome</th>
-              <th className="px-4 py-3 text-center">Embalagem</th>
               <th className="px-4 py-3 text-center">Cor</th>
               <th className="px-4 py-3 text-right">Ações</th>
             </tr>
           </thead>
 
           <tbody className="divide-y divide-slate-100">
-            {produtos.map((produto) => (
+            {produtosTanque.map((produto) => (
               <tr key={produto.id}>
                 {editando?.id === produto.id ? (
-                  <td colSpan={5} className="bg-slate-50 px-4 py-3">
-                    <ProdutoForm
+                  <td colSpan={4} className="bg-slate-50 px-4 py-3">
+                    <ProdutoTanqueForm
                       produto={produto}
                       onSalvo={() => {
                         setEditando(null)
@@ -93,11 +92,6 @@ export function ProdutoList({ produtos, onAtualizado }: Props) {
                   <>
                     <td className="px-4 py-3 font-mono text-slate-600">{produto.sku}</td>
                     <td className="px-4 py-3 font-medium text-slate-900">{produto.nome}</td>
-                    <td className="px-4 py-3 text-center text-sm text-slate-600">
-                      {produto.package_volume_liters != null
-                        ? `${produto.package_volume_liters}L × ${produto.units_per_box} un.`
-                        : <span className="text-slate-400">—</span>}
-                    </td>
                     <td className="px-4 py-3 text-center">
                       <span
                         className="inline-block h-5 w-5 rounded-full border border-slate-300"
@@ -123,10 +117,10 @@ export function ProdutoList({ produtos, onAtualizado }: Props) {
               </tr>
             ))}
 
-            {produtos.length === 0 && (
+            {produtosTanque.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-4 py-8 text-center text-slate-400">
-                  Nenhum produto cadastrado
+                <td colSpan={4} className="px-4 py-8 text-center text-slate-400">
+                  Nenhuma fórmula de tanque cadastrada
                 </td>
               </tr>
             )}

@@ -15,6 +15,7 @@ router.get('/', async (_req: Request, res: Response) => {
       numero_externo,
       tanque,
       tank_id,
+      produto_sku,
       quantidade,
       unidade,
       data_prevista,
@@ -40,6 +41,16 @@ router.get('/', async (_req: Request, res: Response) => {
 
   if (error) return res.status(500).json({ error: error.message })
 
+  const skus = [...new Set((data ?? []).map((r: any) => r.produto_sku).filter(Boolean))]
+  const produtosTanqueMap = new Map<string, string>()
+  if (skus.length > 0) {
+    const { data: pts } = await supabase
+      .from('produtos_tanque')
+      .select('sku, nome')
+      .in('sku', skus)
+    ;(pts ?? []).forEach((p: any) => produtosTanqueMap.set(p.sku, p.nome))
+  }
+
   const items = (data ?? []).map((row: any) => {
     const pedidos = row.ordens_pedidos_erp ?? []
     const totalLitros = pedidos.reduce((acc: number, p: any) => acc + (Number(p.total_litros) || 0), 0)
@@ -48,6 +59,8 @@ router.get('/', async (_req: Request, res: Response) => {
       numero_externo: row.numero_externo,
       tanque: row.tanque,
       tank_id: row.tank_id,
+      produto_sku: row.produto_sku,
+      produto_nome: row.produto_sku ? (produtosTanqueMap.get(row.produto_sku) ?? row.produto_sku) : null,
       quantidade: row.quantidade,
       unidade: row.unidade,
       data_prevista: row.data_prevista,

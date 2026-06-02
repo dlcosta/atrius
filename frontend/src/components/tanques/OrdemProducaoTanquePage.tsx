@@ -3,7 +3,7 @@ import { apiUrl } from '@/lib/api'
 
 import { useEffect, useMemo, useState } from 'react'
 import { format } from 'date-fns'
-import type { Ordem, Produto, Tanque } from '@/types'
+import type { Ordem, ProdutoTanque, Tanque } from '@/types'
 import { toast } from '@/lib/ui/toast'
 import {
   calculateProductionEndTime,
@@ -13,14 +13,14 @@ import {
 import { validateScheduleStart } from '@/lib/planning/schedule'
 
 type Props = {
-  produtos: Produto[]
+  produtosTanque: ProdutoTanque[]
 }
 
 function formatNumber(value: number, digits = 2): string {
   return Number.isFinite(value) ? value.toFixed(digits) : '0.00'
 }
 
-export function OrdemProducaoTanquePage({ produtos }: Props) {
+export function OrdemProducaoTanquePage({ produtosTanque }: Props) {
   const [tanques, setTanques] = useState<Tanque[]>([])
   const [ordensDoDia, setOrdensDoDia] = useState<Ordem[]>([])
   const [carregandoAgenda, setCarregandoAgenda] = useState(false)
@@ -69,7 +69,7 @@ export function OrdemProducaoTanquePage({ produtos }: Props) {
   }, [dataProducao])
 
   const selectedProduct = useMemo(
-    () => produtos.find((item) => item.sku === produtoSku) ?? null,
+    () => produtosTanque.find((item) => item.sku === produtoSku) ?? null,
     [produtos, produtoSku]
   )
 
@@ -280,7 +280,7 @@ export function OrdemProducaoTanquePage({ produtos }: Props) {
                 className="w-full rounded-[8px] border border-[#E4E7EC] bg-white px-3 py-2 text-sm text-[#111827]"
               >
                 <option value="">Selecione...</option>
-                {produtos.map((produto) => (
+                {produtosTanque.map((produto) => (
                   <option key={produto.sku} value={produto.sku}>
                     {produto.nome}
                   </option>

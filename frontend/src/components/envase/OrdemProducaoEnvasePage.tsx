@@ -120,12 +120,15 @@ export function OrdemProducaoEnvasePage({ maquinas, produtos }: Props) {
     return produtos
       .map((produto) => {
         const parsed = normalizarEmbalagem(produto.nome)
-        if (parsed.litros_por_unidade <= 0 || parsed.embalagem_volume_ml <= 0) return null
+        // Priorizar campos do banco; fallback para parse do nome
+        const litrosPorUnidade = produto.package_volume_liters ?? parsed.litros_por_unidade
+        const unidadesPorCaixa = produto.units_per_box ?? parsed.unidades_por_cx
+        if (litrosPorUnidade <= 0) return null
         return {
           produto,
           embalagemLabel: parsed.embalagem_label,
-          litrosPorUnidade: parsed.litros_por_unidade,
-          unidadesPorCaixa: parsed.unidades_por_cx,
+          litrosPorUnidade,
+          unidadesPorCaixa,
           tipoAgrupamento: inferirTipoAgrupamento(produto.nome),
         }
       })

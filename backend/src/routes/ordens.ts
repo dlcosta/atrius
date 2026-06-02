@@ -223,7 +223,7 @@ router.get('/', async (req: Request, res: Response) => {
 
   let query = supabase
     .from('ordens')
-    .select('*, produto:produtos(*), maquina:maquinas(*), tanque_ref:tanques(*)')
+    .select('*, maquina:maquinas(*), tanque_ref:tanques(*)')
     .neq('status', 'cancelada')
     .order('inicio_agendado', { ascending: true, nullsFirst: false })
 
@@ -241,6 +241,7 @@ router.get('/', async (req: Request, res: Response) => {
   const { data: ordens, error } = await query
   if (error) return res.status(500).json({ error: mensagemErroOrdem(error.message) })
 
+  // produto join was removed from select — enrich after fetching both product tables
   let lista = Array.isArray(ordens) ? ordens : []
 
   let queryTanquesNovo = supabase
@@ -274,12 +275,14 @@ router.get('/', async (req: Request, res: Response) => {
     { data: tanquesNovo, error: tanquesNovoError },
     { data: envasesNovo, error: envasesNovoError },
     { data: produtosNovo },
+    { data: produtosTanqueNovo },
     { data: maquinasNovo },
     { data: tanquesRefNovo },
   ] = await Promise.all([
     queryTanquesNovo,
     queryEnvasesNovo,
     supabase.from('produtos').select('*'),
+    supabase.from('produtos_tanque').select('*'),
     supabase.from('maquinas').select('*'),
     supabase.from('tanques').select('*'),
   ])
@@ -288,6 +291,14 @@ router.get('/', async (req: Request, res: Response) => {
   if (envasesNovoError) return res.status(500).json({ error: mensagemErroOrdem(envasesNovoError.message) })
 
   const produtosMap = new Map(((produtosNovo as Produto[] | null) ?? []).map((p) => [p.sku, p]))
+  const produtosTanqueMap = new Map(((produtosTanqueNovo as any[] | null) ?? []).map((p) => [p.sku, p]))
+
+  // Enrich legacy ordens with product data (join was removed)
+  lista = lista.map((ordem: any) => {
+    if (!ordem.produto_sku) return ordem
+    const map = ordem.etapa === 'tanque' ? produtosTanqueMap : produtosMap
+    return { ...ordem, produto: map.get(ordem.produto_sku) ?? undefined }
+  })
   const maquinasMap = new Map(((maquinasNovo as Maquina[] | null) ?? []).map((m) => [m.id, m]))
   const tanquesMap = new Map(((tanquesRefNovo as Tanque[] | null) ?? []).map((t) => [t.id, t]))
 
@@ -307,7 +318,7 @@ router.get('/', async (req: Request, res: Response) => {
         etapa: 'tanque',
         calc_mode: 'LITERS_MASTER',
         flow_source: 'novo_fluxo_tanque',
-        produto: ordem.produto_sku ? produtosMap.get(ordem.produto_sku) ?? undefined : undefined,
+        produto: ordem.produto_sku ? produtosTanqueMap.get(ordem.produto_sku) ?? undefined : undefined,
         maquina: undefined,
         tanque_ref: ordem.tank_id ? tanquesMap.get(ordem.tank_id) ?? undefined : undefined,
       }
@@ -740,7 +751,8 @@ router.post('/', async (req: Request, res: Response) => {
   })
   if (resultado.erro) return res.status(422).json({ error: resultado.erro })
 
-  const { data: produto } = await supabase.from('produtos').select('sku, cor').eq('sku', body.produto_sku).single()
+  const tabelaProduto = etapa === 'tanque' ? 'produtos_tanque' : 'produtos'
+  const { data: produto } = await supabase.from(tabelaProduto as any).select('sku, cor').eq('sku', body.produto_sku).single()
   if (!produto) return res.status(404).json({ error: 'Produto não encontrado' })
 
   let originTank: any | null = null
@@ -800,7 +812,7 @@ router.post('/', async (req: Request, res: Response) => {
     .from('ordens')
     .insert({
       numero_externo,
-      produto_sku: etapa === 'envase' ? originTank?.produto_sku ?? body.produto_sku : body.produto_sku,
+      produto_sku: body.produto_sku,
       quantidade: liters,
       unidade,
       data_prevista: plannedDate,
@@ -1005,9 +1017,11 @@ router.post('/operacao', async (req: Request, res: Response) => {
     // Load product data separately to avoid FK-join failures
     let produto: any = null
     if (raw.produto_sku) {
+      const tabelaProdLookup = raw.etapa === 'tanque' ? 'produtos_tanque' : 'produtos'
+      const selectCols = raw.etapa === 'tanque' ? 'volume_base' : 'volume_base, tempos_maquinas'
       const { data: prodData } = await supabase
-        .from('produtos')
-        .select('volume_base, tempos_maquinas')
+        .from(tabelaProdLookup as any)
+        .select(selectCols)
         .eq('sku', raw.produto_sku)
         .maybeSingle()
       produto = prodData ?? null

@@ -8,7 +8,7 @@ import {
   ChevronDown,
   ChevronUp,
 } from 'lucide-react'
-import type { Maquina, Produto, Tanque } from '@/types'
+import type { Maquina, Produto, ProdutoTanque, Tanque } from '@/types'
 import {
   calculateEstimatedBoxes,
   calculateTotalDuration,
@@ -41,8 +41,10 @@ export function CadastroRapidoForm({ etapa, produtos, onSalvo, onFechar }: Props
   const [tanques, setTanques] = useState<Tanque[]>([])
   const [maquinas, setMaquinas] = useState<Maquina[]>([])
   const [origensTanque, setOrigensTanque] = useState<TankOriginOption[]>([])
+  const [produtosTanque, setProdutosTanque] = useState<ProdutoTanque[]>([])
 
   const [produtoSku, setProdutoSku] = useState('')
+  const [produtoEnvaseSku, setProdutoEnvaseSku] = useState('')
   const [tankId, setTankId] = useState('')
   const [originTankOrderId, setOriginTankOrderId] = useState('')
   const [machineId, setMachineId] = useState('')
@@ -64,8 +66,12 @@ export function CadastroRapidoForm({ etapa, produtos, onSalvo, onFechar }: Props
       setCarregando(true)
       try {
         if (etapa === 'tanque') {
-          const t = await fetch(apiUrl('/api/tanques')).then((r) => r.json())
+          const [t, pt] = await Promise.all([
+            fetch(apiUrl('/api/tanques')).then((r) => r.json()),
+            fetch(apiUrl('/api/produtos-tanque')).then((r) => r.json()),
+          ])
           setTanques(Array.isArray(t) ? t.filter((x: Tanque) => x.ativo) : [])
+          setProdutosTanque(Array.isArray(pt) ? pt : [])
         } else {
           const [m, o] = await Promise.all([
             fetch(apiUrl('/api/maquinas')).then((r) => r.json()),
@@ -87,18 +93,32 @@ export function CadastroRapidoForm({ etapa, produtos, onSalvo, onFechar }: Props
 
   useEffect(() => {
     if (etapa === 'envase' && originSelecionada) {
-      setProdutoSku(originSelecionada.produto_sku ?? '')
       setLote(originSelecionada.lote ?? '')
       setLiters(String(Math.max(0, originSelecionada.saldo_litros)))
     }
   }, [originSelecionada]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const selectedTank = tanques.find((t) => t.id === tankId) ?? null
-  const selectedProduct = produtos.find((p) => p.sku === produtoSku) ?? null
+  const selectedProduct =
+    etapa === 'tanque'
+      ? (produtosTanque.find((p) => p.sku === produtoSku) ?? null)
+      : (produtos.find((p) => p.sku === produtoEnvaseSku) ?? null)
+
+  // Auto-fill de embalagem ao selecionar produto de envase
+  useEffect(() => {
+    if (etapa !== 'envase' || !produtoEnvaseSku) return
+    const p = produtos.find((x) => x.sku === produtoEnvaseSku)
+    if (!p) return
+    if (p.package_volume_liters) setPackageVolumeLiters(String(p.package_volume_liters))
+    if (p.units_per_box) setUnitsPerBox(String(p.units_per_box))
+  }, [produtoEnvaseSku, etapa, produtos]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const litersNum = Number(liters || 0)
   const packageVolumeNum = Number(packageVolumeLiters || 0)
   const unitsPerBoxNum = Number(unitsPerBox || 0)
+
+  const capacidadeTanque = selectedTank?.volume_liters ?? null
+  const capacidadeExcedida = etapa === 'tanque' && capacidadeTanque !== null && litersNum > capacidadeTanque
 
   const { estimatedBoxes } = useMemo(
     () =>
@@ -122,6 +142,10 @@ export function CadastroRapidoForm({ etapa, produtos, onSalvo, onFechar }: Props
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    if (capacidadeExcedida) {
+      toast.error(`Volume excede a capacidade do tanque (${capacidadeTanque?.toLocaleString('pt-BR')} L).`)
+      return
+    }
     setSalvando(true)
 
     try {
@@ -129,6 +153,7 @@ export function CadastroRapidoForm({ etapa, produtos, onSalvo, onFechar }: Props
         etapa === 'tanque'
           ? {
               produto_sku: produtoSku,
+
               etapa: 'tanque',
               calc_mode: 'LITERS_MASTER',
               liters: litersNum,
@@ -151,7 +176,7 @@ export function CadastroRapidoForm({ etapa, produtos, onSalvo, onFechar }: Props
               notes: null,
             }
           : {
-              produto_sku: produtoSku,
+              produto_sku: produtoEnvaseSku,
               etapa: 'envase',
               calc_mode: 'LITERS_MASTER',
               liters: litersNum,
@@ -249,7 +274,7 @@ export function CadastroRapidoForm({ etapa, produtos, onSalvo, onFechar }: Props
                       className={inputClass}
                     >
                       <option value="">Selecione o produto...</option>
-                      {produtos.map((p) => (
+                      {produtosTanque.map((p) => (
                         <option key={p.sku} value={p.sku}>
                           {p.nome}
                         </option>
@@ -338,6 +363,25 @@ export function CadastroRapidoForm({ etapa, produtos, onSalvo, onFechar }: Props
 
                   <div>
                     <label className={labelClass}>
+                      Produto de envase <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      value={produtoEnvaseSku}
+                      onChange={(e) => setProdutoEnvaseSku(e.target.value)}
+                      required
+                      className={inputClass}
+                    >
+                      <option value="">Selecione o produto de envase...</option>
+                      {produtos.map((p) => (
+                        <option key={p.sku} value={p.sku}>
+                          {p.nome}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className={labelClass}>
                       Máquina <span className="text-red-500">*</span>
                     </label>
                     {maquinas.length === 0 ? (
@@ -367,17 +411,28 @@ export function CadastroRapidoForm({ etapa, produtos, onSalvo, onFechar }: Props
               <div>
                 <label className={labelClass}>
                   Volume (litros) <span className="text-red-500">*</span>
+                  {capacidadeTanque !== null && (
+                    <span className="ml-2 text-[12px] font-normal text-[#6B7280]">
+                      máx. {capacidadeTanque.toLocaleString('pt-BR')} L
+                    </span>
+                  )}
                 </label>
                 <input
                   type="number"
                   min={0.01}
+                  max={capacidadeTanque ?? undefined}
                   step="0.01"
                   required
                   value={liters}
                   onChange={(e) => setLiters(e.target.value)}
-                  className={inputClass}
+                  className={`${inputClass} ${capacidadeExcedida ? 'border-red-400 focus:border-red-500' : ''}`}
                   placeholder="Ex: 3800"
                 />
+                {capacidadeExcedida && (
+                  <p className="mt-1.5 text-[12px] font-medium text-red-600">
+                    Volume excede a capacidade do tanque ({capacidadeTanque?.toLocaleString('pt-BR')} L).
+                  </p>
+                )}
               </div>
 
               <div>

@@ -3,14 +3,14 @@ import { apiUrl } from '@/lib/api'
 import { useEffect, useMemo, useState } from 'react'
 import { format } from 'date-fns'
 import { CheckCircle, Droplets, RefreshCw, ClipboardList, Plus } from 'lucide-react'
-import type { Produto, Tanque } from '@/types'
+import type { ProdutoTanque, Tanque } from '@/types'
 import { calculateTotalDuration } from '@/lib/planning/production'
 import { validateScheduleStart } from '@/lib/planning/schedule'
 import { toast } from '@/lib/ui/toast'
 import { ListaOrdens } from './ListaOrdens'
 
 type Props = {
-  produtos: Produto[]
+  produtosTanque: ProdutoTanque[]
   onSalvo?: () => void
 }
 
@@ -64,7 +64,7 @@ function Campo({
 const inputClass =
   'w-full rounded-xl border-2 border-[#E4E7EC] bg-white px-4 py-3 text-[15px] text-[#111827] transition-colors focus:border-[#2563EB] focus:outline-none'
 
-export function CadastroTanqueForm({ produtos, onSalvo }: Props) {
+export function CadastroTanqueForm({ produtosTanque, onSalvo }: Props) {
   const [modo, setModo] = useState<'form' | 'lista'>('form')
   const [tanques, setTanques] = useState<Tanque[]>([])
   const [produtoSku, setProdutoSku] = useState('')
@@ -97,7 +97,7 @@ export function CadastroTanqueForm({ produtos, onSalvo }: Props) {
     [setupTimeMinutes, productionTimeMinutes],
   )
 
-  const selectedProduct = produtos.find((p) => p.sku === produtoSku) ?? null
+  const selectedProduct = produtosTanque.find((p) => p.sku === produtoSku) ?? null
   const selectedTank = tanques.find((t) => t.id === tankId) ?? null
 
   async function handleSubmit(e: React.FormEvent) {
@@ -264,7 +264,7 @@ export function CadastroTanqueForm({ produtos, onSalvo }: Props) {
               className={inputClass}
             >
               <option value="">Selecione o produto...</option>
-              {produtos.map((p) => (
+              {produtosTanque.map((p) => (
                 <option key={p.sku} value={p.sku}>
                   {p.nome}
                 </option>

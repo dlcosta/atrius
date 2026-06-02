@@ -2158,6 +2158,14 @@ export default function CalendarioPage() {
   const [buscaEnvase, setBuscaEnvase] = useState('')
   const [activePayload, setActivePayload] = useState<DragPayload | null>(null)
   const [pendingDrop, setPendingDrop] = useState<PendingDrop | null>(null)
+  const [pendingReschedule, setPendingReschedule] = useState<{
+    ordemId: string
+    maquinaId: string
+    inicio: Date
+    fim?: Date
+    nomeOrdem: string
+    inicioAnterior: Date | null
+  } | null>(null)
   const [configOrder, setConfigOrder] = useState<Ordem | null>(null)
   const [scheduleDrop, setScheduleDrop] = useState<ScheduleDropState | null>(null)
   const [tanqueDetailOrdemId, setTanqueDetailOrdemId] = useState<string | null>(null)
@@ -2366,7 +2374,7 @@ export default function CalendarioPage() {
     return { ok: true, status: res.status }
   }
 
-  async function salvarAgenda(ordemId: string, maquinaId: string, inicio: Date, fim?: Date) {
+  async function executarSalvarAgenda(ordemId: string, maquinaId: string, inicio: Date, fim?: Date) {
     const result = await patchAgenda(ordemId, maquinaId, inicio, fim)
     if (result.ok) {
       await carregarTudo()
@@ -2392,6 +2400,20 @@ export default function CalendarioPage() {
       conflito: ordem ? encontrarConflito(ordensAgendadas, ordem, maquinaId, inicio) : null,
       error: result.error,
     })
+  }
+
+  async function salvarAgenda(ordemId: string, maquinaId: string, inicio: Date, fim?: Date) {
+    const ordem = ordens.find((o) => o.id === ordemId)
+    const nomeOrdem = ordem?.produto?.nome ?? ordem?.produto_sku ?? ordem?.numero_externo ?? ordemId
+    const inicioAnterior = ordem?.inicio_agendado ? new Date(ordem.inicio_agendado) : null
+    setPendingReschedule({ ordemId, maquinaId, inicio, fim, nomeOrdem, inicioAnterior })
+  }
+
+  async function confirmarReschedule() {
+    if (!pendingReschedule) return
+    const { ordemId, maquinaId, inicio, fim } = pendingReschedule
+    setPendingReschedule(null)
+    await executarSalvarAgenda(ordemId, maquinaId, inicio, fim)
   }
 
   async function salvarAgendaComFim(ordemId: string, maquinaId: string, inicio: Date, fim: Date) {
@@ -2907,6 +2929,50 @@ export default function CalendarioPage() {
             }}
             onFechar={() => setNovaOrdemAberta(false)}
           />
+        )}
+
+        {pendingReschedule && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/40 p-4">
+            <div className="w-full max-w-sm rounded-[16px] border border-[#E4E7EC] bg-white p-6 shadow-xl">
+              <h2 className="text-[17px] font-semibold text-[#111827]">Alterar horário</h2>
+              <p className="mt-1 text-[13px] text-[#6B7280]">
+                Confirme a alteração de horário para a ordem abaixo.
+              </p>
+              <p className="mt-3 truncate text-[15px] font-semibold text-[#111827]">
+                {pendingReschedule.nomeOrdem}
+              </p>
+              <div className="mt-3 space-y-1.5 rounded-[10px] bg-[#F7F8FA] px-4 py-3 text-[13px]">
+                {pendingReschedule.inicioAnterior && (
+                  <div className="flex items-center gap-2">
+                    <span className="w-10 text-[#9CA3AF]">De:</span>
+                    <span className="font-mono font-semibold text-[#4B5563]">
+                      {format(pendingReschedule.inicioAnterior, 'dd/MM HH:mm')}
+                    </span>
+                  </div>
+                )}
+                <div className="flex items-center gap-2">
+                  <span className="w-10 text-[#9CA3AF]">Para:</span>
+                  <span className="font-mono font-semibold text-[#111827]">
+                    {format(pendingReschedule.inicio, 'dd/MM HH:mm')}
+                  </span>
+                </div>
+              </div>
+              <div className="mt-5 flex gap-3">
+                <button
+                  onClick={() => setPendingReschedule(null)}
+                  className="flex-1 rounded-[8px] border border-[#CDD2DA] bg-white py-2.5 text-[13px] font-semibold text-[#4B5563] hover:bg-[#F7F8FA]"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={confirmarReschedule}
+                  className="flex-1 rounded-[8px] bg-[#2563EB] py-2.5 text-[13px] font-semibold text-white hover:bg-[#1D4ED8]"
+                >
+                  Confirmar
+                </button>
+              </div>
+            </div>
+          </div>
         )}
 
         {pendingDrop && resourceTab === 'envase' && (

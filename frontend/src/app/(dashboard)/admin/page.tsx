@@ -3,8 +3,9 @@ import { apiUrl } from '@/lib/api'
 
 import { useEffect, useState, useCallback } from 'react'
 import { Boxes, Clock, Cog, Package2, Sparkles, Users2, Waypoints, Waves } from 'lucide-react'
-import type { Produto, Maquina, Operador, Tanque, Turno } from '@/types'
+import type { Produto, ProdutoTanque, Maquina, Operador, Tanque, Turno } from '@/types'
 import { ProdutoList } from '@/components/admin/ProdutoList'
+import { ProdutoTanqueList } from '@/components/admin/ProdutoTanqueList'
 import { MaquinaList } from '@/components/admin/MaquinaList'
 import { OperadorList } from '@/components/admin/OperadorList'
 import { TanqueList } from '@/components/admin/TanqueList'
@@ -48,6 +49,7 @@ function SummaryCard({
 
 export default function AdminPage() {
   const [produtos, setProdutos] = useState<Produto[]>([])
+  const [produtosTanque, setProdutosTanque] = useState<ProdutoTanque[]>([])
   const [maquinas, setMaquinas] = useState<Maquina[]>([])
   const [tanques, setTanques] = useState<Tanque[]>([])
   const [operadores, setOperadores] = useState<Operador[]>([])
@@ -58,23 +60,26 @@ export default function AdminPage() {
     setErroCarga(null)
 
     try {
-      const [pRes, mRes, tRes, oRes, turRes] = await Promise.all([
+      const [pRes, ptRes, mRes, tRes, oRes, turRes] = await Promise.all([
         fetch(apiUrl('/api/produtos')),
+        fetch(apiUrl('/api/produtos-tanque')),
         fetch(apiUrl('/api/maquinas')),
         fetch(apiUrl('/api/tanques')),
         fetch(apiUrl('/api/operadores')),
         fetch(apiUrl('/api/turnos')),
       ])
 
-      const [p, m, t, o, tur] = await Promise.all([pRes.json(), mRes.json(), tRes.json(), oRes.json(), turRes.json()])
+      const [p, pt, m, t, o, tur] = await Promise.all([pRes.json(), ptRes.json(), mRes.json(), tRes.json(), oRes.json(), turRes.json()])
 
       if (!pRes.ok) throw new Error(p?.error ?? 'Erro ao carregar produtos')
+      if (!ptRes.ok) throw new Error(pt?.error ?? 'Erro ao carregar fórmulas de tanque')
       if (!mRes.ok) throw new Error(m?.error ?? 'Erro ao carregar máquinas')
       if (!tRes.ok) throw new Error(t?.error ?? 'Erro ao carregar tanques')
       if (!oRes.ok) throw new Error(o?.error ?? 'Erro ao carregar operadores')
       if (!turRes.ok) throw new Error(tur?.error ?? 'Erro ao carregar turnos')
 
       setProdutos(Array.isArray(p) ? p : [])
+      setProdutosTanque(Array.isArray(pt) ? pt : [])
       setMaquinas(Array.isArray(m) ? m : [])
       setTanques(Array.isArray(t) ? t : [])
       setOperadores(Array.isArray(o) ? o : [])
@@ -82,6 +87,7 @@ export default function AdminPage() {
     } catch (error) {
       setErroCarga(error instanceof Error ? error.message : 'Erro ao carregar cadastros')
       setProdutos([])
+      setProdutosTanque([])
       setMaquinas([])
       setTanques([])
       setOperadores([])
@@ -130,7 +136,10 @@ export default function AdminPage() {
                   4. Turnos
                 </span>
                 <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600">
-                  5. Produtos
+                  5. Produtos Envase
+                </span>
+                <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600">
+                  6. Fórmulas Tanque
                 </span>
               </div>
             </div>
@@ -199,11 +208,18 @@ export default function AdminPage() {
             tone="emerald"
           />
           <SummaryCard
-            label="Produtos"
+            label="Produtos Envase"
             value={produtos.length}
-            hint="Base local de SKUs, nomes e cores"
+            hint="Base local de SKUs com variantes de embalagem"
             icon={Package2}
             tone="blue"
+          />
+          <SummaryCard
+            label="Fórmulas Tanque"
+            value={produtosTanque.length}
+            hint="Produtos base para identificação nos tanques"
+            icon={Boxes}
+            tone="cyan"
           />
         </section>
 
@@ -287,9 +303,9 @@ export default function AdminPage() {
               <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
                 Etapa 5
               </div>
-              <h2 className="mt-1 text-xl font-semibold text-slate-950">Biblioteca de produtos</h2>
+              <h2 className="mt-1 text-xl font-semibold text-slate-950">Biblioteca de produtos — Envase</h2>
               <p className="mt-1 text-sm text-slate-500">
-                Mantenha SKU, nome e cor dos produtos direto no cadastro interno.
+                Produtos com variantes de embalagem (ex: Amaciante 2L, Amaciante 5L) usados nas ordens de envase.
               </p>
             </div>
             <div className="rounded-2xl bg-slate-100 p-3 text-slate-600">
@@ -304,6 +320,24 @@ export default function AdminPage() {
           )}
 
           <ProdutoList produtos={produtos} onAtualizado={carregar} />
+        </section>
+
+        <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="mb-5 flex items-start justify-between gap-4">
+            <div>
+              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                Etapa 6
+              </div>
+              <h2 className="mt-1 text-xl font-semibold text-slate-950">Biblioteca de fórmulas — Tanque</h2>
+              <p className="mt-1 text-sm text-slate-500">
+                Produtos base para identificação nos tanques (ex: Amaciante, Detergente) — sem variantes de embalagem.
+              </p>
+            </div>
+            <div className="rounded-2xl bg-slate-100 p-3 text-slate-600">
+              <Waves size={18} />
+            </div>
+          </div>
+          <ProdutoTanqueList produtosTanque={produtosTanque} onAtualizado={carregar} />
         </section>
       </main>
     </div>

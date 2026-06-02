@@ -83,11 +83,11 @@ router.post('/tanques', async (req: Request, res: Response) => {
   if (isScheduleStartInPast(startAt)) return res.status(422).json({ error: SCHEDULE_IN_PAST_ERROR })
 
   const { data: produto } = await supabase
-    .from('produtos')
+    .from('produtos_tanque')
     .select('sku, nome, cor')
     .eq('sku', body.produto_sku)
     .single()
-  if (!produto) return res.status(404).json({ error: 'Produto não encontrado' })
+  if (!produto) return res.status(404).json({ error: 'Produto de tanque não encontrado' })
 
   const { data: tanque } = await supabase
     .from('tanques')

@@ -31,6 +31,8 @@ router.post('/', async (req: Request, res: Response) => {
       tempos_maquinas: body.tempos_maquinas ?? {},
       tempo_limpeza_min: 0,
       cor: body.cor ?? '#5B9BD5',
+      package_volume_liters: body.package_volume_liters != null ? Number(body.package_volume_liters) : null,
+      units_per_box: Number(body.units_per_box ?? 1),
     })
     .select('*')
     .single()
@@ -41,7 +43,7 @@ router.post('/', async (req: Request, res: Response) => {
 
 router.patch('/', async (req: Request, res: Response) => {
   const supabase = createClient()
-  const { id, nome, volume_base, tempos_maquinas, tempo_limpeza_min, cor } = req.body
+  const { id, nome, volume_base, tempos_maquinas, tempo_limpeza_min, cor, package_volume_liters, units_per_box } = req.body
 
   const updates: Record<string, unknown> = {}
   if (nome !== undefined) updates.nome = nome
@@ -49,6 +51,8 @@ router.patch('/', async (req: Request, res: Response) => {
   if (tempos_maquinas !== undefined) updates.tempos_maquinas = tempos_maquinas
   if (tempo_limpeza_min !== undefined) updates.tempo_limpeza_min = Number(tempo_limpeza_min)
   if (cor !== undefined) updates.cor = cor
+  if (package_volume_liters !== undefined) updates.package_volume_liters = package_volume_liters != null ? Number(package_volume_liters) : null
+  if (units_per_box !== undefined) updates.units_per_box = Number(units_per_box)
 
   try {
     const { data, error } = await supabase

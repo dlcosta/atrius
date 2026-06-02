@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 import { apiUrl } from '@/lib/api'
 
 import { useState } from 'react'
@@ -14,6 +14,10 @@ export function ProdutoForm({ produto, onSalvo, onCancelar }: Props) {
   const [sku, setSku] = useState(produto?.sku ?? '')
   const [nome, setNome] = useState(produto?.nome ?? '')
   const [cor, setCor] = useState(produto?.cor ?? '#5B9BD5')
+  const [packageVolumeLiters, setPackageVolumeLiters] = useState(
+    produto?.package_volume_liters != null ? String(produto.package_volume_liters) : ''
+  )
+  const [unitsPerBox, setUnitsPerBox] = useState(String(produto?.units_per_box ?? 1))
   const [salvando, setSalvando] = useState(false)
   const [erro, setErro] = useState('')
 
@@ -30,6 +34,8 @@ export function ProdutoForm({ produto, onSalvo, onCancelar }: Props) {
         tempo_limpeza_min: Number(produto?.tempo_limpeza_min ?? 0),
         cor,
         tempos_maquinas: produto?.tempos_maquinas ?? {},
+        package_volume_liters: packageVolumeLiters !== '' ? Number(packageVolumeLiters) : null,
+        units_per_box: Number(unitsPerBox || 1),
       }
       const method = produto ? 'PATCH' : 'POST'
       const payload = produto ? { ...body, id: produto.id } : body
@@ -84,6 +90,7 @@ export function ProdutoForm({ produto, onSalvo, onCancelar }: Props) {
             value={nome}
             onChange={(e) => setNome(e.target.value)}
             required
+            placeholder="Ex: Amaciante 2L"
             className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm transition-all focus:border-blue-500 focus:outline-hidden focus:ring-2 focus:ring-blue-500/20"
           />
         </div>
@@ -99,8 +106,52 @@ export function ProdutoForm({ produto, onSalvo, onCancelar }: Props) {
         </div>
       </div>
 
-      <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-        O volume e os detalhes de capacidade permanecem vinculados à descrição do produto.
+      <div className="rounded-2xl border border-blue-100 bg-blue-50 p-4">
+        <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-blue-600">
+          Dados de embalagem
+        </p>
+        <div className="grid gap-4 md:grid-cols-2">
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">
+              Volume da embalagem (L)
+            </label>
+            <input
+              type="number"
+              min={0}
+              step="0.001"
+              value={packageVolumeLiters}
+              onChange={(e) => setPackageVolumeLiters(e.target.value)}
+              placeholder="Ex: 2"
+              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm transition-all focus:border-blue-500 focus:outline-hidden focus:ring-2 focus:ring-blue-500/20"
+            />
+            <p className="mt-1 text-xs text-slate-500">Volume por unidade (ex: 2 para 2L)</p>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">
+              Unidades por caixa
+            </label>
+            <input
+              type="number"
+              min={1}
+              step="1"
+              value={unitsPerBox}
+              onChange={(e) => setUnitsPerBox(e.target.value)}
+              placeholder="Ex: 4"
+              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm transition-all focus:border-blue-500 focus:outline-hidden focus:ring-2 focus:ring-blue-500/20"
+            />
+            <p className="mt-1 text-xs text-slate-500">Quantidade de unidades por caixa</p>
+          </div>
+        </div>
+
+        {packageVolumeLiters && Number(packageVolumeLiters) > 0 && Number(unitsPerBox) > 0 && (
+          <p className="mt-3 text-sm font-medium text-blue-700">
+            Volume por caixa:{' '}
+            <span className="font-semibold">
+              {parseFloat((Number(packageVolumeLiters) * Number(unitsPerBox)).toFixed(3)).toLocaleString('pt-BR', { maximumFractionDigits: 3 })} L
+            </span>
+          </p>
+        )}
       </div>
 
       {erro && <p className="text-sm text-red-600">{erro}</p>}

@@ -90,6 +90,7 @@ export function CadastroEnvaseForm({ produtos, onSalvo }: Props) {
   const [maquinas, setMaquinas] = useState<Maquina[]>([])
   const [origensTanque, setOrigensTanque] = useState<TankOriginOption[]>([])
   const [originTankOrderId, setOriginTankOrderId] = useState('')
+  const [produtoEnvaseSku, setProdutoEnvaseSku] = useState('')
   const [machineId, setMachineId] = useState('')
   const [liters, setLiters] = useState('')
   const [packageVolumeLiters, setPackageVolumeLiters] = useState('5')
@@ -134,6 +135,15 @@ export function CadastroEnvaseForm({ produtos, onSalvo }: Props) {
       setLiters(String(Math.max(0, originSelecionada.saldo_litros)))
     }
   }, [originSelecionada])
+
+  // Auto-fill de embalagem ao selecionar produto
+  useEffect(() => {
+    if (!produtoEnvaseSku) return
+    const p = produtos.find((x) => x.sku === produtoEnvaseSku)
+    if (!p) return
+    if (p.package_volume_liters) setPackageVolumeLiters(String(p.package_volume_liters))
+    if (p.units_per_box) setUnitsPerBox(String(p.units_per_box))
+  }, [produtoEnvaseSku, produtos]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const litersNum = Number(liters || 0)
   const packageVolumeNum = Number(packageVolumeLiters || 0)
@@ -192,14 +202,13 @@ export function CadastroEnvaseForm({ produtos, onSalvo }: Props) {
     const startAtIso = startAt?.toISOString() ?? null
 
     try {
-      const produtoSku = originSelecionada?.produto_sku ?? ''
       const lote = originSelecionada?.lote ?? null
 
       const res = await fetch(apiUrl('/api/ordens'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          produto_sku: produtoSku,
+          produto_sku: produtoEnvaseSku,
           etapa: 'envase',
           calc_mode: 'LITERS_MASTER',
           liters: litersNum,
@@ -218,7 +227,7 @@ export function CadastroEnvaseForm({ produtos, onSalvo }: Props) {
           inicio_agendado: startAtIso,
           data_prevista: dataProducao,
           planning_status: startAtIso ? 'SCHEDULED' : 'BACKLOG',
-          color: produtos.find((p) => p.sku === produtoSku)?.cor || '#16A34A',
+          color: produtos.find((p) => p.sku === produtoEnvaseSku)?.cor || '#16A34A',
           notes: notes || null,
         }),
       })
@@ -240,6 +249,7 @@ export function CadastroEnvaseForm({ produtos, onSalvo }: Props) {
   function resetar() {
     setSucesso(false)
     setOriginTankOrderId('')
+    setProdutoEnvaseSku('')
     setMachineId('')
     setLiters('')
     setNotes('')
@@ -375,6 +385,27 @@ export function CadastroEnvaseForm({ produtos, onSalvo }: Props) {
                   ))}
                 </select>
               )}
+            </Campo>
+
+            {/* Produto de envase */}
+            <Campo
+              label="Produto de envase"
+              obrigatorio
+              dica="Selecione o produto específico que será envasado (ex: Amaciante 2L, Amaciante 5L)."
+            >
+              <select
+                value={produtoEnvaseSku}
+                onChange={(e) => setProdutoEnvaseSku(e.target.value)}
+                required
+                className={inputClass}
+              >
+                <option value="">Selecione o produto de envase...</option>
+                {produtos.map((p) => (
+                  <option key={p.sku} value={p.sku}>
+                    {p.nome}
+                  </option>
+                ))}
+              </select>
             </Campo>
 
             {/* Informações do tanque selecionado */}

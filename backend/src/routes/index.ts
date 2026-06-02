@@ -1,6 +1,7 @@
 import { Express } from 'express'
 import maquinasRouter from './maquinas'
 import produtosRouter from './produtos'
+import produtosTanqueRouter from './produtos-tanque'
 import tanquesRouter from './tanques'
 import operadoresRouter from './operadores'
 import turnosRouter from './turnos'
@@ -20,6 +21,7 @@ import callbackRouter from './callback'
 export function registerRoutes(app: Express) {
   app.use('/api/maquinas', maquinasRouter)
   app.use('/api/produtos', produtosRouter)
+  app.use('/api/produtos-tanque', produtosTanqueRouter)
   app.use('/api/tanques', tanquesRouter)
   app.use('/api/operadores', operadoresRouter)
   app.use('/api/turnos', turnosRouter)

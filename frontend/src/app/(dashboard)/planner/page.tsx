@@ -67,7 +67,7 @@ export default function PlannerPage() {
   const [operadores, setOperadores] = useState<Operador[]>([])
   const [ordens, setOrdens] = useState<Ordem[]>([])
   const [produtos, setProdutos] = useState<Produto[]>([])
-  const [agoraMs, setAgoraMs] = useState<number>(Date.now())
+  const [agoraMs, setAgoraMs] = useState<number>(0)
   const [novaOrdemAberta, setNovaOrdemAberta] = useState(false)
   const [executandoOrdemId, setExecutandoOrdemId] = useState<string | null>(null)
   const [operadorPorRecurso, setOperadorPorRecurso] = useState<OperadorPorRecurso>({})
@@ -119,6 +119,7 @@ export default function PlannerPage() {
   }, [carregarDados])
 
   useEffect(() => {
+    setAgoraMs(Date.now())
     const clock = setInterval(() => setAgoraMs(Date.now()), 1000)
     return () => clearInterval(clock)
   }, [])
@@ -289,7 +290,7 @@ export default function PlannerPage() {
           <div className="flex items-center gap-2 rounded-[10px] border border-[#E4E7EC] bg-[#F7F8FA] px-3 py-2">
             <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-500" />
             <span className="font-mono text-[15px] font-semibold text-[#111827]">
-              {format(new Date(agoraMs), 'HH:mm:ss', { locale: ptBR })}
+              {agoraMs ? format(new Date(agoraMs), 'HH:mm:ss', { locale: ptBR }) : '--:--:--'}
             </span>
           </div>
 

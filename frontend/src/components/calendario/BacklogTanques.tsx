@@ -124,6 +124,11 @@ function DraggableCard({ ordem, onDeletado }: { ordem: OrdemBacklogItem; onDelet
             <div className="truncate text-[13px] font-semibold leading-snug text-[#111827]">
               {ordem.tanque ?? ordem.numero_externo}
             </div>
+            {(ordem as any).produto_nome && (
+              <div className="mt-0.5 truncate text-[12px] font-medium text-[#2563EB]">
+                {(ordem as any).produto_nome}
+              </div>
+            )}
             <div className="mt-0.5 font-mono text-[11px] text-[#9CA3AF]">
               #{ordem.numero_externo}
             </div>

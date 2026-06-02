@@ -3,7 +3,7 @@ import { apiUrl } from '@/lib/api'
 
 import { useEffect, useMemo, useState } from 'react'
 import { format } from 'date-fns'
-import type { Maquina, Produto, Tanque } from '@/types'
+import type { Maquina, Produto, ProdutoTanque, Tanque } from '@/types'
 import { toast } from '@/lib/ui/toast'
 import {
   CalcMode,
@@ -43,7 +43,9 @@ export function NovaOrdemForm({ produtos, dataInicial, onSalvo, onFechar }: Prop
   const [maquinas, setMaquinas] = useState<Maquina[]>([])
   const [tanques, setTanques] = useState<Tanque[]>([])
   const [origensTanque, setOrigensTanque] = useState<TankOriginOption[]>([])
+  const [produtosTanque, setProdutosTanque] = useState<ProdutoTanque[]>([])
   const [produtoSku, setProdutoSku] = useState('')
+  const [produtoEnvaseSku, setProdutoEnvaseSku] = useState('')
   const [etapa, setEtapa] = useState<'tanque' | 'envase'>('tanque')
   const [calcMode, setCalcMode] = useState<CalcMode>('LITERS_MASTER')
   const [liters, setLiters] = useState('3800')
@@ -66,14 +68,16 @@ export function NovaOrdemForm({ produtos, dataInicial, onSalvo, onFechar }: Prop
   useEffect(() => {
     async function carregarRecursos() {
       try {
-        const [m, t, o] = await Promise.all([
+        const [m, t, o, pt] = await Promise.all([
           fetch(apiUrl('/api/maquinas')).then((r) => r.json()),
           fetch(apiUrl('/api/tanques')).then((r) => r.json()),
           fetch(apiUrl('/api/ordens/tanques-origem')).then((r) => r.json()),
+          fetch(apiUrl('/api/produtos-tanque')).then((r) => r.json()),
         ])
         setMaquinas(Array.isArray(m) ? m.filter((item) => item.ativa) : [])
         setTanques(Array.isArray(t) ? t.filter((item) => item.ativo) : [])
         setOrigensTanque(Array.isArray(o) ? o : [])
+        setProdutosTanque(Array.isArray(pt) ? pt : [])
       } catch {
         // O formulário continua funcional mesmo sem carregar os recursos.
       }
@@ -88,7 +92,6 @@ export function NovaOrdemForm({ produtos, dataInicial, onSalvo, onFechar }: Prop
 
   useEffect(() => {
     if (etapa === 'envase' && originSelecionada) {
-      setProdutoSku(originSelecionada.produto_sku ?? '')
       setLote(originSelecionada.lote ?? '')
       if (!liters || Number(liters) <= 0) {
         setLiters(String(Math.max(originSelecionada.saldo_litros, 0)))
@@ -205,9 +208,21 @@ export function NovaOrdemForm({ produtos, dataInicial, onSalvo, onFechar }: Prop
   }, [etapa, originSelecionada, liters])
 
   const selectedProduct = useMemo(
-    () => produtos.find((item) => item.sku === produtoSku) ?? null,
-    [produtos, produtoSku]
+    () =>
+      etapa === 'tanque'
+        ? (produtosTanque.find((item) => item.sku === produtoSku) ?? null)
+        : (produtos.find((item) => item.sku === produtoEnvaseSku) ?? null),
+    [etapa, produtosTanque, produtoSku, produtos, produtoEnvaseSku]
   )
+
+  // Auto-fill de embalagem ao selecionar produto de envase
+  useEffect(() => {
+    if (etapa !== 'envase' || !produtoEnvaseSku) return
+    const p = produtos.find((x) => x.sku === produtoEnvaseSku)
+    if (!p) return
+    if (p.package_volume_liters) setPackageVolumeLiters(String(p.package_volume_liters))
+    if (p.units_per_box) setUnitsPerBox(String(p.units_per_box))
+  }, [produtoEnvaseSku, etapa, produtos]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -225,7 +240,7 @@ export function NovaOrdemForm({ produtos, dataInicial, onSalvo, onFechar }: Prop
 
     try {
       const payload = {
-        produto_sku: produtoSku,
+        produto_sku: etapa === 'tanque' ? produtoSku : produtoEnvaseSku,
         etapa,
         calc_mode: calcMode,
         liters: Number(liters),
@@ -322,21 +337,38 @@ export function NovaOrdemForm({ produtos, dataInicial, onSalvo, onFechar }: Prop
 
           <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
             <div>
-              <label className="mb-1 block text-sm font-medium text-[#4B5563]">Produto</label>
-              <select
-                value={produtoSku}
-                onChange={(e) => setProdutoSku(e.target.value)}
-                required
-                disabled={etapa === 'envase'}
-                className="w-full rounded-[8px] border border-[#E4E7EC] bg-white px-3 py-2 text-sm text-[#111827] disabled:bg-[#F0F2F5]"
-              >
-                <option value="">Selecione...</option>
-                {produtos.map((p) => (
-                  <option key={p.sku} value={p.sku}>
-                    {p.nome}
-                  </option>
-                ))}
-              </select>
+              <label className="mb-1 block text-sm font-medium text-[#4B5563]">
+                {etapa === 'tanque' ? 'Fórmula (tanque)' : 'Produto de envase'}
+              </label>
+              {etapa === 'tanque' ? (
+                <select
+                  value={produtoSku}
+                  onChange={(e) => setProdutoSku(e.target.value)}
+                  required
+                  className="w-full rounded-[8px] border border-[#E4E7EC] bg-white px-3 py-2 text-sm text-[#111827]"
+                >
+                  <option value="">Selecione...</option>
+                  {produtosTanque.map((p) => (
+                    <option key={p.sku} value={p.sku}>
+                      {p.nome}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <select
+                  value={produtoEnvaseSku}
+                  onChange={(e) => setProdutoEnvaseSku(e.target.value)}
+                  required
+                  className="w-full rounded-[8px] border border-[#E4E7EC] bg-white px-3 py-2 text-sm text-[#111827]"
+                >
+                  <option value="">Selecione...</option>
+                  {produtos.map((p) => (
+                    <option key={p.sku} value={p.sku}>
+                      {p.nome}
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-[#4B5563]">Lote</label>
